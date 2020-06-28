@@ -12,7 +12,6 @@ use anyhow::Result;
 use std::{
     collections::BTreeSet,
     env, fs,
-    os::unix::process::CommandExt,
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
@@ -113,7 +112,28 @@ fn do_external(all_args: Vec<String>) -> Result<i32> {
         .find(|file| is_executable(file));
 
     let command = path.ok_or_else(|| errors::CliError::NoSuchSubcommand(cmd.to_owned()))?;
-    Ok(Err(std::process::Command::new(command).args(args).exec())?)
+    exec_or_spawn(std::process::Command::new(command).args(args))
+}
+
+#[cfg(unix)]
+/// On Unix, exec() to replace ourselves with the child process. This function
+/// *should* never return.
+fn exec_or_spawn(cmd: &mut std::process::Command) -> Result<i32> {
+    use std::os::unix::process::CommandExt;
+
+    // exec() only returns an io::Error directly, since on success it never
+    // returns; the following tomfoolery transforms it into our Result
+    // machinery as desired.
+    Ok(Err(cmd.exec())?)
+}
+
+#[cfg(not(unix))]
+/// On other platforms, just run the process and wait for it.
+fn exec_or_spawn(cmd: &mut std::process::Command) -> Result<i32> {
+    // code() can only return None on Unix when the subprocess was killed by a
+    // signal. This function only runs if we're not on Unix, so we'll always
+    // get Some.
+    Ok(cmd.status()?.code().unwrap())
 }
 
 // Lots of copy/paste from cargo:
