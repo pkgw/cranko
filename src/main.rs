@@ -1,0 +1,175 @@
+// Copyright 2020 Peter Williams <peter@newton.cx> and collaborators
+// Licensed under the MIT License.
+
+//! ! The main cranko command-line interface
+//!
+//! This just provides swiss-army-knife access to commands installed by other
+//! Cranko modules. Not 100% sure this is the way to got but we'll see.
+//!
+//! Heavily modeled on Cargo's implementation of the same sort of functionality.
+
+use anyhow::Result;
+use std::{
+    collections::BTreeSet,
+    env, fs,
+    os::unix::process::CommandExt,
+    path::{Path, PathBuf},
+};
+use structopt::StructOpt;
+
+mod errors;
+
+#[derive(Debug, PartialEq, StructOpt)]
+#[structopt(about = "automate versioning and releasing")]
+struct CrankoOptions {
+    #[structopt(subcommand)]
+    command: Commands,
+}
+
+trait Command {
+    fn execute(self) -> Result<i32>;
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+enum Commands {
+    #[structopt(name = "help")]
+    /// Prints this message or the help of the given subcommand
+    Help(HelpCommand),
+
+    #[structopt(name = "list-commands")]
+    /// List available subcommands
+    ListCommands(ListCommandsCommand),
+
+    #[structopt(external_subcommand)]
+    External(Vec<String>),
+}
+
+impl Command for Commands {
+    fn execute(self) -> Result<i32> {
+        match self {
+            Commands::Help(o) => o.execute(),
+            Commands::ListCommands(o) => o.execute(),
+            Commands::External(args) => do_external(args),
+        }
+    }
+}
+
+fn main() -> Result<()> {
+    let opts = CrankoOptions::from_args();
+    let exitcode = opts.command.execute()?;
+    std::process::exit(exitcode);
+}
+
+// help
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct HelpCommand {
+    command: Option<String>,
+}
+
+impl Command for HelpCommand {
+    fn execute(self) -> Result<i32> {
+        match self.command.as_deref() {
+            None => {
+                CrankoOptions::clap().print_long_help()?;
+                println!();
+                Ok(0)
+            }
+
+            Some(cmd) => {
+                CrankoOptions::from_iter(&[&std::env::args().next().unwrap(), cmd, "--help"])
+                    .command
+                    .execute()
+            }
+        }
+    }
+}
+
+// list-commands
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ListCommandsCommand {}
+
+impl Command for ListCommandsCommand {
+    fn execute(self) -> Result<i32> {
+        println!("Currently available \"cranko\" subcommands:\n");
+
+        for command in list_commands() {
+            println!("    {}", command);
+        }
+
+        Ok(0)
+    }
+}
+
+/// Run an external command by executing a subprocess.
+fn do_external(all_args: Vec<String>) -> Result<i32> {
+    let (cmd, args) = all_args.split_first().unwrap();
+
+    let command_exe = format!("cranko-{}{}", cmd, env::consts::EXE_SUFFIX);
+    let path = search_directories()
+        .iter()
+        .map(|dir| dir.join(&command_exe))
+        .find(|file| is_executable(file));
+
+    let command = path.ok_or_else(|| errors::CliError::NoSuchSubcommand(cmd.to_owned()))?;
+    Ok(Err(std::process::Command::new(command).args(args).exec())?)
+}
+
+// Lots of copy/paste from cargo:
+
+fn list_commands() -> BTreeSet<String> {
+    let prefix = "cranko-";
+    let suffix = env::consts::EXE_SUFFIX;
+    let mut commands = BTreeSet::new();
+
+    for dir in search_directories() {
+        let entries = match fs::read_dir(dir) {
+            Ok(entries) => entries,
+            _ => continue,
+        };
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            let filename = match path.file_name().and_then(|s| s.to_str()) {
+                Some(filename) => filename,
+                _ => continue,
+            };
+            if !filename.starts_with(prefix) || !filename.ends_with(suffix) {
+                continue;
+            }
+            if is_executable(entry.path()) {
+                let end = filename.len() - suffix.len();
+                commands.insert(filename[prefix.len()..end].to_string());
+            }
+        }
+    }
+
+    commands.insert("help".to_owned());
+    commands.insert("list-commands".to_owned());
+
+    commands
+}
+
+#[cfg(unix)]
+fn is_executable<P: AsRef<Path>>(path: P) -> bool {
+    use std::os::unix::prelude::*;
+    fs::metadata(path)
+        .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+        .unwrap_or(false)
+}
+
+#[cfg(windows)]
+fn is_executable<P: AsRef<Path>>(path: P) -> bool {
+    fs::metadata(path)
+        .map(|metadata| metadata.is_file())
+        .unwrap_or(false)
+}
+
+fn search_directories() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    if let Some(val) = env::var_os("PATH") {
+        dirs.extend(env::split_paths(&val));
+    }
+    dirs
+}
