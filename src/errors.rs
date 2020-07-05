@@ -10,3 +10,11 @@ pub enum CliError {
     #[error("no internal or external subcommand `{0}` is available (install `cranko-{0}`?)")]
     NoSuchSubcommand(String),
 }
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("{0}")]
+    Git(#[from] git2::Error),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;

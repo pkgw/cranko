@@ -1,7 +1,7 @@
 // Copyright 2020 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
-//! ! The main cranko command-line interface
+//! The main cranko command-line interface.
 //!
 //! This just provides swiss-army-knife access to commands installed by other
 //! Cranko modules. Not 100% sure this is the way to got but we'll see.
@@ -16,7 +16,10 @@ use std::{
 };
 use structopt::StructOpt;
 
+mod app;
 mod errors;
+mod graph;
+mod project;
 
 #[derive(Debug, PartialEq, StructOpt)]
 #[structopt(about = "automate versioning and releasing")]
@@ -39,6 +42,10 @@ enum Commands {
     /// List available subcommands
     ListCommands(ListCommandsCommand),
 
+    #[structopt(name = "status")]
+    /// Report release status inside the active repo
+    Status(StatusCommand),
+
     #[structopt(external_subcommand)]
     External(Vec<String>),
 }
@@ -48,6 +55,7 @@ impl Command for Commands {
         match self {
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
+            Commands::Status(o) => o.execute(),
             Commands::External(args) => do_external(args),
         }
     }
@@ -95,6 +103,32 @@ impl Command for ListCommandsCommand {
 
         for command in list_commands() {
             println!("    {}", command);
+        }
+
+        Ok(0)
+    }
+}
+
+// status
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct StatusCommand {}
+
+impl Command for StatusCommand {
+    fn execute(self) -> Result<i32> {
+        let app = app::App::initialize()?;
+        let index = app.repo.index()?;
+
+        for entry in index.iter() {
+            use std::ffi::OsStr;
+            use std::path::Path;
+            //let p = Path::new(&OsStr::new(&entry.path[..]));
+
+            if let Ok(s) = std::str::from_utf8(&entry.path) {
+                println!("p {}", s);
+            } else {
+                println!("decode failed: {:?}", entry.path);
+            }
         }
 
         Ok(0)
