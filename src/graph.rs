@@ -11,10 +11,21 @@
 
 use petgraph::graph::DiGraph;
 
-use crate::project::ProjectId;
+use crate::project::{Project, ProjectId};
 
 /// A DAG of projects expressing their dependencies.
+#[derive(Debug, Default)]
 pub struct ProjectGraph {
     /// The `petgraph` state expressing the project graph.
     graph: DiGraph<ProjectId, ()>,
+}
+
+impl ProjectGraph {
+    pub fn len(&self) -> usize {
+        self.graph.node_count()
+    }
+
+    pub fn add_project(&mut self, proj: &Project) {
+        self.graph.add_node(proj.ident());
+    }
 }

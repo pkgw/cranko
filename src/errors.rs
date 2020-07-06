@@ -15,6 +15,9 @@ pub enum CliError {
 pub enum Error {
     #[error("{0}")]
     Git(#[from] git2::Error),
+
+    #[error("operation on bare repositories is not allowed")]
+    BareRepository,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

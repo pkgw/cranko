@@ -20,6 +20,7 @@ mod app;
 mod errors;
 mod graph;
 mod project;
+mod projmeta;
 
 #[derive(Debug, PartialEq, StructOpt)]
 #[structopt(about = "automate versioning and releasing")]
@@ -116,21 +117,8 @@ struct StatusCommand {}
 
 impl Command for StatusCommand {
     fn execute(self) -> Result<i32> {
-        let app = app::App::initialize()?;
-        let index = app.repo.index()?;
-
-        for entry in index.iter() {
-            use std::ffi::OsStr;
-            use std::path::Path;
-            //let p = Path::new(&OsStr::new(&entry.path[..]));
-
-            if let Ok(s) = std::str::from_utf8(&entry.path) {
-                println!("p {}", s);
-            } else {
-                println!("decode failed: {:?}", entry.path);
-            }
-        }
-
+        let mut app = app::App::initialize()?;
+        let graph = app.graph()?;
         Ok(0)
     }
 }
@@ -200,6 +188,7 @@ fn list_commands() -> BTreeSet<String> {
 
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
+    commands.insert("status".to_owned());
 
     commands
 }
