@@ -3,7 +3,7 @@
 
 //! Project metadata files.
 
-use crate::{app::RepoPath, errors::Result};
+use crate::{app::{AppSession, RepoPath}, errors::Result};
 
 pub mod cargo;
 
@@ -17,7 +17,7 @@ pub trait ProjectMetadata: std::fmt::Debug {
     /// to a project (e.g., there's a Cargo.toml but it's a workspace-only
     /// file). The repo_path is empty if we’re looking at the root directory;
     /// otherwise it will end in a path separator.
-    fn new_from_prefix(repo_path: &RepoPath) -> Result<Option<Self>>
+    fn new_from_prefix(sess: &AppSession, repo_path: &RepoPath) -> Result<Option<Self>>
     where
         Self: Sized;
 

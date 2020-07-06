@@ -117,8 +117,8 @@ struct StatusCommand {}
 
 impl Command for StatusCommand {
     fn execute(self) -> Result<i32> {
-        let mut app = app::App::initialize()?;
-        let graph = app.graph()?;
+        let mut sess = app::AppSession::initialize()?;
+        let graph = sess.graph()?;
         Ok(0)
     }
 }

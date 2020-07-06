@@ -9,7 +9,7 @@
 //! interdependencies inducing a Directed Acyclic Graph (DAG) structure on them,
 //! as implemented in the `graph` module.
 
-use crate::{app::RepoPath, errors::Result, projmeta::ProjectMetadata};
+use crate::{app::{AppSession, RepoPath}, errors::Result, projmeta::ProjectMetadata};
 
 pub type ProjectId = usize;
 
@@ -23,10 +23,11 @@ impl Project {
     /// The `repo_path` prefix will either be empty (for the top level of the
     /// repo) or end with a directory separator.
     pub fn new_from_prefix<T: 'static + ProjectMetadata>(
+        sess: &AppSession,
         ident: ProjectId,
         repo_path: &RepoPath,
     ) -> Result<Option<Self>> {
-        let meta = match T::new_from_prefix(repo_path)? {
+        let meta = match T::new_from_prefix(sess, repo_path)? {
             None => return Ok(None),
             Some(m) => m,
         };

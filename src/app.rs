@@ -4,6 +4,7 @@
 //! State for the Cranko CLI application.
 
 use git2::Repository;
+use std::path::{Path, PathBuf};
 
 use crate::{
     errors::{Error, Result},
@@ -12,7 +13,7 @@ use crate::{
 };
 
 /// The main Cranko CLI application state structure.
-pub struct App {
+pub struct AppSession {
     /// The Git repository.
     repo: Repository,
 
@@ -24,12 +25,12 @@ pub struct App {
     projects: Vec<Project>,
 }
 
-impl App {
+impl AppSession {
     /// Initialize a new application session.
     ///
     /// Initialization may fail if the process is not running inside a Git
     /// repository.
-    pub fn initialize() -> Result<App> {
+    pub fn initialize() -> Result<AppSession> {
         let repo = Repository::open_from_env()?;
 
         if repo.is_bare() {
@@ -39,11 +40,18 @@ impl App {
         let graph = ProjectGraph::default();
         let projects = Vec::new();
 
-        Ok(App {
+        Ok(AppSession {
             graph,
             repo,
             projects,
         })
+    }
+
+    /// Resolve a repository path to a filesystem path in the working directory.
+    pub fn resolve_workdir(&self, p: &RepoPath) -> PathBuf {
+        let mut fullpath = self.repo.workdir().unwrap().to_owned();
+        fullpath.push(p.as_path());
+        fullpath
     }
 
     /// Get the graph of projects inside this app session.
@@ -68,6 +76,7 @@ impl App {
             let (dirname, basename) = RepoPath::new(&entry.path).split_basename();
             let maybe_proj = if basename.as_ref() == b"Cargo.toml" {
                 Project::new_from_prefix::<crate::projmeta::cargo::CargoMetadata>(
+                    &self,
                     self.projects.len(),
                     dirname,
                 )?
@@ -125,6 +134,23 @@ impl RepoPath {
         // include the separating items, which we want.
         let basename = self.0.rsplit(|c| *c == b'/').next().unwrap();
         let ndir = self.0.len() - basename.len();
-        return (&self.0[..=ndir].as_ref(), basename.as_ref());
+        return (&self.0[..ndir].as_ref(), basename.as_ref());
     }
+
+    /// Convert the repository path into an OS path
+    pub fn as_path(&self) -> &Path {
+        bytes2path(&self.0)
+    }
+}
+
+// Copied from git2-rs src/util.rs
+#[cfg(unix)]
+fn bytes2path(b: &[u8]) -> &Path {
+    use std::{ffi::OsStr, os::unix::prelude::*};
+    Path::new(OsStr::from_bytes(b))
+}
+#[cfg(windows)]
+fn bytes2path(b: &[u8]) -> &Path {
+    use std::str;
+    Path::new(str::from_utf8(b).unwrap())
 }
