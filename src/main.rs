@@ -19,8 +19,8 @@ use structopt::StructOpt;
 mod app;
 mod errors;
 mod graph;
+mod loaders;
 mod project;
-mod projmeta;
 
 #[derive(Debug, PartialEq, StructOpt)]
 #[structopt(about = "automate versioning and releasing")]

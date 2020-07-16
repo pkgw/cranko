@@ -74,20 +74,15 @@ impl AppSession {
 
         for entry in index.iter() {
             let (dirname, basename) = RepoPath::new(&entry.path).split_basename();
-            let maybe_proj = if basename.as_ref() == b"Cargo.toml" {
-                Project::new_from_prefix::<crate::projmeta::cargo::CargoMetadata>(
-                    &self,
-                    self.projects.len(),
-                    dirname,
-                )?
-            } else {
-                None
-            };
+            //if basename.as_ref() == b"Cargo.toml" {
+            //} else {
+            //    None
+            //};
 
-            if let Some(p) = maybe_proj {
-                println!("got one {:?}", p);
-                self.projects.push(p);
-            }
+            //if let Some(p) = maybe_proj {
+            //    println!("got one {:?}", p);
+            //    self.projects.push(p);
+            //}
         }
 
         // Populate the graph.
