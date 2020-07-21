@@ -118,7 +118,7 @@ struct StatusCommand {}
 impl Command for StatusCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-        let graph = sess.graph()?;
+        let graph = sess.populated_graph()?;
         Ok(0)
     }
 }

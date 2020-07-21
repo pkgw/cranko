@@ -19,10 +19,6 @@ pub struct AppSession {
 
     /// The graph of projects contained within the repo.
     graph: ProjectGraph,
-
-    /// The projects. Projects are uniquely identified by their index into this
-    /// vector.
-    projects: Vec<Project>,
 }
 
 impl AppSession {
@@ -38,20 +34,20 @@ impl AppSession {
         }
 
         let graph = ProjectGraph::default();
-        let projects = Vec::new();
 
-        Ok(AppSession {
-            graph,
-            repo,
-            projects,
-        })
+        Ok(AppSession { graph, repo })
     }
 
-    /// Resolve a repository path to a filesystem path in the working directory.
+    /// Resolve a `RepoPath` repository path to a filesystem path in the working directory.
     pub fn resolve_workdir(&self, p: &RepoPath) -> PathBuf {
         let mut fullpath = self.repo.workdir().unwrap().to_owned();
         fullpath.push(p.as_path());
         fullpath
+    }
+
+    /// Get the graph of projects inside this app session, mutably.
+    pub fn graph_mut(&mut self) -> &mut ProjectGraph {
+        &mut self.graph
     }
 
     /// Get the graph of projects inside this app session.
@@ -59,7 +55,7 @@ impl AppSession {
     /// If the graph has not yet been loaded, this triggers processing of the
     /// config file and repository to fill in the graph information, hence the
     /// fallibility.
-    pub fn graph(&mut self) -> Result<&ProjectGraph> {
+    pub fn populated_graph(&mut self) -> Result<&ProjectGraph> {
         if self.graph.len() == 0 {
             self.populate_graph()?;
         }
@@ -79,12 +75,6 @@ impl AppSession {
         }
 
         cargo.finalize(self)?;
-
-        // Populate the graph.
-        for p in &self.projects {
-            self.graph.add_project(&p);
-        }
-
         Ok(())
     }
 }

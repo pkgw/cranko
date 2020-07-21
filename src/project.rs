@@ -12,6 +12,7 @@
 use crate::{
     app::{AppSession, RepoPath},
     errors::Result,
+    graph::ProjectGraph,
 };
 
 /// An internal, unique identifier for a project in this app session.
@@ -33,19 +34,49 @@ pub struct Project {
 }
 
 impl Project {
-    pub fn new(name_hier: Vec<String>, version: Version) -> Self {
-        Project {
-            ident: 0, // XXX??
-            name_hier,
-            version,
-        }
-    }
-
     /// Get the internal unique identifier of this project.
     ///
     /// These identifiers should not be persisted and are not guaranteed to have
     /// any particular semantics other than being cheaply copyable.
     pub fn ident(&self) -> ProjectId {
         self.ident
+    }
+}
+
+/// A builder for initializing a new project entry that will be added to the
+/// graph.
+///
+/// Note that you can also mutate Projects after they have been created, so not
+/// all possible settings are exposed in this interface. This builder exists to
+/// initialize the fields in Project that (1) are required and (2) do not have
+/// "sensible" defaults.
+#[derive(Debug)]
+pub struct ProjectBuilder<'a> {
+    owner: &'a mut ProjectGraph,
+    version: Option<Version>,
+}
+
+impl<'a> ProjectBuilder<'a> {
+    #[doc(hidden)]
+    pub fn new(owner: &'a mut ProjectGraph) -> Self {
+        ProjectBuilder {
+            owner,
+            version: None,
+        }
+    }
+
+    pub fn version(&mut self, version: Version) -> &mut Self {
+        self.version = Some(version);
+        self
+    }
+
+    pub fn finish_init(self) -> ProjectId {
+        let version = self.version.unwrap();
+
+        self.owner.finalize_project_addition(|ident| Project {
+            ident,
+            name_hier: Vec::new(),
+            version,
+        })
     }
 }

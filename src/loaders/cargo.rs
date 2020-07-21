@@ -71,16 +71,17 @@ impl CargoLoader {
         cmd.features(cargo_metadata::CargoOpt::AllFeatures);
         let cargo_meta = cmd.exec()?;
 
+        let graph = app.graph_mut();
+
         for pkg in &cargo_meta.packages {
             if pkg.source.is_some() {
                 continue; // This is an external package; not to be tracked.
             }
 
-            let proj = Project::new(
-                vec![pkg.name.clone(), "cargo".to_owned()],
-                Version::Semver(pkg.version.clone()),
-            );
-            println!("cargo: {:?}", proj);
+            let mut pb = graph.add_project();
+            pb.version(Version::Semver(pkg.version.clone()));
+            let ident = pb.finish_init();
+            println!("added project ID{:?}", ident);
         }
 
         Ok(())
