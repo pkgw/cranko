@@ -3,6 +3,4 @@
 
 //! Auto-loading project information from the repository.
 
-use crate::{app::{AppSession, RepoPath}, errors::Result};
-
 pub mod cargo;

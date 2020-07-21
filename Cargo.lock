@@ -124,6 +124,7 @@ dependencies = [
  "cargo_metadata",
  "git2",
  "petgraph",
+ "semver",
  "structopt",
  "thiserror",
  "toml_edit",

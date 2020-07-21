@@ -9,16 +9,38 @@
 //! interdependencies inducing a Directed Acyclic Graph (DAG) structure on them,
 //! as implemented in the `graph` module.
 
-use crate::{app::{AppSession, RepoPath}, errors::Result};
+use crate::{
+    app::{AppSession, RepoPath},
+    errors::Result,
+};
 
+/// An internal, unique identifier for a project in this app session.
+///
+/// These identifiers should not be persisted and are not guaranteed to have any
+/// particular semantics other than being cheaply copyable.
 pub type ProjectId = usize;
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum Version {
+    Semver(semver::Version),
+}
 
 #[derive(Debug)]
 pub struct Project {
     ident: ProjectId,
+    name_hier: Vec<String>,
+    version: Version,
 }
 
 impl Project {
+    pub fn new(name_hier: Vec<String>, version: Version) -> Self {
+        Project {
+            ident: 0, // XXX??
+            name_hier,
+            version,
+        }
+    }
+
     /// Get the internal unique identifier of this project.
     ///
     /// These identifiers should not be persisted and are not guaranteed to have

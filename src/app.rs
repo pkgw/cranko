@@ -71,19 +71,14 @@ impl AppSession {
         // Start by auto-detecting everything in the Git index.
 
         let index = self.repo.index()?;
+        let mut cargo = crate::loaders::cargo::CargoLoader::default();
 
         for entry in index.iter() {
             let (dirname, basename) = RepoPath::new(&entry.path).split_basename();
-            //if basename.as_ref() == b"Cargo.toml" {
-            //} else {
-            //    None
-            //};
-
-            //if let Some(p) = maybe_proj {
-            //    println!("got one {:?}", p);
-            //    self.projects.push(p);
-            //}
+            cargo.process_index_item(dirname, basename);
         }
+
+        cargo.finalize(self)?;
 
         // Populate the graph.
         for p in &self.projects {
@@ -132,9 +127,19 @@ impl RepoPath {
         return (&self.0[..ndir].as_ref(), basename.as_ref());
     }
 
-    /// Convert the repository path into an OS path
+    /// Get the length of the path, in bytes
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Convert the repository path into an OS path.
     pub fn as_path(&self) -> &Path {
         bytes2path(&self.0)
+    }
+
+    /// Convert this borrowed reference into an owned copy.
+    pub fn to_owned(&self) -> RepoPathBuf {
+        RepoPathBuf::new(&self.0[..])
     }
 }
 
@@ -148,4 +153,33 @@ fn bytes2path(b: &[u8]) -> &Path {
 fn bytes2path(b: &[u8]) -> &Path {
     use std::str;
     Path::new(str::from_utf8(b).unwrap())
+}
+
+/// An owned reference to a pathname as understood by the backing repository.
+#[derive(Debug, Eq, PartialEq)]
+#[repr(transparent)]
+pub struct RepoPathBuf(Vec<u8>);
+
+impl std::convert::AsRef<RepoPath> for RepoPathBuf {
+    fn as_ref(&self) -> &RepoPath {
+        RepoPath::new(&self.0[..])
+    }
+}
+
+impl RepoPathBuf {
+    pub fn new(b: &[u8]) -> Self {
+        RepoPathBuf(b.to_vec())
+    }
+
+    pub fn truncate(&mut self, len: usize) {
+        self.0.truncate(len);
+    }
+}
+
+impl std::ops::Deref for RepoPathBuf {
+    type Target = RepoPath;
+
+    fn deref(&self) -> &RepoPath {
+        RepoPath::new(&self.0[..])
+    }
 }

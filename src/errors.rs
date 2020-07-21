@@ -17,6 +17,9 @@ pub enum Error {
     BareRepository,
 
     #[error("{0}")]
+    CargoMetadata(#[from] cargo_metadata::Error),
+
+    #[error("{0}")]
     Git(#[from] git2::Error),
 
     #[error("I/O error: {0}")]
