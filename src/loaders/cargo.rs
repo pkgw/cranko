@@ -68,6 +68,7 @@ impl CargoLoader {
         toml_path.push("Cargo.toml");
         let mut cmd = MetadataCommand::new();
         cmd.manifest_path(&toml_path);
+        cmd.features(cargo_metadata::CargoOpt::AllFeatures);
         let cargo_meta = cmd.exec()?;
 
         for pkg in &cargo_meta.packages {
