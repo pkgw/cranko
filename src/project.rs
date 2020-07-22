@@ -50,6 +50,16 @@ impl Project {
     pub fn ident(&self) -> ProjectId {
         self.ident
     }
+
+    /// Get the name of the project as we'll show it to the user.
+    ///
+    /// This is not necessarily straightforward since a repository might contain
+    /// multiple projects with names that need distinguishing; e.g. a repository
+    /// with related Python and NPM packages that have the same name on their
+    /// respective registries.
+    pub fn user_facing_name(&self) -> &str {
+        &self.qnames[0] // XXXX DO BETTER
+    }
 }
 
 /// A builder for initializing a new project entry that will be added to the

@@ -19,6 +19,9 @@ pub enum Error {
     #[error("{0}")]
     CargoMetadata(#[from] cargo_metadata::Error),
 
+    #[error("internal dependency cycle associated with project {0}")]
+    Cycle(String),
+
     #[error("{0}")]
     Git(#[from] git2::Error),
 

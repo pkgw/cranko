@@ -119,6 +119,11 @@ impl Command for StatusCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
         let graph = sess.populated_graph()?;
+
+        for proj in graph.toposort()? {
+            println!("project: {}", proj.user_facing_name());
+        }
+
         Ok(0)
     }
 }
