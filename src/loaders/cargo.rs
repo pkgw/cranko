@@ -9,9 +9,10 @@
 use cargo_metadata::MetadataCommand;
 
 use crate::{
-    app::{AppSession, RepoPath, RepoPathBuf},
+    app::AppSession,
     errors::Result,
     project::{Project, Version},
+    repository::{RepoPath, RepoPathBuf},
 };
 
 #[derive(Debug)]
@@ -64,7 +65,7 @@ impl CargoLoader {
             None => return Ok(()),
         };
 
-        let mut toml_path = app.resolve_workdir(&shortest_toml_dirname);
+        let mut toml_path = app.repo.resolve_workdir(&shortest_toml_dirname);
         toml_path.push("Cargo.toml");
         let mut cmd = MetadataCommand::new();
         cmd.manifest_path(&toml_path);
