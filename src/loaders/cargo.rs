@@ -82,7 +82,7 @@ impl CargoLoader {
 
             // Q: should we include a registry name as a qualifier?
             pb.qnames(&[&pkg.name, "cargo"])
-              .version(Version::Semver(pkg.version.clone()));
+                .version(Version::Semver(pkg.version.clone()));
             let ident = pb.finish_init();
         }
 

@@ -33,7 +33,7 @@ pub enum Version {
 impl std::fmt::Display for Version {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
         match self {
-            Version::Semver(ref v) => write!(f, "{}", v)
+            Version::Semver(ref v) => write!(f, "{}", v),
         }
     }
 }
@@ -99,7 +99,10 @@ impl<'a> ProjectBuilder<'a> {
         }
     }
 
-    pub fn qnames<T: std::fmt::Display>(&mut self, qnames: impl IntoIterator<Item = T>) -> &mut Self {
+    pub fn qnames<T: std::fmt::Display>(
+        &mut self,
+        qnames: impl IntoIterator<Item = T>,
+    ) -> &mut Self {
         self.qnames = qnames.into_iter().map(|s| s.to_string()).collect();
         self
     }
