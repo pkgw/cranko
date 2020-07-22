@@ -29,7 +29,16 @@ pub enum Version {
 #[derive(Debug)]
 pub struct Project {
     ident: ProjectId,
-    name_hier: Vec<String>,
+
+    /// Qualified names. The package name, qualified with hierarchical
+    /// indicators. The first item in the vector is the most specific name and
+    /// the one that the user is most likely to recognize as corresponding to
+    /// the project. Additional terms become more and more general and can be
+    /// used to disambiguate packages originating from different schemes: e.g.,
+    /// a repo containing related Python and NPM packages that both have the
+    /// same name.
+    qnames: Vec<String>,
+
     version: Version,
 }
 
@@ -53,6 +62,7 @@ impl Project {
 #[derive(Debug)]
 pub struct ProjectBuilder<'a> {
     owner: &'a mut ProjectGraph,
+    qnames: Vec<String>,
     version: Option<Version>,
 }
 
@@ -61,8 +71,14 @@ impl<'a> ProjectBuilder<'a> {
     pub fn new(owner: &'a mut ProjectGraph) -> Self {
         ProjectBuilder {
             owner,
+            qnames: Vec::new(),
             version: None,
         }
+    }
+
+    pub fn qnames<T: std::fmt::Display>(&mut self, qnames: impl IntoIterator<Item = T>) -> &mut Self {
+        self.qnames = qnames.into_iter().map(|s| s.to_string()).collect();
+        self
     }
 
     pub fn version(&mut self, version: Version) -> &mut Self {
@@ -71,11 +87,14 @@ impl<'a> ProjectBuilder<'a> {
     }
 
     pub fn finish_init(self) -> ProjectId {
+        assert!(self.qnames.len() > 0);
+        let qnames = self.qnames;
+
         let version = self.version.unwrap();
 
         self.owner.finalize_project_addition(|ident| Project {
             ident,
-            name_hier: Vec::new(),
+            qnames: qnames,
             version,
         })
     }

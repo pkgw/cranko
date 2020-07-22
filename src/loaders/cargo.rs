@@ -79,9 +79,11 @@ impl CargoLoader {
             }
 
             let mut pb = graph.add_project();
-            pb.version(Version::Semver(pkg.version.clone()));
+
+            // Q: should we include a registry name as a qualifier?
+            pb.qnames(&[&pkg.name, "cargo"])
+              .version(Version::Semver(pkg.version.clone()));
             let ident = pb.finish_init();
-            println!("added project ID{:?}", ident);
         }
 
         Ok(())
