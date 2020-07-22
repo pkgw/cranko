@@ -9,7 +9,7 @@
 //! depend on each other. In the general case, these intra-repository
 //! dependencies have the structure of a directed acyclic graph (DAG).
 
-use petgraph::graph::DiGraph;
+use petgraph::graph::{DefaultIx, DiGraph, NodeIndex};
 
 use crate::project::{Project, ProjectBuilder, ProjectId};
 
@@ -20,13 +20,16 @@ pub struct ProjectGraph {
     /// vector.
     projects: Vec<Project>,
 
+    /// NodeIndex values for each project based on its identifier.
+    node_ixs: Vec<NodeIndex<DefaultIx>>,
+
     /// The `petgraph` state expressing the project graph.
     graph: DiGraph<ProjectId, ()>,
 }
 
 impl ProjectGraph {
     pub fn len(&self) -> usize {
-        self.graph.node_count()
+        self.projects.len()
     }
 
     pub fn add_project<'a>(&'a mut self) -> ProjectBuilder<'a> {
@@ -41,6 +44,7 @@ impl ProjectGraph {
     {
         let id = self.projects.len();
         self.projects.push(f(id));
+        self.node_ixs.push(self.graph.add_node(id));
         id
     }
 
@@ -49,7 +53,7 @@ impl ProjectGraph {
         &self.projects[ident]
     }
 
-    /// Get a reference to a project in the graph from its ID.
+    /// Get a mutable reference to a project in the graph from its ID.
     pub fn lookup_mut(&mut self, ident: ProjectId) -> &mut Project {
         &mut self.projects[ident]
     }
