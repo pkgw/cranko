@@ -21,9 +21,21 @@ use crate::{
 /// particular semantics other than being cheaply copyable.
 pub type ProjectId = usize;
 
+/// A version number associated with a project.
+///
+/// This is an enumeration because different kinds of projects may subscribe to
+/// different kinds of versioning schemes.
 #[derive(Debug, Eq, PartialEq)]
 pub enum Version {
     Semver(semver::Version),
+}
+
+impl std::fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
+        match self {
+            Version::Semver(ref v) => write!(f, "{}", v)
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -39,7 +51,8 @@ pub struct Project {
     /// same name.
     qnames: Vec<String>,
 
-    version: Version,
+    /// The version associated with this project.
+    pub version: Version,
 }
 
 impl Project {

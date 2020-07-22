@@ -121,7 +121,7 @@ impl Command for StatusCommand {
         let graph = sess.populated_graph()?;
 
         for proj in graph.toposort()? {
-            println!("project: {}", proj.user_facing_name());
+            println!("{}: {}", proj.user_facing_name(), proj.version);
         }
 
         Ok(0)
