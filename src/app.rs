@@ -3,12 +3,7 @@
 
 //! State for the Cranko CLI application.
 
-use crate::{
-    errors::{Error, Result},
-    graph::ProjectGraph,
-    project::Project,
-    repository::{RepoPath, Repository},
-};
+use crate::{errors::Result, graph::ProjectGraph, repository::Repository};
 
 /// The main Cranko CLI application state structure.
 pub struct AppSession {

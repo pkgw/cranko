@@ -9,7 +9,7 @@
 //! interdependencies inducing a Directed Acyclic Graph (DAG) structure on them,
 //! as implemented in the `graph` module.
 
-use crate::{app::AppSession, errors::Result, graph::ProjectGraph, repository::RepoPath};
+use crate::graph::ProjectGraph;
 
 /// An internal, unique identifier for a project in this app session.
 ///

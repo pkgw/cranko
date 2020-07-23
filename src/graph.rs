@@ -10,7 +10,7 @@
 //! dependencies have the structure of a directed acyclic graph (DAG).
 
 use petgraph::{
-    algo::{toposort, Cycle},
+    algo::toposort,
     graph::{DefaultIx, DiGraph, NodeIndex},
 };
 
