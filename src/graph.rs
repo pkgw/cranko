@@ -64,6 +64,13 @@ impl ProjectGraph {
         &mut self.projects[ident]
     }
 
+    /// Add a dependency between two projects in the graph.
+    pub fn add_dependency(&mut self, depender_id: ProjectId, dependee_id: ProjectId) {
+        let depender_nix = self.node_ixs[depender_id];
+        let dependee_nix = self.node_ixs[dependee_id];
+        self.graph.add_edge(dependee_nix, depender_nix, ());
+    }
+
     /// Get an iterator to visit the projects in the graph in topologically
     /// sorted order.
     ///

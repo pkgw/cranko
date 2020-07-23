@@ -7,6 +7,7 @@
 //! information about all of the crates and their interdependencies.
 
 use cargo_metadata::MetadataCommand;
+use std::collections::HashMap;
 
 use crate::{
     app::AppSession,
@@ -72,7 +73,10 @@ impl CargoLoader {
         cmd.features(cargo_metadata::CargoOpt::AllFeatures);
         let cargo_meta = cmd.exec()?;
 
+        // Fill in the packages
+
         let graph = app.graph_mut();
+        let mut cargo_to_graph = HashMap::new();
 
         for pkg in &cargo_meta.packages {
             if pkg.source.is_some() {
@@ -85,6 +89,19 @@ impl CargoLoader {
             pb.qnames(&[&pkg.name, "cargo"])
                 .version(Version::Semver(pkg.version.clone()));
             let ident = pb.finish_init();
+            cargo_to_graph.insert(pkg.id.clone(), ident);
+        }
+
+        // Now establish the interdependencies.
+
+        for node in &cargo_meta.resolve.unwrap().nodes {
+            if let Some(depender_id) = cargo_to_graph.get(&node.id) {
+                for dep in &node.deps {
+                    if let Some(dependee_id) = cargo_to_graph.get(&dep.pkg) {
+                        graph.add_dependency(*depender_id, *dependee_id);
+                    }
+                }
+            }
         }
 
         Ok(())
