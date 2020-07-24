@@ -3,6 +3,7 @@
 
 //! State of the backing version control repository.
 
+use dynfmt::{Format, SimpleCurlyFormat};
 use std::path::{Path, PathBuf};
 
 use crate::errors::{Error, Result};
@@ -24,6 +25,10 @@ pub struct Repository {
     /// The name of the `release`-type branch in the upstream remote. Also
     /// optional.
     upstream_release_name: Option<String>,
+
+    /// The format specification to use for release tag names, as understood by
+    /// the `SimpleCurlyFormat` of the `dynfmt` crate.
+    release_tag_name_format: String,
 }
 
 impl Repository {
@@ -102,6 +107,10 @@ impl Repository {
             }
         }
 
+        // Release tag name format. Should also become configurable.
+
+        let release_tag_name_format = "{project_slug}@{version}".to_owned();
+
         // All set up.
 
         Ok(Repository {
@@ -109,6 +118,7 @@ impl Repository {
             upstream_name,
             upstream_rc_name,
             upstream_release_name,
+            release_tag_name_format,
         })
     }
 
