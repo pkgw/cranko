@@ -17,14 +17,13 @@ pub struct Repository {
     /// branches of record.
     upstream_name: String,
 
-    /// The name of the `rc`-type branch in the upstream remote. This is
-    /// optional since we want to be able to run successfully even if the
-    /// upstream isn't fully configured.
-    upstream_rc_name: Option<String>,
+    /// The name of the `rc`-type branch in the upstream remote. The branch
+    /// itself might not exist, if the upstream repo is just being initialized.
+    upstream_rc_name: String,
 
-    /// The name of the `release`-type branch in the upstream remote. Also
-    /// optional.
-    upstream_release_name: Option<String>,
+    /// The name of the `release`-type branch in the upstream remote. As with `rc`,
+    /// the branch itself might not exist.
+    upstream_release_name: String,
 
     /// The format specification to use for release tag names, as understood by
     /// the `SimpleCurlyFormat` of the `dynfmt` crate.
@@ -81,31 +80,8 @@ impl Repository {
         // configuration could be stored in the repository since every checkout
         // should be talking about the same upstream.
 
-        let mut upstream_rc_name = None;
-        let mut upstream_release_name = None;
-        let n_uname = upstream_name.len();
-
-        for maybe_branch in repo.branches(Some(git2::BranchType::Remote))? {
-            if let Ok((branch, _type)) = maybe_branch {
-                if let Some(bname) = branch.name()? {
-                    let n_bname = bname.len();
-
-                    if n_bname == n_uname + 3
-                        && bname.starts_with(&upstream_name)
-                        && bname.ends_with("/rc")
-                    {
-                        upstream_rc_name = Some(bname.to_owned());
-                    }
-
-                    if n_bname == n_uname + 8
-                        && bname.starts_with(&upstream_name)
-                        && bname.ends_with("/release")
-                    {
-                        upstream_release_name = Some(bname.to_owned());
-                    }
-                }
-            }
-        }
+        let mut upstream_rc_name = format!("{}/rc", &upstream_name);
+        let mut upstream_release_name = format!("{}/release", &upstream_name);
 
         // Release tag name format. Should also become configurable.
 
@@ -162,7 +138,64 @@ impl Repository {
 
         Ok(())
     }
+
+    /// Get information about the state of the projects in the repository as
+    /// of the latest release commit.
+    pub fn get_latest_release_info(&self) -> Result<ReleaseCommitInfo> {
+        match self
+            .repo
+            .find_branch(&self.upstream_release_name, git2::BranchType::Remote)
+        {
+            Ok(branch) => unimplemented!("get info from commit!"),
+            Err(e) => {
+                if e.code() == git2::ErrorCode::NotFound {
+                    // No `release` branch in the upstream. We assume this means
+                    // that it just hasn't been Cranko-ified yet, so we return
+                    // an empty object.
+                    Ok(ReleaseCommitInfo::default())
+                } else {
+                    Err(e.into())
+                }
+            }
+        }
+    }
 }
+
+/// Information about the state of the projects in the repository corresponding
+/// to a "release" commit where all of the projects have been assigned version
+/// numbers, and the commit should have made it out into the wild only if all of
+/// the CI tests passed.
+#[derive(Debug, Default)]
+pub struct ReleaseCommitInfo {
+    /// The Git commit-ish that this object describes. May be None when there is
+    /// no upstream `release` branch, in which case this struct will contain no
+    /// genuine information.
+    pub committish: Option<git2::Oid>,
+
+    /// A list of projects and their release information as of this commit. This
+    /// list includes every tracked project in this commit. Not all of those
+    /// projects necessarily were released with this commit, if they were
+    /// unchanged from a previous release commit.
+    pub projects: Vec<ReleasedProjectInfo>,
+}
+
+#[derive(Debug)]
+pub struct ReleasedProjectInfo {
+    /// The qualified names of this project, equivalent to the same-named
+    /// property of the Project struct.
+    pub qnames: Vec<String>,
+
+    /// The version of the project in this commit, as text.
+    pub version: String,
+
+    /// The number of consecutive release commits for which this project
+    /// has had the assigned version string. If zero, that means that the
+    /// specified version was first released with this commit.
+    pub age: usize,
+}
+
+// Below we have helpers for trying to deal with git's paths properly, on the
+// off-chance that they contain invalid UTF-8 and the like.
 
 /// A borrowed reference to a pathname as understood by the backing repository.
 ///

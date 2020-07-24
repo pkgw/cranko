@@ -84,6 +84,7 @@ impl Command for ApplyCommand {
         let mut sess = app::AppSession::initialize()?;
         let graph = sess.populated_graph()?;
 
+        sess.repo.get_latest_release_info()?;
         sess.repo.check_dirty()?;
 
         Ok(0)
