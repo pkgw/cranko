@@ -15,6 +15,15 @@ pub struct Repository {
     /// The name of the "upstream" remote that hosts the `rc` and `release`
     /// branches of record.
     upstream_name: String,
+
+    /// The name of the `rc`-type branch in the upstream remote. This is
+    /// optional since we want to be able to run successfully even if the
+    /// upstream isn't fully configured.
+    upstream_rc_name: Option<String>,
+
+    /// The name of the `release`-type branch in the upstream remote. Also
+    /// optional.
+    upstream_release_name: Option<String>,
 }
 
 impl Repository {
@@ -35,7 +44,10 @@ impl Repository {
         // use it; if there are multiple and one is "origin", we use it.
         // Otherwise, we error out. TODO: make this configurable, add more
         // heuristics. Note that this config item should not be stored in the
-        // repo since it can be unique to each checkout.
+        // repo since it can be unique to each checkout. (What *could* be stored
+        // in the repo would be a list of URLs corresponding to the official
+        // upstream, and we could see if any of the remotes have one of those
+        // URLs.)
 
         let mut upstream_name = None;
         let mut n_remotes = 0;
@@ -58,7 +70,34 @@ impl Repository {
 
         let upstream_name = upstream_name.unwrap();
 
-        Ok(Repository { repo, upstream_name })
+        // Now that we've got that, check for the upstream `rc` and `release`
+        // branches. This could/should also be configurable. Note that this
+        // configuration could be stored in the repository since every checkout
+        // should be talking about the same upstream.
+
+        let mut upstream_rc_name = None;
+        let mut upstream_release_name = None;
+        let n_uname = upstream_name.len();
+
+        for maybe_branch in repo.branches(Some(git2::BranchType::Remote))? {
+            if let Ok((branch, _type)) = maybe_branch {
+                if let Some(bname) = branch.name()? {
+                    let n_bname = bname.len();
+
+                    if n_bname == n_uname + 3 && bname.starts_with(&upstream_name) && bname.ends_with("/rc") {
+                        upstream_rc_name = Some(bname.to_owned());
+                    }
+
+                    if n_bname == n_uname + 8 && bname.starts_with(&upstream_name) && bname.ends_with("/release") {
+                        upstream_release_name = Some(bname.to_owned());
+                    }
+                }
+            }
+        }
+
+        // All set up.
+
+        Ok(Repository { repo, upstream_name, upstream_rc_name, upstream_release_name })
     }
 
     /// Resolve a `RepoPath` repository path to a filesystem path in the working
