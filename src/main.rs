@@ -22,6 +22,7 @@ mod graph;
 mod loaders;
 mod project;
 mod repository;
+mod version;
 
 #[derive(Debug, PartialEq, StructOpt)]
 #[structopt(about = "automate versioning and releasing")]

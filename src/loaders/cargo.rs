@@ -12,8 +12,8 @@ use std::collections::HashMap;
 use crate::{
     app::AppSession,
     errors::Result,
-    project::Version,
     repository::{RepoPath, RepoPathBuf},
+    version::Version,
 };
 
 #[derive(Debug)]
