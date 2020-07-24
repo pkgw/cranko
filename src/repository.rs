@@ -11,6 +11,10 @@ use crate::errors::{Error, Result};
 pub struct Repository {
     /// The underlying `git2` repository object.
     repo: git2::Repository,
+
+    /// The name of the "upstream" remote that hosts the `rc` and `release`
+    /// branches of record.
+    upstream_name: String,
 }
 
 impl Repository {
@@ -27,7 +31,34 @@ impl Repository {
             return Err(Error::BareRepository);
         }
 
-        Ok(Repository { repo })
+        // Guess the name of the upstream remote. If there's only one remote, we
+        // use it; if there are multiple and one is "origin", we use it.
+        // Otherwise, we error out. TODO: make this configurable, add more
+        // heuristics. Note that this config item should not be stored in the
+        // repo since it can be unique to each checkout.
+
+        let mut upstream_name = None;
+        let mut n_remotes = 0;
+
+        for remote_name in &repo.remotes()? {
+            // `None` happens if a remote name is not valid UTF8. At the moment
+            // I can't be bothered to properly handle that.
+            if let Some(remote_name) = remote_name {
+                n_remotes += 1;
+
+                if upstream_name.is_none() || remote_name == "origin" {
+                    upstream_name = Some(remote_name.to_owned());
+                }
+            }
+        }
+
+        if upstream_name.is_none() || (n_remotes > 1 && upstream_name.as_deref() != Some("origin")) {
+            return Err(Error::NoUpstreamRemote);
+        }
+
+        let upstream_name = upstream_name.unwrap();
+
+        Ok(Repository { repo, upstream_name })
     }
 
     /// Resolve a `RepoPath` repository path to a filesystem path in the working

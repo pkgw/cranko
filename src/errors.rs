@@ -28,6 +28,9 @@ pub enum Error {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("cannot identify the upstream remote for the backing repository")]
+    NoUpstreamRemote,
+
     #[error("TOML format error: {0}")]
     Toml(#[from] toml_edit::TomlError),
 }
