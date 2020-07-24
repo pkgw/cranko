@@ -22,6 +22,9 @@ pub enum Error {
     #[error("internal dependency cycle associated with project {0}")]
     Cycle(String),
 
+    #[error("cannot proceed with a dirty backing repository (path: {0})")]
+    DirtyRepository(String),
+
     #[error("{0}")]
     Git(#[from] git2::Error),
 

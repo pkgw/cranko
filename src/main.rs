@@ -36,6 +36,10 @@ trait Command {
 
 #[derive(Debug, PartialEq, StructOpt)]
 enum Commands {
+    #[structopt(name = "apply")]
+    /// Create a new commit applying version numbers all projects
+    Apply(ApplyCommand),
+
     #[structopt(name = "help")]
     /// Prints this message or the help of the given subcommand
     Help(HelpCommand),
@@ -55,6 +59,7 @@ enum Commands {
 impl Command for Commands {
     fn execute(self) -> Result<i32> {
         match self {
+            Commands::Apply(o) => o.execute(),
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
             Commands::Status(o) => o.execute(),
@@ -67,6 +72,22 @@ fn main() -> Result<()> {
     let opts = CrankoOptions::from_args();
     let exitcode = opts.command.execute()?;
     std::process::exit(exitcode);
+}
+
+// apply
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ApplyCommand {}
+
+impl Command for ApplyCommand {
+    fn execute(self) -> Result<i32> {
+        let mut sess = app::AppSession::initialize()?;
+        let graph = sess.populated_graph()?;
+
+        sess.repo.check_dirty()?;
+
+        Ok(0)
+    }
 }
 
 // help
@@ -192,6 +213,7 @@ fn list_commands() -> BTreeSet<String> {
         }
     }
 
+    commands.insert("apply".to_owned());
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
     commands.insert("status".to_owned());

@@ -64,7 +64,8 @@ impl Repository {
             }
         }
 
-        if upstream_name.is_none() || (n_remotes > 1 && upstream_name.as_deref() != Some("origin")) {
+        if upstream_name.is_none() || (n_remotes > 1 && upstream_name.as_deref() != Some("origin"))
+        {
             return Err(Error::NoUpstreamRemote);
         }
 
@@ -84,11 +85,17 @@ impl Repository {
                 if let Some(bname) = branch.name()? {
                     let n_bname = bname.len();
 
-                    if n_bname == n_uname + 3 && bname.starts_with(&upstream_name) && bname.ends_with("/rc") {
+                    if n_bname == n_uname + 3
+                        && bname.starts_with(&upstream_name)
+                        && bname.ends_with("/rc")
+                    {
                         upstream_rc_name = Some(bname.to_owned());
                     }
 
-                    if n_bname == n_uname + 8 && bname.starts_with(&upstream_name) && bname.ends_with("/release") {
+                    if n_bname == n_uname + 8
+                        && bname.starts_with(&upstream_name)
+                        && bname.ends_with("/release")
+                    {
                         upstream_release_name = Some(bname.to_owned());
                     }
                 }
@@ -97,7 +104,12 @@ impl Repository {
 
         // All set up.
 
-        Ok(Repository { repo, upstream_name, upstream_rc_name, upstream_release_name })
+        Ok(Repository {
+            repo,
+            upstream_name,
+            upstream_rc_name,
+            upstream_release_name,
+        })
     }
 
     /// Resolve a `RepoPath` repository path to a filesystem path in the working
@@ -108,7 +120,7 @@ impl Repository {
         fullpath
     }
 
-    // Scan the paths in the repository index.
+    /// Scan the paths in the repository index.
     pub fn scan_paths<F>(&self, mut f: F) -> Result<()>
     where
         F: FnMut(&RepoPath) -> (),
@@ -120,6 +132,22 @@ impl Repository {
 
         for entry in index.iter() {
             f(RepoPath::new(&entry.path));
+        }
+
+        Ok(())
+    }
+
+    /// Check that the repository is clean. We allow untracked and ignored files
+    /// but otherwise don't want any modifications, etc.
+    pub fn check_dirty(&self) -> Result<()> {
+        // Default options are what we want.
+        let mut opts = git2::StatusOptions::new();
+
+        for entry in self.repo.statuses(Some(&mut opts))?.iter() {
+            // Is this correct / sufficient?
+            if entry.status() != git2::Status::CURRENT {
+                return Err(Error::DirtyRepository(escape_pathlike(entry.path_bytes())));
+            }
         }
 
         Ok(())
@@ -219,5 +247,24 @@ impl std::ops::Deref for RepoPathBuf {
 
     fn deref(&self) -> &RepoPath {
         RepoPath::new(&self.0[..])
+    }
+}
+
+/// Convert an arbitrary byte slice to something printable.
+///
+/// If the bytes can be interpreted as UTF-8, their Unicode stringification will
+/// be returned. Otherwise, bytes that aren't printable ASCII will be
+/// backslash-escaped, and the whole string will be wrapped in double quotes.
+///
+/// **Note**: we should probably only do a direct conversion if it's printable
+/// ASCII without whitespaces, etc. To be refined.
+pub fn escape_pathlike(b: &[u8]) -> String {
+    if let Ok(s) = std::str::from_utf8(b) {
+        s.to_owned()
+    } else {
+        let mut buf = vec![b'\"'];
+        buf.extend(b.iter().map(|c| std::ascii::escape_default(*c)).flatten());
+        buf.push(b'\"');
+        String::from_utf8(buf).unwrap()
     }
 }
