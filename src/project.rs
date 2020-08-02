@@ -11,6 +11,7 @@
 
 use crate::{
     graph::ProjectGraph,
+    rewriters::Rewriter,
     version::{ReleaseMode, Version, VersioningScheme},
 };
 
@@ -41,6 +42,10 @@ pub struct Project {
 
     /// The versioning scheme to use in ReleaseMode::Primary releases.
     primary_scheme: VersioningScheme,
+
+    /// Steps to perform when rewriting this project's metadata to produce
+    /// a release commit.
+    pub rewriters: Vec<Box<Rewriter>>,
 }
 
 impl Project {
@@ -129,6 +134,7 @@ impl<'a> ProjectBuilder<'a> {
             version,
             dev_scheme: VersioningScheme::DevDatecode,
             primary_scheme: VersioningScheme::DevDatecode, // XXX update
+            rewriters: Vec::new(),
         })
     }
 }

@@ -13,6 +13,7 @@ use crate::{
     app::AppSession,
     errors::Result,
     repository::{RepoPath, RepoPathBuf},
+    rewriters::cargo::CargoRewriter,
     version::Version,
 };
 
@@ -90,6 +91,13 @@ impl CargoLoader {
                 .version(Version::Semver(pkg.version.clone()));
             let ident = pb.finish_init();
             cargo_to_graph.insert(pkg.id.clone(), ident);
+
+            // Auto-register a rewriter to update this package's Cargo.toml.
+            let cargo_rewrite = CargoRewriter::new(ident, pkg.manifest_path.clone());
+            graph
+                .lookup_mut(ident)
+                .rewriters
+                .push(Box::new(cargo_rewrite));
         }
 
         // Now establish the interdependencies.

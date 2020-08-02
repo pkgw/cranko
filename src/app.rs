@@ -31,6 +31,11 @@ impl AppSession {
         Ok(AppSession { graph, repo })
     }
 
+    /// Get the graph of projects inside this app session.
+    pub fn graph(&self) -> &ProjectGraph {
+        &self.graph
+    }
+
     /// Get the graph of projects inside this app session, mutably.
     pub fn graph_mut(&mut self) -> &mut ProjectGraph {
         &mut self.graph
@@ -81,6 +86,17 @@ impl AppSession {
                 cur_version,
                 proj.version
             );
+        }
+
+        Ok(())
+    }
+
+    /// Rewrite everyone's metadata to match our internal state.
+    pub fn rewrite(&self) -> Result<()> {
+        for proj in self.graph.toposort()? {
+            for rw in &proj.rewriters {
+                rw.rewrite(self)?;
+            }
         }
 
         Ok(())

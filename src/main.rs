@@ -22,6 +22,7 @@ mod graph;
 mod loaders;
 mod project;
 mod repository;
+mod rewriters;
 mod version;
 
 #[derive(Debug, PartialEq, StructOpt)]
@@ -84,6 +85,7 @@ impl Command for ApplyCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
         sess.apply_versions(version::ReleaseMode::Development)?;
+        sess.rewrite()?;
         Ok(0)
     }
 }
