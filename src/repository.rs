@@ -6,7 +6,10 @@
 use dynfmt::{Format, SimpleCurlyFormat};
 use std::path::{Path, PathBuf};
 
-use crate::errors::{Error, Result};
+use crate::{
+    errors::{Error, Result},
+    project::Project,
+};
 
 /// Information about the backing version control repository.
 pub struct Repository {
@@ -177,6 +180,23 @@ pub struct ReleaseCommitInfo {
     /// projects necessarily were released with this commit, if they were
     /// unchanged from a previous release commit.
     pub projects: Vec<ReleasedProjectInfo>,
+}
+
+impl ReleaseCommitInfo {
+    /// Attempt to find info for a prior release of the named project.
+    ///
+    /// Information may be missing of the project was only added to the
+    /// repository after this information was recorded.
+    pub fn lookup_project(&self, proj: &Project) -> Option<&ReleasedProjectInfo> {
+        for rpi in &self.projects {
+            if rpi.qnames == *proj.qualified_names() {
+                return Some(rpi);
+            }
+        }
+
+        // TODO: any more sophisticated search to try?
+        None
+    }
 }
 
 #[derive(Debug)]

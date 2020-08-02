@@ -83,11 +83,7 @@ struct ApplyCommand {}
 impl Command for ApplyCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-        let graph = sess.populated_graph()?;
-
-        sess.repo.get_latest_release_info()?;
-        sess.repo.check_dirty()?;
-
+        sess.apply_versions(version::ReleaseMode::Development)?;
         Ok(0)
     }
 }

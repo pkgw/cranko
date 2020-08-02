@@ -9,7 +9,10 @@
 //! interdependencies inducing a Directed Acyclic Graph (DAG) structure on them,
 //! as implemented in the `graph` module.
 
-use crate::{graph::ProjectGraph, version::Version};
+use crate::{
+    graph::ProjectGraph,
+    version::{ReleaseMode, Version, VersioningScheme},
+};
 
 /// An internal, unique identifier for a project in this app session.
 ///
@@ -32,6 +35,12 @@ pub struct Project {
 
     /// The version associated with this project.
     pub version: Version,
+
+    /// The versioning scheme to use in ReleaseMode::Development releases.
+    dev_scheme: VersioningScheme,
+
+    /// The versioning scheme to use in ReleaseMode::Primary releases.
+    primary_scheme: VersioningScheme,
 }
 
 impl Project {
@@ -43,6 +52,11 @@ impl Project {
         self.ident
     }
 
+    /// Get a reference to this project's full qualified names.
+    pub fn qualified_names(&self) -> &Vec<String> {
+        &self.qnames
+    }
+
     /// Get the name of the project as we'll show it to the user.
     ///
     /// This is not necessarily straightforward since a repository might contain
@@ -51,6 +65,14 @@ impl Project {
     /// respective registries.
     pub fn user_facing_name(&self) -> &str {
         &self.qnames[0] // XXXX DO BETTER
+    }
+
+    /// Get the versioning scheme used by this project for specific release mode.
+    pub fn versioning_scheme(&self, mode: ReleaseMode) -> VersioningScheme {
+        match mode {
+            ReleaseMode::Development => self.dev_scheme,
+            ReleaseMode::Primary => self.primary_scheme,
+        }
     }
 }
 
@@ -78,6 +100,7 @@ impl<'a> ProjectBuilder<'a> {
         }
     }
 
+    /// Set the qualified names associated with the project to be created.
     pub fn qnames<T: std::fmt::Display>(
         &mut self,
         qnames: impl IntoIterator<Item = T>,
@@ -86,11 +109,14 @@ impl<'a> ProjectBuilder<'a> {
         self
     }
 
+    /// Set the current version number associated with the project to be created.
     pub fn version(&mut self, version: Version) -> &mut Self {
         self.version = Some(version);
         self
     }
 
+    /// Add the template project to the graph, consuming this object and
+    /// returning its unique ID that can be used to apply further settings.
     pub fn finish_init(self) -> ProjectId {
         assert!(self.qnames.len() > 0);
         let qnames = self.qnames;
@@ -101,6 +127,8 @@ impl<'a> ProjectBuilder<'a> {
             ident,
             qnames: qnames,
             version,
+            dev_scheme: VersioningScheme::DevDatecode,
+            primary_scheme: VersioningScheme::DevDatecode, // XXX update
         })
     }
 }

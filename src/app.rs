@@ -3,7 +3,12 @@
 
 //! State for the Cranko CLI application.
 
-use crate::{errors::Result, graph::ProjectGraph, repository::Repository};
+use crate::{
+    errors::Result,
+    graph::ProjectGraph,
+    repository::Repository,
+    version::{ReleaseMode, VersioningScheme},
+};
 
 /// The main Cranko CLI application state structure.
 pub struct AppSession {
@@ -55,6 +60,29 @@ impl AppSession {
         })?;
 
         cargo.finalize(self)?;
+        Ok(())
+    }
+
+    /// Apply version numbers given the current repository state and a release mode.
+    pub fn apply_versions(&mut self, mode: ReleaseMode) -> Result<()> {
+        self.populate_graph()?;
+        let latest_info = self.repo.get_latest_release_info()?;
+
+        self.repo.check_dirty()?;
+
+        for proj in self.graph.toposort_mut()? {
+            let scheme = proj.versioning_scheme(mode);
+            let cur_version = proj.version.clone();
+            let latest_release = latest_info.lookup_project(proj);
+            proj.version = scheme.apply(&cur_version, mode, latest_release)?;
+            println!(
+                "{}: {} => {}",
+                proj.user_facing_name(),
+                cur_version,
+                proj.version
+            );
+        }
+
         Ok(())
     }
 }
