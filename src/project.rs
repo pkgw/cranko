@@ -45,7 +45,7 @@ pub struct Project {
 
     /// Steps to perform when rewriting this project's metadata to produce
     /// a release commit.
-    pub rewriters: Vec<Box<Rewriter>>,
+    pub rewriters: Vec<Box<dyn Rewriter>>,
 }
 
 impl Project {

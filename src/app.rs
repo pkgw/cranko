@@ -6,8 +6,8 @@
 use crate::{
     errors::Result,
     graph::ProjectGraph,
-    repository::Repository,
-    version::{ReleaseMode, VersioningScheme},
+    repository::{ChangeList, Repository},
+    version::ReleaseMode,
 };
 
 /// The main Cranko CLI application state structure.
@@ -92,13 +92,15 @@ impl AppSession {
     }
 
     /// Rewrite everyone's metadata to match our internal state.
-    pub fn rewrite(&self) -> Result<()> {
+    pub fn rewrite(&self) -> Result<ChangeList> {
+        let mut changes = ChangeList::default();
+
         for proj in self.graph.toposort()? {
             for rw in &proj.rewriters {
-                rw.rewrite(self)?;
+                rw.rewrite(self, &mut changes)?;
             }
         }
 
-        Ok(())
+        Ok(changes)
     }
 }

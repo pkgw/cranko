@@ -3,7 +3,7 @@
 
 //! State of the backing version control repository.
 
-use dynfmt::{Format, SimpleCurlyFormat};
+//use dynfmt::{Format, SimpleCurlyFormat};
 use std::path::{Path, PathBuf};
 
 use crate::{
@@ -83,8 +83,8 @@ impl Repository {
         // configuration could be stored in the repository since every checkout
         // should be talking about the same upstream.
 
-        let mut upstream_rc_name = format!("{}/rc", &upstream_name);
-        let mut upstream_release_name = format!("{}/release", &upstream_name);
+        let upstream_rc_name = "rc".to_owned();
+        let upstream_release_name = "release".to_owned();
 
         // Release tag name format. Should also become configurable.
 
@@ -107,6 +107,20 @@ impl Repository {
         let mut fullpath = self.repo.workdir().unwrap().to_owned();
         fullpath.push(p.as_path());
         fullpath
+    }
+
+    /// Convert a filesystem path pointing inside the working directory into a
+    /// RepoPathBuf.
+    ///
+    /// Some external tools (e.g. `cargo metadata`) make it so that it is useful
+    /// to be able to do this reverse conversion.
+    pub fn convert_path<P: AsRef<Path>>(&self, p: P) -> Result<RepoPathBuf> {
+        let c_root = self.repo.workdir().unwrap().canonicalize()?;
+        let c_p = p.as_ref().canonicalize()?;
+        let rel = c_p
+            .strip_prefix(&c_root)
+            .map_err(|_| Error::OutsideOfRepository(c_p.display().to_string()))?;
+        RepoPathBuf::from_path(rel)
     }
 
     /// Scan the paths in the repository index.
@@ -145,22 +159,96 @@ impl Repository {
     /// Get information about the state of the projects in the repository as
     /// of the latest release commit.
     pub fn get_latest_release_info(&self) -> Result<ReleaseCommitInfo> {
-        match self
-            .repo
-            .find_branch(&self.upstream_release_name, git2::BranchType::Remote)
-        {
-            Ok(branch) => unimplemented!("get info from commit!"),
+        if let Some(_c) = self.try_get_release_commit()? {
+            unimplemented!("get info from commit!");
+        } else {
+            Ok(ReleaseCommitInfo::default())
+        }
+    }
+
+    fn get_signature(&self) -> Result<git2::Signature> {
+        Ok(git2::Signature::now("cranko", "cranko@devnull")?)
+    }
+
+    fn try_get_release_commit(&self) -> Result<Option<git2::Commit>> {
+        let release_ref = match self.repo.resolve_reference_from_short_name(&format!(
+            "{}/{}",
+            self.upstream_name, self.upstream_release_name
+        )) {
+            Ok(r) => r,
             Err(e) => {
-                if e.code() == git2::ErrorCode::NotFound {
-                    // No `release` branch in the upstream. We assume this means
-                    // that it just hasn't been Cranko-ified yet, so we return
-                    // an empty object.
-                    Ok(ReleaseCommitInfo::default())
+                return if e.code() == git2::ErrorCode::NotFound {
+                    // No `release` branch in the upstream, which is OK
+                    Ok(None)
                 } else {
                     Err(e.into())
-                }
+                };
             }
-        }
+        };
+
+        Ok(Some(release_ref.peel_to_commit()?))
+    }
+
+    /// Make a commit merging the current workdir state into the release branch.
+    pub fn make_release_commit(&mut self, changes: &ChangeList) -> Result<()> {
+        // Gather useful info.
+
+        let maybe_release_commit = self.try_get_release_commit()?;
+        let head_ref = self.repo.head()?;
+        let head_commit = head_ref.peel_to_commit()?;
+        let sig = self.get_signature()?;
+        let local_ref_name = format!("refs/heads/{}", self.upstream_release_name);
+
+        // Create and save a new Tree containing the working-tree changes made
+        // during the rewrite process.
+
+        let tree_oid = {
+            let mut index = self.repo.index()?;
+
+            for p in &changes.paths {
+                index.add_path(p.as_path())?;
+            }
+
+            index.write_tree()?
+        };
+        let tree = self.repo.find_tree(tree_oid)?;
+
+        // Create the merged release commit and save it under the
+        // local_ref_name.
+
+        let commit = |parents: &[&git2::Commit]| -> Result<git2::Oid> {
+            self.repo
+                .reference(&local_ref_name, parents[0].id(), true, "update release")?;
+            Ok(self.repo.commit(
+                Some(&local_ref_name), // update_ref
+                &sig,                  // author
+                &sig,                  // committer
+                "Release message!",    // message
+                &tree,
+                parents,
+            )?)
+        };
+
+        let commit_id = if let Some(release_commit) = maybe_release_commit {
+            commit(&[&release_commit, &head_commit])?
+        } else {
+            commit(&[&head_commit])?
+        };
+
+        // Switch the working directory to be the checkout of our new merge
+        // commit. By construction, nothing on the filesystem should actually
+        // change.
+
+        self.repo.set_head(&local_ref_name)?;
+        self.repo.reset(
+            self.repo.find_commit(commit_id)?.as_object(),
+            git2::ResetType::Mixed,
+            None,
+        )?;
+
+        // Phew, all done!
+
+        Ok(())
     }
 }
 
@@ -212,6 +300,20 @@ pub struct ReleasedProjectInfo {
     /// has had the assigned version string. If zero, that means that the
     /// specified version was first released with this commit.
     pub age: usize,
+}
+
+/// A data structure recording changes made when rewriting files
+/// in the repository.
+#[derive(Debug, Default)]
+pub struct ChangeList {
+    paths: Vec<RepoPathBuf>,
+}
+
+impl ChangeList {
+    /// Mark the file at this path as having been updated.
+    pub fn add_path(&mut self, p: &RepoPath) {
+        self.paths.push(p.to_owned());
+    }
 }
 
 // Below we have helpers for trying to deal with git's paths properly, on the
@@ -270,6 +372,11 @@ impl RepoPath {
     pub fn to_owned(&self) -> RepoPathBuf {
         RepoPathBuf::new(&self.0[..])
     }
+
+    /// Compute a user-displayable escaped version of this path.
+    pub fn escaped(&self) -> String {
+        escape_pathlike(&self.0)
+    }
 }
 
 // Copied from git2-rs src/util.rs
@@ -298,6 +405,38 @@ impl std::convert::AsRef<RepoPath> for RepoPathBuf {
 impl RepoPathBuf {
     pub fn new(b: &[u8]) -> Self {
         RepoPathBuf(b.to_vec())
+    }
+
+    /// Create a RepoPathBuf from a Path-like. It is assumed that the path is
+    /// relative to the repository working directory root and doesn't have any
+    /// funny business like ".." in it.
+    fn from_path<P: AsRef<Path>>(p: P) -> Result<Self> {
+        if cfg!(unix) {
+            use std::os::unix::ffi::OsStrExt;
+            Ok(Self::new(p.as_ref().as_os_str().as_bytes()))
+        } else {
+            let mut first = true;
+            let mut b = Vec::new();
+
+            for cmpt in p.as_ref().components() {
+                if first {
+                    first = false;
+                } else {
+                    b.push(b'/');
+                }
+
+                if let std::path::Component::Normal(c) = cmpt {
+                    b.extend(c.to_str().unwrap().as_bytes());
+                } else {
+                    return Err(Error::OutsideOfRepository(format!(
+                        "path with unexpected components: {}",
+                        p.as_ref().display()
+                    )));
+                }
+            }
+
+            Ok(RepoPathBuf(b))
+        }
     }
 
     pub fn truncate(&mut self, len: usize) {

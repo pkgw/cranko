@@ -76,7 +76,6 @@ impl CargoLoader {
 
         // Fill in the packages
 
-        let graph = app.graph_mut();
         let mut cargo_to_graph = HashMap::new();
 
         for pkg in &cargo_meta.packages {
@@ -84,7 +83,7 @@ impl CargoLoader {
                 continue; // This is an external package; not to be tracked.
             }
 
-            let mut pb = graph.add_project();
+            let mut pb = app.graph_mut().add_project();
 
             // Q: should we include a registry name as a qualifier?
             pb.qnames(&[&pkg.name, "cargo"])
@@ -93,14 +92,17 @@ impl CargoLoader {
             cargo_to_graph.insert(pkg.id.clone(), ident);
 
             // Auto-register a rewriter to update this package's Cargo.toml.
-            let cargo_rewrite = CargoRewriter::new(ident, pkg.manifest_path.clone());
-            graph
+            let manifest_repopath = app.repo.convert_path(&pkg.manifest_path)?;
+            let cargo_rewrite = CargoRewriter::new(ident, manifest_repopath);
+            app.graph_mut()
                 .lookup_mut(ident)
                 .rewriters
                 .push(Box::new(cargo_rewrite));
         }
 
         // Now establish the interdependencies.
+
+        let graph = app.graph_mut();
 
         for node in &cargo_meta.resolve.unwrap().nodes {
             if let Some(depender_id) = cargo_to_graph.get(&node.id) {

@@ -3,7 +3,7 @@
 
 //! Version numbers.
 
-use chrono::{offset::Local, DateTime, Datelike};
+use chrono::{offset::Local, Datelike};
 
 use crate::{errors::Result, repository::ReleasedProjectInfo};
 
@@ -50,8 +50,8 @@ impl VersioningScheme {
 
         fn apply_dev_datecode(
             template: &Version,
-            mode: ReleaseMode,
-            latest_release: Option<&ReleasedProjectInfo>,
+            _mode: ReleaseMode,
+            _latest_release: Option<&ReleasedProjectInfo>,
         ) -> Result<Version> {
             let local = Local::now();
             let code = format!("{:04}{:02}{:02}", local.year(), local.month(), local.day());
