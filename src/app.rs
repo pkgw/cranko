@@ -86,6 +86,12 @@ impl AppSession {
                 cur_version,
                 proj.version
             );
+
+            // Bookkeeping so that we can produce updated release info.
+            proj.version_age = match (latest_release, proj.version == cur_version) {
+                (Some(info), true) => info.age + 1,
+                _ => 0,
+            };
         }
 
         Ok(())
@@ -102,5 +108,10 @@ impl AppSession {
         }
 
         Ok(changes)
+    }
+
+    pub fn make_release_commit(&mut self, changes: &ChangeList) -> Result<()> {
+        self.repo.make_release_commit(&self.graph, &changes)?;
+        Ok(())
     }
 }

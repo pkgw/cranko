@@ -86,7 +86,7 @@ impl Command for ApplyCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.apply_versions(version::ReleaseMode::Development)?;
         let changes = sess.rewrite()?;
-        sess.repo.make_release_commit(&changes)?;
+        sess.make_release_commit(&changes)?;
         Ok(0)
     }
 }

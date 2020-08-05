@@ -4,10 +4,12 @@
 //! State of the backing version control repository.
 
 //use dynfmt::{Format, SimpleCurlyFormat};
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use crate::{
     errors::{Error, Result},
+    graph::ProjectGraph,
     project::Project,
 };
 
@@ -190,7 +192,11 @@ impl Repository {
     }
 
     /// Make a commit merging the current workdir state into the release branch.
-    pub fn make_release_commit(&mut self, changes: &ChangeList) -> Result<()> {
+    pub fn make_release_commit(
+        &mut self,
+        graph: &ProjectGraph,
+        changes: &ChangeList,
+    ) -> Result<()> {
         // Gather useful info.
 
         let maybe_release_commit = self.try_get_release_commit()?;
@@ -198,6 +204,33 @@ impl Repository {
         let head_commit = head_ref.peel_to_commit()?;
         let sig = self.get_signature()?;
         let local_ref_name = format!("refs/heads/{}", self.upstream_release_name);
+
+        // Set up the project release info. This will be serialized into the
+        // commit message. (In principle, we could attempt to extract this
+        // information from the Git Tree associated with the release commit, but
+        // not only would that be harder to implement, it would introduce all
+        // sorts of fragility into the system as data formats change. Better to
+        // just save the data as data.)
+
+        let mut info = SerializedCommitInfo::default();
+
+        for proj in graph.toposort()? {
+            info.projects.push(ReleasedProjectInfo {
+                qnames: proj.qualified_names().clone(),
+                version: proj.version.to_string(),
+                age: proj.version_age,
+            });
+        }
+
+        let message = format!(
+            "Release commit created with Cranko.
+
++++ cranko-release-info-v1
+{}
++++
+",
+            toml::to_string(&info)?
+        );
 
         // Create and save a new Tree containing the working-tree changes made
         // during the rewrite process.
@@ -223,7 +256,7 @@ impl Repository {
                 Some(&local_ref_name), // update_ref
                 &sig,                  // author
                 &sig,                  // committer
-                "Release message!",    // message
+                &message,
                 &tree,
                 parents,
             )?)
@@ -287,7 +320,12 @@ impl ReleaseCommitInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct SerializedCommitInfo {
+    pub projects: Vec<ReleasedProjectInfo>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ReleasedProjectInfo {
     /// The qualified names of this project, equivalent to the same-named
     /// property of the Project struct.

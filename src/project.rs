@@ -37,6 +37,12 @@ pub struct Project {
     /// The version associated with this project.
     pub version: Version,
 
+    /// The number of commits at which this project has kept the same version.
+    /// This isn't meant to be used in most cases, but it helps us with the
+    /// "project info" bookkeeping that we do in the commit messages on the
+    /// release branch.
+    pub version_age: usize,
+
     /// The versioning scheme to use in ReleaseMode::Development releases.
     dev_scheme: VersioningScheme,
 
@@ -132,6 +138,7 @@ impl<'a> ProjectBuilder<'a> {
             ident,
             qnames: qnames,
             version,
+            version_age: 0,
             dev_scheme: VersioningScheme::DevDatecode,
             primary_scheme: VersioningScheme::DevDatecode, // XXX update
             rewriters: Vec::new(),

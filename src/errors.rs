@@ -44,8 +44,11 @@ pub enum Error {
     #[error("repo rewrite error: {0}")]
     RewriteFormatError(String),
 
+    #[error("TOML serialization error: {0}")]
+    TomlSer(#[from] toml::ser::Error),
+
     #[error("TOML format error: {0}")]
-    Toml(#[from] toml_edit::TomlError),
+    TomlEdit(#[from] toml_edit::TomlError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

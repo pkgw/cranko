@@ -12,6 +12,8 @@ dynfmt = { version ="^0.1", default-features = false, features = ["curly"] }
 git2 = "^0.13"
 petgraph = "^0.5"
 semver = "^0.9"
+serde = { version = "^1.0", features = ["derive"] }
 structopt = "^0.3"
 thiserror = "1.0"
+toml = "^0.5"
 toml_edit = "^0.2"
