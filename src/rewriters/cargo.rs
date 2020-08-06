@@ -6,7 +6,6 @@
 use std::{
     fs::File,
     io::{Read, Write},
-    path::PathBuf,
 };
 use toml_edit::Document;
 
