@@ -448,33 +448,38 @@ impl RepoPathBuf {
     /// Create a RepoPathBuf from a Path-like. It is assumed that the path is
     /// relative to the repository working directory root and doesn't have any
     /// funny business like ".." in it.
+    #[cfg(unix)]
     fn from_path<P: AsRef<Path>>(p: P) -> Result<Self> {
-        if cfg!(unix) {
-            use std::os::unix::ffi::OsStrExt;
-            Ok(Self::new(p.as_ref().as_os_str().as_bytes()))
-        } else {
-            let mut first = true;
-            let mut b = Vec::new();
+        use std::os::unix::ffi::OsStrExt;
+        Ok(Self::new(p.as_ref().as_os_str().as_bytes()))
+    }
 
-            for cmpt in p.as_ref().components() {
-                if first {
-                    first = false;
-                } else {
-                    b.push(b'/');
-                }
+    /// Create a RepoPathBuf from a Path-like. It is assumed that the path is
+    /// relative to the repository working directory root and doesn't have any
+    /// funny business like ".." in it.
+    #[cfg(windows)]
+    fn from_path<P: AsRef<Path>>(p: P) -> Result<Self> {
+        let mut first = true;
+        let mut b = Vec::new();
 
-                if let std::path::Component::Normal(c) = cmpt {
-                    b.extend(c.to_str().unwrap().as_bytes());
-                } else {
-                    return Err(Error::OutsideOfRepository(format!(
-                        "path with unexpected components: {}",
-                        p.as_ref().display()
-                    )));
-                }
+        for cmpt in p.as_ref().components() {
+            if first {
+                first = false;
+            } else {
+                b.push(b'/');
             }
 
-            Ok(RepoPathBuf(b))
+            if let std::path::Component::Normal(c) = cmpt {
+                b.extend(c.to_str().unwrap().as_bytes());
+            } else {
+                return Err(Error::OutsideOfRepository(format!(
+                    "path with unexpected components: {}",
+                    p.as_ref().display()
+                )));
+            }
         }
+
+        Ok(RepoPathBuf(b))
     }
 
     pub fn truncate(&mut self, len: usize) {
