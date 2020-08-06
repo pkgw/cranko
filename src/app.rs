@@ -6,7 +6,7 @@
 use crate::{
     errors::Result,
     graph::ProjectGraph,
-    repository::{ChangeList, Repository},
+    repository::{ChangeList, CommitId, Repository},
     version::ReleaseMode,
 };
 
@@ -115,7 +115,7 @@ impl AppSession {
         Ok(())
     }
 
-    pub fn analyze_history_to_release(&self) -> Result<Vec<Vec<git2::Oid>>> {
+    pub fn analyze_history_to_release(&self) -> Result<Vec<Vec<CommitId>>> {
         let mut prefixes = Vec::with_capacity(self.graph.len());
 
         for pid in 0..self.graph.len() {

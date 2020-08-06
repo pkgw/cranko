@@ -5,16 +5,23 @@
 
 //use dynfmt::{Format, SimpleCurlyFormat};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use crate::{
     errors::{Error, Result},
     graph::ProjectGraph,
     project::Project,
 };
+
+/// Opaque type representing a commit in the repository.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CommitId(git2::Oid);
+
+impl std::fmt::Display for CommitId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 /// Information about the backing version control repository.
 pub struct Repository {
@@ -289,10 +296,7 @@ impl Repository {
 
     /// Look at the commits between HEAD and the latest release and analyze
     /// their diffs to categorize which commits affect which projects.
-    pub fn analyze_history_to_release(
-        &self,
-        prefixes: &[&RepoPath],
-    ) -> Result<Vec<Vec<git2::Oid>>> {
+    pub fn analyze_history_to_release(&self, prefixes: &[&RepoPath]) -> Result<Vec<Vec<CommitId>>> {
         // Set up to walk the history.
 
         let mut walk = self.repo.revwalk()?;
@@ -383,7 +387,7 @@ impl Repository {
 
             for (idx, commit_list) in matches.iter_mut().enumerate() {
                 if hit_buf[idx] {
-                    commit_list.push(oid.clone());
+                    commit_list.push(CommitId(oid.clone()));
                 }
             }
         }
