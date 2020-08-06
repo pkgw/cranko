@@ -81,13 +81,13 @@ impl ProjectGraph {
     /// dependency graph contains cycles — i.e., if project B depends on project
     /// A and project A depends on project B. This shouldn't happen but isn't
     /// strictly impossible.
-    pub fn toposort(&self) -> Result<GraphTopoSort> {
+    pub fn toposort(&self) -> Result<GraphIter> {
         let node_idxs = toposort(&self.graph, None).map_err(|cycle| {
             let ident = self.graph[cycle.node_id()];
             Error::Cycle(self.projects[ident].user_facing_name().to_owned())
         })?;
 
-        Ok(GraphTopoSort {
+        Ok(GraphIter {
             graph: self,
             node_idxs_iter: node_idxs.into_iter(),
         })
@@ -97,30 +97,26 @@ impl ProjectGraph {
     /// sorted order, mutably.
     ///
     /// See `toposort()` for details. This function is the mutable variant.
-    pub fn toposort_mut(&mut self) -> Result<GraphTopoSortMut> {
+    pub fn toposort_mut(&mut self) -> Result<GraphIterMut> {
         let node_idxs = toposort(&self.graph, None).map_err(|cycle| {
             let ident = self.graph[cycle.node_id()];
             Error::Cycle(self.projects[ident].user_facing_name().to_owned())
         })?;
 
-        Ok(GraphTopoSortMut {
+        Ok(GraphIterMut {
             graph: self,
             node_idxs_iter: node_idxs.into_iter(),
         })
     }
 }
 
-/// An iterator for visiting the projects in the graph in a topologically sorted
-/// order.
-///
-/// That is, if project A in the repository depends on project B, project B will
-/// be visited before project A.
-pub struct GraphTopoSort<'a> {
+/// An iterator for visiting the projects in the graph.
+pub struct GraphIter<'a> {
     graph: &'a ProjectGraph,
     node_idxs_iter: std::vec::IntoIter<NodeIndex<DefaultIx>>,
 }
 
-impl<'a> Iterator for GraphTopoSort<'a> {
+impl<'a> Iterator for GraphIter<'a> {
     type Item = &'a Project;
 
     fn next(&mut self) -> Option<&'a Project> {
@@ -130,14 +126,13 @@ impl<'a> Iterator for GraphTopoSort<'a> {
     }
 }
 
-/// An iterator for visiting the projects in the graph in a topologically sorted
-/// order, mutably.
-pub struct GraphTopoSortMut<'a> {
+/// An iterator for visiting the projects in the graph, mutably.
+pub struct GraphIterMut<'a> {
     graph: &'a mut ProjectGraph,
     node_idxs_iter: std::vec::IntoIter<NodeIndex<DefaultIx>>,
 }
 
-impl<'a> Iterator for GraphTopoSortMut<'a> {
+impl<'a> Iterator for GraphIterMut<'a> {
     type Item = &'a mut Project;
 
     fn next(&mut self) -> Option<&'a mut Project> {
