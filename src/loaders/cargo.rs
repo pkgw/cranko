@@ -83,16 +83,21 @@ impl CargoLoader {
                 continue; // This is an external package; not to be tracked.
             }
 
+            // Auto-register a rewriter to update this package's Cargo.toml.
+            let manifest_repopath = app.repo.convert_path(&pkg.manifest_path)?;
+            let (prefix, _) = manifest_repopath.split_basename();
+
             let mut pb = app.graph_mut().add_project();
 
             // Q: should we include a registry name as a qualifier?
             pb.qnames(&[&pkg.name, "cargo"])
                 .version(Version::Semver(pkg.version.clone()));
+            pb.prefix(prefix.to_owned());
+
             let ident = pb.finish_init();
             cargo_to_graph.insert(pkg.id.clone(), ident);
 
             // Auto-register a rewriter to update this package's Cargo.toml.
-            let manifest_repopath = app.repo.convert_path(&pkg.manifest_path)?;
             let cargo_rewrite = CargoRewriter::new(ident, manifest_repopath);
             app.graph_mut()
                 .lookup_mut(ident)

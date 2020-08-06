@@ -11,6 +11,7 @@
 
 use crate::{
     graph::ProjectGraph,
+    repository::{RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::{ReleaseMode, Version, VersioningScheme},
 };
@@ -52,6 +53,12 @@ pub struct Project {
     /// Steps to perform when rewriting this project's metadata to produce
     /// a release commit.
     pub rewriters: Vec<Box<dyn Rewriter>>,
+
+    /// A directory prefix in the repository: any commits that affect files
+    /// within this prefix are assumed to affect this project. Should be empty
+    /// if all commits affect this project. Otherwise, should end with a
+    /// trailing slash for easy path combination.
+    prefix: RepoPathBuf,
 }
 
 impl Project {
@@ -85,6 +92,11 @@ impl Project {
             ReleaseMode::Primary => self.primary_scheme,
         }
     }
+
+    /// Get this project's prefix in the repository filesystem.
+    pub fn prefix(&self) -> &RepoPath {
+        &self.prefix
+    }
 }
 
 /// A builder for initializing a new project entry that will be added to the
@@ -99,6 +111,7 @@ pub struct ProjectBuilder<'a> {
     owner: &'a mut ProjectGraph,
     qnames: Vec<String>,
     version: Option<Version>,
+    prefix: Option<RepoPathBuf>,
 }
 
 impl<'a> ProjectBuilder<'a> {
@@ -108,6 +121,7 @@ impl<'a> ProjectBuilder<'a> {
             owner,
             qnames: Vec::new(),
             version: None,
+            prefix: None,
         }
     }
 
@@ -126,6 +140,12 @@ impl<'a> ProjectBuilder<'a> {
         self
     }
 
+    /// Set the repository file prefix associated with the project to be created.
+    pub fn prefix(&mut self, prefix: RepoPathBuf) -> &mut Self {
+        self.prefix = Some(prefix);
+        self
+    }
+
     /// Add the template project to the graph, consuming this object and
     /// returning its unique ID that can be used to apply further settings.
     pub fn finish_init(self) -> ProjectId {
@@ -133,6 +153,7 @@ impl<'a> ProjectBuilder<'a> {
         let qnames = self.qnames;
 
         let version = self.version.unwrap();
+        let prefix = self.prefix.unwrap();
 
         self.owner.finalize_project_addition(|ident| Project {
             ident,
@@ -142,6 +163,7 @@ impl<'a> ProjectBuilder<'a> {
             dev_scheme: VersioningScheme::DevDatecode,
             primary_scheme: VersioningScheme::DevDatecode, // XXX update
             rewriters: Vec::new(),
+            prefix,
         })
     }
 }
