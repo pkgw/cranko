@@ -10,6 +10,7 @@ cargo_metadata = "^0.10"
 chrono = "^0.4"
 dynfmt = { version ="^0.1", default-features = false, features = ["curly"] }
 git2 = "^0.13"
+lru = "^0.6"
 petgraph = "^0.5"
 semver = "^0.9"
 serde = { version = "^1.0", features = ["derive"] }

@@ -5,7 +5,10 @@
 
 //use dynfmt::{Format, SimpleCurlyFormat};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     errors::{Error, Result},
@@ -283,6 +286,110 @@ impl Repository {
 
         Ok(())
     }
+
+    /// Look at the commits between HEAD and the latest release and analyze
+    /// their diffs to categorize which commits affect which projects.
+    pub fn analyze_history_to_release(
+        &self,
+        prefixes: &[&RepoPath],
+    ) -> Result<Vec<Vec<git2::Oid>>> {
+        // Set up to walk the history.
+
+        let mut walk = self.repo.revwalk()?;
+
+        walk.push_head()?;
+
+        if let Some(release_commit) = self.try_get_release_commit()? {
+            walk.hide(release_commit.id())?;
+        }
+
+        // Set up our results table.
+
+        let mut hit_buf = vec![false; prefixes.len()];
+        let mut matches = vec![Vec::new(); prefixes.len()];
+
+        // Do the walk!
+
+        let mut trees = lru::LruCache::new(3);
+        let mut dopts = git2::DiffOptions::new();
+        dopts.include_typechange(true);
+
+        for maybe_oid in walk {
+            // Get the two relevant trees and compute their diff. We have to
+            // jump through some hoops to support the root commit (with no
+            // parents) but it's not really that bad. We also have to pop() the
+            // trees out of the LRU because get() holds a mutable reference to
+            // the cache, which prevents us from looking at two trees
+            // simultaneously.
+
+            let oid = maybe_oid?;
+            let commit = self.repo.find_commit(oid)?;
+            let ctid = commit.tree_id();
+            let cur_tree = match trees.pop(&ctid) {
+                Some(t) => t,
+                None => self.repo.find_tree(ctid)?,
+            };
+
+            let (maybe_ptid, maybe_parent_tree) = if commit.parent_count() == 0 {
+                (None, None) // this is the first commit in the history!
+            } else {
+                let parent = commit.parent(0)?;
+                let ptid = parent.tree_id();
+                let parent_tree = match trees.pop(&ptid) {
+                    Some(t) => t,
+                    None => self.repo.find_tree(ptid)?,
+                };
+                (Some(ptid), Some(parent_tree))
+            };
+
+            let diff = self.repo.diff_tree_to_tree(
+                maybe_parent_tree.as_ref(),
+                Some(&cur_tree),
+                Some(&mut dopts),
+            )?;
+
+            trees.put(ctid, cur_tree);
+            if let (Some(ptid), Some(pt)) = (maybe_ptid, maybe_parent_tree) {
+                trees.put(ptid, pt);
+            }
+
+            // Examine the diff and see what file paths, and therefore which
+            // projects, are affected.
+
+            for flag in &mut hit_buf {
+                *flag = false;
+            }
+
+            for delta in diff.deltas() {
+                // there's presumably a cleaner way to do this?
+                if let Some(old_path_bytes) = delta.old_file().path_bytes() {
+                    let old_path = RepoPath::new(old_path_bytes);
+                    for (idx, prefix) in prefixes.iter().enumerate() {
+                        if old_path.starts_with(prefix) {
+                            hit_buf[idx] = true;
+                        }
+                    }
+                }
+
+                if let Some(new_path_bytes) = delta.new_file().path_bytes() {
+                    let new_path = RepoPath::new(new_path_bytes);
+                    for (idx, prefix) in prefixes.iter().enumerate() {
+                        if new_path.starts_with(prefix) {
+                            hit_buf[idx] = true;
+                        }
+                    }
+                }
+            }
+
+            for (idx, commit_list) in matches.iter_mut().enumerate() {
+                if hit_buf[idx] {
+                    commit_list.push(oid.clone());
+                }
+            }
+        }
+
+        Ok(matches)
+    }
 }
 
 /// Information about the state of the projects in the repository corresponding
@@ -414,6 +521,17 @@ impl RepoPath {
     /// Compute a user-displayable escaped version of this path.
     pub fn escaped(&self) -> String {
         escape_pathlike(&self.0)
+    }
+
+    /// Return true if this path starts with the argument.
+    pub fn starts_with(&self, other: &RepoPath) -> bool {
+        let n = other.len();
+
+        if self.len() < n {
+            false
+        } else {
+            self.0[..n] == other.0
+        }
     }
 }
 

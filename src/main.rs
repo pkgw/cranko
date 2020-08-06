@@ -141,10 +141,16 @@ struct StatusCommand {}
 impl Command for StatusCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-        let graph = sess.populated_graph()?;
+        sess.populated_graph()?;
+        let oids = sess.analyze_history_to_release()?;
+        let graph = sess.graph();
 
         for proj in graph.toposort()? {
             println!("{}: {}", proj.user_facing_name(), proj.version);
+            println!(
+                "  number of relevant commits since release: {}",
+                oids[proj.ident()].len()
+            );
         }
 
         Ok(0)

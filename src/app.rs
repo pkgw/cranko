@@ -114,4 +114,14 @@ impl AppSession {
         self.repo.make_release_commit(&self.graph, &changes)?;
         Ok(())
     }
+
+    pub fn analyze_history_to_release(&self) -> Result<Vec<Vec<git2::Oid>>> {
+        let mut prefixes = Vec::with_capacity(self.graph.len());
+
+        for pid in 0..self.graph.len() {
+            prefixes.push(self.graph.lookup(pid).prefix());
+        }
+
+        self.repo.analyze_history_to_release(&prefixes)
+    }
 }
