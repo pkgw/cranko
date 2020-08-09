@@ -31,6 +31,9 @@ pub enum Error {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("multiple projects with same name {0} (?!)")]
+    NamingClash(String),
+
     #[error("cannot identify the upstream remote for the backing repository")]
     NoUpstreamRemote,
 

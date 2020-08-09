@@ -146,7 +146,7 @@ impl Command for StatusCommand {
         let graph = sess.graph();
 
         for proj in graph.toposort()? {
-            println!("{}: {}", proj.user_facing_name(), proj.version);
+            println!("{}: {}", proj.user_facing_name, proj.version);
             println!(
                 "  number of relevant commits since release: {}",
                 oids[proj.ident()].len()

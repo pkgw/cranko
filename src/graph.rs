@@ -13,6 +13,7 @@ use petgraph::{
     algo::toposort,
     graph::{DefaultIx, DiGraph, NodeIndex},
 };
+use std::collections::HashMap;
 
 use crate::{
     errors::{Error, Result},
@@ -31,6 +32,10 @@ pub struct ProjectGraph {
 
     /// The `petgraph` state expressing the project graph.
     graph: DiGraph<ProjectId, ()>,
+
+    /// Mapping from user-facing project name to project ID. This is calculated
+    /// in the complete_loading() method.
+    name_to_id: HashMap<String, ProjectId>,
 }
 
 impl ProjectGraph {
@@ -41,6 +46,10 @@ impl ProjectGraph {
 
     /// Start the process of adding a new project to the graph.
     pub fn add_project<'a>(&'a mut self) -> ProjectBuilder<'a> {
+        if self.name_to_id.len() != 0 {
+            panic!("cannot add projects after finalizing initialization");
+        }
+
         ProjectBuilder::new(self)
     }
 
@@ -73,6 +82,140 @@ impl ProjectGraph {
         self.graph.add_edge(dependee_nix, depender_nix, ());
     }
 
+    /// Complete construction of the graph.
+    ///
+    /// In particular, this function calculates unique, user-facing names for
+    /// every project in the graph. After this function is called, new projects
+    /// may not be added to the graph.
+    pub fn complete_loading(&mut self) -> Result<()> {
+        // TODO: our algorithm for coming up with unambiguous names is totally
+        // ad-hoc and probably crashes in various corner cases. There's probably
+        // a much smarter way to approach this.
+
+        let node_ixs = toposort(&self.graph, None).map_err(|cycle| {
+            let ident = self.graph[cycle.node_id()];
+            Error::Cycle(self.projects[ident].user_facing_name.to_owned())
+        })?;
+
+        let name_to_id = &mut self.name_to_id;
+
+        // Each project has a vector of "qualified names" [n1, n2, ..., nN] that
+        // should be unique. Here n1 is the "narrowest" name and probably
+        // corresponds to what the user naively thinks of as the project names.
+        // Farther-out names help us disambiguate, e.g. in a monorepo containing
+        // a Python project and an NPM project with the same name. Our disambiguation
+        // strings together n_broad items from the broad end of the list and n_narrow
+        // items from the narrow end of the list. If qnames is [foo, bar, bax, quux],
+        // n_narrow is 2, and n_broad is 1, the rendered name is "quux:bar:foo".
+        #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+        struct NamingState {
+            pub n_narrow: usize,
+        }
+
+        impl Default for NamingState {
+            fn default() -> Self {
+                NamingState { n_narrow: 1 }
+            }
+        }
+
+        impl NamingState {
+            fn compute_name(&self, proj: &Project) -> String {
+                let mut s = String::new();
+                let qnames = proj.qualified_names();
+                const SEP: char = ':';
+
+                for i in 0..self.n_narrow {
+                    if i != 0 {
+                        s.push(SEP);
+                    }
+
+                    s.push_str(&qnames[self.n_narrow - 1 - i]);
+                }
+
+                s
+            }
+        }
+
+        let mut states = vec![NamingState::default(); self.projects.len()];
+        let mut need_another_pass = true;
+
+        while need_another_pass {
+            name_to_id.clear();
+            need_another_pass = false;
+
+            for node_ix in &node_ixs {
+                use std::collections::hash_map::Entry;
+                let ident1 = self.graph[*node_ix];
+                let proj1 = &self.projects[ident1];
+                let candidate_name = states[ident1].compute_name(proj1);
+
+                let ident2: ProjectId = match name_to_id.entry(candidate_name) {
+                    Entry::Vacant(o) => {
+                        // Great. No conflict.
+                        o.insert(ident1);
+                        continue;
+                    }
+
+                    Entry::Occupied(o) => o.remove(),
+                };
+
+                // If we're still here, we have a name conflict that needs
+                // solving. We've removed the conflicting project from the map.
+                //
+                // We'd like to disambiguate both of the conflicting entries
+                // equally. I.e., if the qnames are [pywwt, npm] and [pywwt,
+                // python] we want to end up with "python:pywwt" and
+                // "npm:pywwt", not "python:pywwt" and "pywwt".
+
+                let proj2 = &self.projects[ident2];
+                let qn1 = proj1.qualified_names();
+                let qn2 = proj2.qualified_names();
+                let n1 = qn1.len();
+                let n2 = qn2.len();
+                let mut success = false;
+
+                for i in 0..std::cmp::min(n1, n2) {
+                    if qn1[i] != qn2[i] {
+                        success = true;
+                        states[ident1].n_narrow = std::cmp::max(states[ident1].n_narrow, i + 1);
+                        states[ident2].n_narrow = std::cmp::max(states[ident2].n_narrow, i + 1);
+                        break;
+                    }
+                }
+
+                if !success {
+                    if n1 > n2 {
+                        states[ident1].n_narrow = std::cmp::max(states[ident1].n_narrow, n2 + 1);
+                    } else if n2 > n1 {
+                        states[ident2].n_narrow = std::cmp::max(states[ident2].n_narrow, n1 + 1);
+                    } else {
+                        return Err(Error::NamingClash(states[ident1].compute_name(proj1)));
+                    }
+                }
+
+                if name_to_id
+                    .insert(states[ident1].compute_name(proj1), ident1)
+                    .is_some()
+                {
+                    need_another_pass = true; // this name clashes too!
+                }
+
+                if name_to_id
+                    .insert(states[ident2].compute_name(proj2), ident2)
+                    .is_some()
+                {
+                    need_another_pass = true; // this name clashes too!
+                }
+            }
+        }
+
+        for (name, ident) in name_to_id {
+            self.projects[*ident].user_facing_name = name.clone();
+        }
+
+        Ok(())
+    }
+
     /// Get an iterator to visit the projects in the graph in topologically
     /// sorted order.
     ///
@@ -84,7 +227,7 @@ impl ProjectGraph {
     pub fn toposort(&self) -> Result<GraphIter> {
         let node_idxs = toposort(&self.graph, None).map_err(|cycle| {
             let ident = self.graph[cycle.node_id()];
-            Error::Cycle(self.projects[ident].user_facing_name().to_owned())
+            Error::Cycle(self.projects[ident].user_facing_name.to_owned())
         })?;
 
         Ok(GraphIter {
@@ -100,7 +243,7 @@ impl ProjectGraph {
     pub fn toposort_mut(&mut self) -> Result<GraphIterMut> {
         let node_idxs = toposort(&self.graph, None).map_err(|cycle| {
             let ident = self.graph[cycle.node_id()];
-            Error::Cycle(self.projects[ident].user_facing_name().to_owned())
+            Error::Cycle(self.projects[ident].user_facing_name.to_owned())
         })?;
 
         Ok(GraphIterMut {
@@ -149,5 +292,70 @@ impl<'a> Iterator for GraphIterMut<'a> {
         // allows this. Cf:
         // https://users.rust-lang.org/t/help-with-iterators-yielding-mutable-references/24892
         Some(unsafe { &mut *(self.graph.lookup_mut(ident) as *mut _) })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{repository::RepoPathBuf, version::Version};
+
+    fn do_name_assignment_test(spec: &[(&[&str], &str)]) -> Result<()> {
+        let mut graph = ProjectGraph::default();
+        let mut ids = HashMap::new();
+
+        for (qnames, user_facing) in spec {
+            let mut b = graph.add_project();
+            b.qnames(*qnames);
+            b.version(Version::Semver(semver::Version::new(0, 0, 0)));
+            b.prefix(RepoPathBuf::new(b""));
+            let projid = b.finish_init();
+            ids.insert(projid, user_facing);
+        }
+
+        graph.complete_loading()?;
+
+        for (projid, user_facing) in ids {
+            assert_eq!(graph.lookup(projid).user_facing_name, *user_facing);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn name_assignment_1() {
+        do_name_assignment_test(&[(&["A", "B"], "A")]).unwrap();
+    }
+
+    #[test]
+    fn name_assignment_2() {
+        do_name_assignment_test(&[(&["A", "B"], "B:A"), (&["A", "C"], "C:A")]).unwrap();
+    }
+
+    #[test]
+    fn name_assignment_3() {
+        do_name_assignment_test(&[
+            (&["A", "B"], "B:A"),
+            (&["A", "C"], "C:A"),
+            (&["D", "B"], "D"),
+            (&["E"], "E"),
+        ])
+        .unwrap();
+    }
+
+    #[test]
+    fn name_assignment_4() {
+        do_name_assignment_test(&[(&["A", "A"], "A:A"), (&["A"], "A")]).unwrap();
+    }
+
+    #[test]
+    fn name_assignment_5() {
+        do_name_assignment_test(&[
+            (&["A"], "A"),
+            (&["A", "B"], "B:A"),
+            (&["A", "B", "C"], "C:B:A"),
+            (&["A", "B", "C", "D"], "D:C:B:A"),
+        ])
+        .unwrap();
     }
 }

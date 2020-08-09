@@ -49,6 +49,7 @@ impl AppSession {
     pub fn populated_graph(&mut self) -> Result<&ProjectGraph> {
         if self.graph.len() == 0 {
             self.populate_graph()?;
+            self.graph.complete_loading()?;
         }
 
         Ok(&self.graph)
@@ -82,9 +83,7 @@ impl AppSession {
             proj.version = scheme.apply(&cur_version, mode, latest_release)?;
             println!(
                 "{}: {} => {}",
-                proj.user_facing_name(),
-                cur_version,
-                proj.version
+                proj.user_facing_name, cur_version, proj.version
             );
 
             // Bookkeeping so that we can produce updated release info.

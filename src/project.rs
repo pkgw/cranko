@@ -35,6 +35,11 @@ pub struct Project {
     /// same name.
     qnames: Vec<String>,
 
+    /// The user-facing package name; this is computed from the qualified names
+    /// after all of the projects are loaded, so that we can make sure that
+    /// these are unique.
+    pub user_facing_name: String,
+
     /// The version associated with this project.
     pub version: Version,
 
@@ -73,16 +78,6 @@ impl Project {
     /// Get a reference to this project's full qualified names.
     pub fn qualified_names(&self) -> &Vec<String> {
         &self.qnames
-    }
-
-    /// Get the name of the project as we'll show it to the user.
-    ///
-    /// This is not necessarily straightforward since a repository might contain
-    /// multiple projects with names that need distinguishing; e.g. a repository
-    /// with related Python and NPM packages that have the same name on their
-    /// respective registries.
-    pub fn user_facing_name(&self) -> &str {
-        &self.qnames[0] // XXXX DO BETTER
     }
 
     /// Get the versioning scheme used by this project for specific release mode.
@@ -158,6 +153,7 @@ impl<'a> ProjectBuilder<'a> {
         self.owner.finalize_project_addition(|ident| Project {
             ident,
             qnames: qnames,
+            user_facing_name: String::new(),
             version,
             version_age: 0,
             dev_scheme: VersioningScheme::DevDatecode,
