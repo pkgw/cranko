@@ -34,6 +34,9 @@ pub enum Error {
     #[error("multiple projects with same name {0} (?!)")]
     NamingClash(String),
 
+    #[error("no such project `{0}`")]
+    NoSuchProject(String),
+
     #[error("cannot identify the upstream remote for the backing repository")]
     NoUpstreamRemote,
 

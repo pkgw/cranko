@@ -50,6 +50,10 @@ enum Commands {
     /// List available subcommands
     ListCommands(ListCommandsCommand),
 
+    #[structopt(name = "stage")]
+    /// Mark one or more projects as planned for release
+    Stage(StageCommand),
+
     #[structopt(name = "status")]
     /// Report release status inside the active repo
     Status(StatusCommand),
@@ -64,6 +68,7 @@ impl Command for Commands {
             Commands::Apply(o) => o.execute(),
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
+            Commands::Stage(o) => o.execute(),
             Commands::Status(o) => o.execute(),
             Commands::External(args) => do_external(args),
         }
@@ -127,6 +132,32 @@ impl Command for ListCommandsCommand {
 
         for command in list_commands() {
             println!("    {}", command);
+        }
+
+        Ok(0)
+    }
+}
+
+// stage
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct StageCommand {
+    #[structopt(help = "Name(s) of the project(s) to stage for release")]
+    proj_names: Vec<String>,
+}
+
+impl Command for StageCommand {
+    fn execute(self) -> Result<i32> {
+        let mut sess = app::AppSession::initialize()?;
+
+        // TODO: more flexibly querying; if no names are provided, default to
+        // staging any changed projects.
+        let mut q = graph::GraphQueryBuilder::default();
+        q.names(self.proj_names);
+
+        let graph = sess.populated_graph()?;
+        for proj in graph.query(q)? {
+            println!("staging {}", proj.user_facing_name);
         }
 
         Ok(0)
@@ -223,6 +254,7 @@ fn list_commands() -> BTreeSet<String> {
     commands.insert("apply".to_owned());
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
+    commands.insert("stage".to_owned());
     commands.insert("status".to_owned());
 
     commands

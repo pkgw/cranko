@@ -20,6 +20,8 @@ use crate::{
     project::{Project, ProjectBuilder, ProjectId},
 };
 
+type OurNodeIndex = NodeIndex<DefaultIx>;
+
 /// A DAG of projects expressing their dependencies.
 #[derive(Debug, Default)]
 pub struct ProjectGraph {
@@ -28,7 +30,7 @@ pub struct ProjectGraph {
     projects: Vec<Project>,
 
     /// NodeIndex values for each project based on its identifier.
-    node_ixs: Vec<NodeIndex<DefaultIx>>,
+    node_ixs: Vec<OurNodeIndex>,
 
     /// The `petgraph` state expressing the project graph.
     graph: DiGraph<ProjectId, ()>,
@@ -251,12 +253,59 @@ impl ProjectGraph {
             node_idxs_iter: node_idxs.into_iter(),
         })
     }
+
+    /// Get an iterator to visit some subset of the projects in the graph,
+    /// according to a query. It is OK if the query returns no results.
+    pub fn query(&self, query: GraphQueryBuilder) -> Result<GraphIter> {
+        // Note: if we add a mutable variant, we need to make sure that it's not
+        // possible to visit the same project more than once in one query.
+        let mut node_idxs = Vec::new();
+
+        for name in query.names {
+            if let Some(id) = self.name_to_id.get(&name) {
+                node_idxs.push(self.node_ixs[*id]);
+            } else {
+                return Err(Error::NoSuchProject(name));
+            }
+        }
+
+        Ok(GraphIter {
+            graph: self,
+            node_idxs_iter: node_idxs.into_iter(),
+        })
+    }
+}
+
+/// Builder structure for querying projects in the graph.
+///
+/// The main purpose of this type is to support command-line applications that
+/// accept some number of projects as arguments. Depending on the use case, it
+/// might be zero or more projects, exactly one project, etc.
+#[derive(Debug)]
+pub struct GraphQueryBuilder {
+    names: Vec<String>,
+}
+
+impl Default for GraphQueryBuilder {
+    fn default() -> Self {
+        GraphQueryBuilder { names: Vec::new() }
+    }
+}
+
+impl GraphQueryBuilder {
+    /// Specify particular project names as part of the query.
+    ///
+    /// Depending on the nature of the query, a zero-sized list may be OK here.
+    pub fn names<T: std::fmt::Display>(&mut self, names: impl IntoIterator<Item = T>) -> &mut Self {
+        self.names = names.into_iter().map(|s| s.to_string()).collect();
+        self
+    }
 }
 
 /// An iterator for visiting the projects in the graph.
 pub struct GraphIter<'a> {
     graph: &'a ProjectGraph,
-    node_idxs_iter: std::vec::IntoIter<NodeIndex<DefaultIx>>,
+    node_idxs_iter: std::vec::IntoIter<OurNodeIndex>,
 }
 
 impl<'a> Iterator for GraphIter<'a> {
@@ -272,7 +321,7 @@ impl<'a> Iterator for GraphIter<'a> {
 /// An iterator for visiting the projects in the graph, mutably.
 pub struct GraphIterMut<'a> {
     graph: &'a mut ProjectGraph,
-    node_idxs_iter: std::vec::IntoIter<NodeIndex<DefaultIx>>,
+    node_idxs_iter: std::vec::IntoIter<OurNodeIndex>,
 }
 
 impl<'a> Iterator for GraphIterMut<'a> {
