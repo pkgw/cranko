@@ -296,6 +296,12 @@ impl Repository {
 
     /// Look at the commits between HEAD and the latest release and analyze
     /// their diffs to categorize which commits affect which projects.
+    ///
+    /// TODO: say that a subproject was modified but not released in the most
+    /// recent release commit -- something that we want to allow for
+    /// practicality. For that project we will need to reach farther back in the
+    /// history than the tip of `release`, which will force this algorithm to
+    /// become a lot more complicated.
     pub fn analyze_history_to_release(&self, prefixes: &[&RepoPath]) -> Result<Vec<Vec<CommitId>>> {
         // Set up to walk the history.
 
@@ -393,6 +399,17 @@ impl Repository {
         }
 
         Ok(matches)
+    }
+
+    /// Get the brief message associated with a commit.
+    pub fn get_commit_message(&self, cid: CommitId) -> Result<String> {
+        let commit = self.repo.find_commit(cid.0)?;
+
+        if let Some(s) = commit.summary() {
+            Ok(s.to_owned())
+        } else {
+            Ok(format!("[commit {0}: non-Unicode summary]", cid.0))
+        }
     }
 }
 

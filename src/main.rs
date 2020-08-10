@@ -17,6 +17,7 @@ use std::{
 use structopt::StructOpt;
 
 mod app;
+mod changelog;
 mod errors;
 mod graph;
 mod loaders;
@@ -149,15 +150,34 @@ struct StageCommand {
 impl Command for StageCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
+        sess.populated_graph()?;
 
-        // TODO: more flexibly querying; if no names are provided, default to
-        // staging any changed projects.
+        // Get the list of projects that we're interested in.
+        //
+        // TODO: better validation and more flexible querying; if no names are
+        // provided, default to staging any changed projects.
         let mut q = graph::GraphQueryBuilder::default();
         q.names(self.proj_names);
+        let idents = sess.graph().query_ids(q)?;
 
-        let graph = sess.populated_graph()?;
-        for proj in graph.query(q)? {
-            println!("staging {}", proj.user_facing_name);
+        // Pull up the relevant repository history for all of those projects.
+        let history = {
+            let graph = sess.graph();
+            let mut prefixes = Vec::new();
+
+            for projid in &idents {
+                let proj = graph.lookup(*projid);
+                prefixes.push(proj.prefix());
+            }
+
+            sess.repo.analyze_history_to_release(&prefixes[..])?
+        };
+
+        // Update the changelogs
+        for i in 0..idents.len() {
+            let proj = sess.graph().lookup(idents[i]);
+            let changes = &history[i][..];
+            proj.changelog.draft_release_update(proj, &sess, changes)?;
         }
 
         Ok(0)

@@ -25,6 +25,10 @@ pub enum Error {
     #[error("cannot proceed with a dirty backing repository (path: {0})")]
     DirtyRepository(String),
 
+    // See comment in From implementation below
+    #[error("templating error: {0}")]
+    Dynfmt(String),
+
     #[error("{0}")]
     Git(#[from] git2::Error),
 
@@ -55,6 +59,14 @@ pub enum Error {
 
     #[error("TOML format error: {0}")]
     TomlEdit(#[from] toml_edit::TomlError),
+}
+
+// Note: we cannot preserve the dynfmt::Error since it has an associated
+// lifetime. So, we stringify it.
+impl<'a> From<dynfmt::Error<'a>> for Error {
+    fn from(e: dynfmt::Error<'a>) -> Self {
+        Error::Dynfmt(e.to_string())
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

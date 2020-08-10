@@ -10,6 +10,7 @@
 //! as implemented in the `graph` module.
 
 use crate::{
+    changelog::ChangelogFormat,
     graph::ProjectGraph,
     repository::{RepoPath, RepoPathBuf},
     rewriters::Rewriter,
@@ -64,6 +65,9 @@ pub struct Project {
     /// if all commits affect this project. Otherwise, should end with a
     /// trailing slash for easy path combination.
     prefix: RepoPathBuf,
+
+    /// How this project's changelog is formatted and updated.
+    pub changelog: ChangelogFormat,
 }
 
 impl Project {
@@ -160,6 +164,7 @@ impl<'a> ProjectBuilder<'a> {
             primary_scheme: VersioningScheme::DevDatecode, // XXX update
             rewriters: Vec::new(),
             prefix,
+            changelog: ChangelogFormat::default(),
         })
     }
 }

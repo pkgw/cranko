@@ -13,7 +13,7 @@ use petgraph::{
     algo::toposort,
     graph::{DefaultIx, DiGraph, NodeIndex},
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     errors::{Error, Result},
@@ -254,25 +254,26 @@ impl ProjectGraph {
         })
     }
 
-    /// Get an iterator to visit some subset of the projects in the graph,
-    /// according to a query. It is OK if the query returns no results.
-    pub fn query(&self, query: GraphQueryBuilder) -> Result<GraphIter> {
-        // Note: if we add a mutable variant, we need to make sure that it's not
-        // possible to visit the same project more than once in one query.
-        let mut node_idxs = Vec::new();
+    /// Process the query and return a vector of matched project IDs
+    pub fn query_ids(&self, query: GraphQueryBuilder) -> Result<Vec<ProjectId>> {
+        // Note: while it generally feels "right" to not allow repeated visits
+        // to the same project, this is especially important if a query is used
+        // to construct a mutable iterator, since it breaks soundness to have
+        // such an iterator visit the same project more than once.
+        let mut idents = Vec::new();
+        let mut seen_ids = HashSet::new();
 
         for name in query.names {
             if let Some(id) = self.name_to_id.get(&name) {
-                node_idxs.push(self.node_ixs[*id]);
+                if seen_ids.insert(*id) {
+                    idents.push(*id);
+                } // todo? error/warning/etc on duplicated project
             } else {
                 return Err(Error::NoSuchProject(name));
             }
         }
 
-        Ok(GraphIter {
-            graph: self,
-            node_idxs_iter: node_idxs.into_iter(),
-        })
+        Ok(idents)
     }
 }
 
