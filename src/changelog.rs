@@ -59,7 +59,7 @@ impl Default for MarkdownFormat {
     fn default() -> Self {
         MarkdownFormat {
             basename: "CHANGELOG.md".to_owned(),
-            release_header_format: "# Version {version} ({yyyymmdd})\n\n".to_owned(),
+            release_header_format: "# Version {version} ({yyyy_mm_dd})\n\n".to_owned(),
             stage_header_format: "# rc: {bump_spec}\n\n".to_owned(),
             footer_format: "\n".to_owned(),
         }
@@ -67,14 +67,19 @@ impl Default for MarkdownFormat {
 }
 
 impl MarkdownFormat {
+    fn changelog_path(&self, proj: &Project, repo: &Repository) -> PathBuf {
+        let mut changelog_path = repo.resolve_workdir(proj.prefix());
+        changelog_path.push(&self.basename);
+        changelog_path
+    }
+
     fn draft_release_update(
         &self,
         proj: &Project,
         sess: &AppSession,
         changes: &[CommitId],
     ) -> Result<()> {
-        let mut changelog_path = sess.repo.resolve_workdir(proj.prefix());
-        changelog_path.push(&self.basename);
+        let changelog_path = self.changelog_path(proj, &sess.repo);
 
         let prev_log = {
             match File::open(&changelog_path) {
@@ -112,7 +117,7 @@ impl MarkdownFormat {
         const WRAP_WIDTH: usize = 78;
 
         for cid in changes {
-            let message = sess.repo.get_commit_message(*cid)?;
+            let message = sess.repo.get_commit_summary(*cid)?;
             let mut prefix = "- ";
 
             for line in textwrap::wrap_iter(&message, WRAP_WIDTH) {

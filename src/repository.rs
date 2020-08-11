@@ -222,7 +222,7 @@ impl Repository {
         // sorts of fragility into the system as data formats change. Better to
         // just save the data as data.)
 
-        let mut info = SerializedCommitInfo::default();
+        let mut info = SerializedReleaseCommitInfo::default();
 
         for proj in graph.toposort()? {
             info.projects.push(ReleasedProjectInfo {
@@ -402,7 +402,7 @@ impl Repository {
     }
 
     /// Get the brief message associated with a commit.
-    pub fn get_commit_message(&self, cid: CommitId) -> Result<String> {
+    pub fn get_commit_summary(&self, cid: CommitId) -> Result<String> {
         let commit = self.repo.find_commit(cid.0)?;
 
         if let Some(s) = commit.summary() {
@@ -422,7 +422,7 @@ pub struct ReleaseCommitInfo {
     /// The Git commit-ish that this object describes. May be None when there is
     /// no upstream `release` branch, in which case this struct will contain no
     /// genuine information.
-    pub committish: Option<git2::Oid>,
+    pub committish: Option<CommitId>,
 
     /// A list of projects and their release information as of this commit. This
     /// list includes every tracked project in this commit. Not all of those
@@ -449,7 +449,7 @@ impl ReleaseCommitInfo {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-struct SerializedCommitInfo {
+struct SerializedReleaseCommitInfo {
     pub projects: Vec<ReleasedProjectInfo>,
 }
 
@@ -545,14 +545,35 @@ impl RepoPath {
     }
 
     /// Return true if this path starts with the argument.
-    pub fn starts_with(&self, other: &RepoPath) -> bool {
-        let n = other.len();
+    pub fn starts_with<P: AsRef<[u8]>>(&self, other: P) -> bool {
+        let other = other.as_ref();
+        let sn = self.len();
+        let on = other.len();
 
-        if self.len() < n {
+        if sn < on {
             false
         } else {
-            self.0[..n] == other.0
+            &self.0[..on] == other
         }
+    }
+
+    /// Return true if this path ends with the argument.
+    pub fn ends_with<P: AsRef<[u8]>>(&self, other: P) -> bool {
+        let other = other.as_ref();
+        let sn = self.len();
+        let on = other.len();
+
+        if sn < on {
+            false
+        } else {
+            &self.0[(sn - on)..] == other
+        }
+    }
+}
+
+impl git2::IntoCString for &RepoPath {
+    fn into_c_string(self) -> std::result::Result<std::ffi::CString, git2::Error> {
+        self.0.into_c_string()
     }
 }
 
