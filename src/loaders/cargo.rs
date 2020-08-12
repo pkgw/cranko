@@ -44,7 +44,7 @@ impl CargoLoader {
 
         if let Some(ref mut prev) = self.shortest_toml_dirname {
             // Find the longest common prefix of the two dirnames.
-            let bytes0: &[u8] = prev.as_ref().as_ref();
+            let bytes0: &[u8] = prev.as_ref();
             let bytes1: &[u8] = dirname.as_ref();
             let len = bytes0
                 .iter()

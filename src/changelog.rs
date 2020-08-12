@@ -13,10 +13,16 @@ use dynfmt::{Format, SimpleCurlyFormat};
 use std::{
     collections::HashMap,
     fs::File,
-    io::{Read, Write},
+    io::{prelude::*, BufReader},
+    path::{Path, PathBuf},
 };
 
-use crate::{app::AppSession, errors::Result, project::Project, repository::CommitId};
+use crate::{
+    app::AppSession,
+    errors::{Error, Result},
+    project::Project,
+    repository::{CommitId, RcProjectInfo, RepoPath, Repository},
+};
 
 /// How to format the changelog for a given project.
 #[derive(Debug)]
@@ -42,6 +48,23 @@ impl ChangelogFormat {
     ) -> Result<()> {
         match self {
             ChangelogFormat::Markdown(f) => f.draft_release_update(proj, sess, changes),
+        }
+    }
+
+    /// Test whether a path in the working directory, relative to the working
+    /// directory root, corresponds to a changelog file. Used in "cranko
+    /// confirm" to detect staged projects and make sure that there are no
+    /// functional changes.
+    pub fn is_changelog_path_for(&self, proj: &Project, path: &RepoPath) -> bool {
+        match self {
+            ChangelogFormat::Markdown(f) => f.is_changelog_path_for(proj, path),
+        }
+    }
+
+    /// Scan an RC changelog to extract metadata about the proposed release.
+    pub fn scan_rc_info(&self, proj: &Project, repo: &Repository) -> Result<RcProjectInfo> {
+        match self {
+            ChangelogFormat::Markdown(f) => f.scan_rc_info(proj, repo),
         }
     }
 }
@@ -134,5 +157,53 @@ impl MarkdownFormat {
         // Write back all of the previous contents, and we're done.
         f.write_all(&prev_log[..])?;
         Ok(())
+    }
+
+    fn is_changelog_path_for(&self, proj: &Project, path: &RepoPath) -> bool {
+        let pfx = proj.prefix();
+
+        if !path.starts_with(pfx) {
+            return false;
+        }
+
+        if path.len() != pfx.len() + self.basename.len() {
+            return false;
+        }
+
+        return path.ends_with(self.basename.as_bytes());
+    }
+
+    fn scan_rc_info(&self, proj: &Project, repo: &Repository) -> Result<RcProjectInfo> {
+        let changelog_path = self.changelog_path(proj, repo);
+        let f = File::open(&changelog_path)?;
+        let reader = BufReader::new(f);
+        let mut bump_spec = None;
+
+        // We allow all-whitespace lines before the rc: header, but that's it.
+        for maybe_line in reader.lines() {
+            let line = maybe_line?;
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            if line.starts_with("# rc:") {
+                let spec = line[5..].trim();
+                bump_spec = Some(spec.to_owned());
+                break;
+            }
+
+            return Err(Error::InvalidChangelogFormat(
+                changelog_path.display().to_string(),
+            ));
+        }
+
+        let bump_spec = bump_spec
+            .ok_or_else(|| Error::InvalidChangelogFormat(changelog_path.display().to_string()))?;
+        let _check_scheme = proj.version.parse_bump_scheme(&bump_spec)?;
+
+        Ok(RcProjectInfo {
+            qnames: proj.qualified_names().clone(),
+            bump_spec,
+        })
     }
 }

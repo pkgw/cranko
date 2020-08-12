@@ -215,6 +215,27 @@ impl ProjectGraph {
             self.projects[*ident].user_facing_name = name.clone();
         }
 
+        // Another bit of housekeeping: by default we set things up so that
+        // project's path matchers are partially disjoint. In particular, if
+        // there is a project rooted in prefix "a/" and a project rooted in
+        // prefix "a/b/", we make it so that paths in "a/b/" are not flagged as
+        // belonging to the project in "a/".
+        //
+        // The algorithm here (and in make_disjoint()) is not efficient, but it
+        // shouldn't matter unless you have an unrealistically large number of
+        // projects. We have to use split_at_mut() to get simultaneous
+        // mutability of two pieces of the vec.
+
+        for index1 in 1..self.projects.len() {
+            let (left, right) = self.projects.split_at_mut(index1);
+            let litem = &mut left[index1 - 1];
+
+            for ritem in right {
+                litem.repo_paths.make_disjoint(&ritem.repo_paths);
+                ritem.repo_paths.make_disjoint(&litem.repo_paths);
+            }
+        }
+
         Ok(())
     }
 

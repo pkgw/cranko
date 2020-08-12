@@ -302,7 +302,10 @@ impl Repository {
     /// practicality. For that project we will need to reach farther back in the
     /// history than the tip of `release`, which will force this algorithm to
     /// become a lot more complicated.
-    pub fn analyze_history_to_release(&self, prefixes: &[&RepoPath]) -> Result<Vec<Vec<CommitId>>> {
+    pub fn analyze_history_to_release(
+        &self,
+        matchers: &[&PathMatcher],
+    ) -> Result<Vec<Vec<CommitId>>> {
         // Set up to walk the history.
 
         let mut walk = self.repo.revwalk()?;
@@ -315,8 +318,8 @@ impl Repository {
 
         // Set up our results table.
 
-        let mut hit_buf = vec![false; prefixes.len()];
-        let mut matches = vec![Vec::new(); prefixes.len()];
+        let mut hit_buf = vec![false; matchers.len()];
+        let mut matches = vec![Vec::new(); matchers.len()];
 
         // Do the walk!
 
@@ -374,8 +377,8 @@ impl Repository {
                 // there's presumably a cleaner way to do this?
                 if let Some(old_path_bytes) = delta.old_file().path_bytes() {
                     let old_path = RepoPath::new(old_path_bytes);
-                    for (idx, prefix) in prefixes.iter().enumerate() {
-                        if old_path.starts_with(prefix) {
+                    for (idx, matcher) in matchers.iter().enumerate() {
+                        if matcher.repo_path_matches(old_path) {
                             hit_buf[idx] = true;
                         }
                     }
@@ -383,8 +386,8 @@ impl Repository {
 
                 if let Some(new_path_bytes) = delta.new_file().path_bytes() {
                     let new_path = RepoPath::new(new_path_bytes);
-                    for (idx, prefix) in prefixes.iter().enumerate() {
-                        if new_path.starts_with(prefix) {
+                    for (idx, matcher) in matchers.iter().enumerate() {
+                        if matcher.repo_path_matches(new_path) {
                             hit_buf[idx] = true;
                         }
                     }
@@ -409,6 +412,51 @@ impl Repository {
             Ok(s.to_owned())
         } else {
             Ok(format!("[commit {0}: non-Unicode summary]", cid.0))
+        }
+    }
+
+    /// Examine a project's state in the working directory and report whether it
+    /// is properly staged for a release request.
+    ///
+    /// Returns None if there's nothing wrong but this project doesn't seem to
+    /// have been staged for release.
+    pub fn scan_rc_info(&self, proj: &Project) -> Result<Option<RcProjectInfo>> {
+        let mut saw_changelog = false;
+
+        let mut opts = git2::StatusOptions::new();
+        opts.include_untracked(true);
+        opts.include_ignored(true);
+
+        // TODO: DTRT if one project's prefix is a substring of the other. If we
+        // have multiple projects and one of them has a prefix of "", changes to
+        // any other project will mess up a naive scan.
+
+        for entry in self.repo.statuses(Some(&mut opts))?.iter() {
+            let path = RepoPath::new(entry.path_bytes());
+            if !proj.repo_paths.repo_path_matches(path) {
+                continue;
+            }
+
+            let status = entry.status();
+
+            if proj.changelog.is_changelog_path_for(proj, path) {
+                if status.is_conflicted() {
+                    return Err(Error::DirtyRepository(path.escaped()));
+                } else if status.is_index_new() || status.is_index_modified() {
+                    saw_changelog = true;
+                } // TODO: handle/complain about some other statuses
+            } else {
+                if status.is_ignored() || status.is_wt_new() || status == git2::Status::CURRENT {
+                } else {
+                    return Err(Error::DirtyRepository(path.escaped()));
+                }
+            }
+        }
+
+        if saw_changelog {
+            Ok(Some(proj.changelog.scan_rc_info(proj, self)?))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -453,6 +501,7 @@ struct SerializedReleaseCommitInfo {
     pub projects: Vec<ReleasedProjectInfo>,
 }
 
+/// Serializable state information about a single project in a release commit.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ReleasedProjectInfo {
     /// The qualified names of this project, equivalent to the same-named
@@ -468,6 +517,37 @@ pub struct ReleasedProjectInfo {
     pub age: usize,
 }
 
+/// Information about the projects in the repository corresponding to an "rc"
+/// commit where the user has requested that one or more of the projects be
+/// released.
+#[derive(Debug, Default)]
+pub struct RcCommitInfo {
+    /// The Git commit-ish that this object describes.
+    pub committish: Option<CommitId>,
+
+    /// A list of projects and their "rc" information as of this commit. This
+    /// should contain at least one project, but doesn't necessarily include
+    /// every project in the repo.
+    pub projects: Vec<RcProjectInfo>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct SerializedRcCommitInfo {
+    pub projects: Vec<RcProjectInfo>,
+}
+
+/// Serializable state information about a single project with a proposed
+/// release in an `rc` commit.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RcProjectInfo {
+    /// The qualified names of this project, equivalent to the same-named
+    /// property of the Project struct.
+    pub qnames: Vec<String>,
+
+    /// The kind of version bump requested by the user.
+    pub bump_spec: String,
+}
+
 /// A data structure recording changes made when rewriting files
 /// in the repository.
 #[derive(Debug, Default)]
@@ -480,6 +560,83 @@ impl ChangeList {
     pub fn add_path(&mut self, p: &RepoPath) {
         self.paths.push(p.to_owned());
     }
+}
+
+/// A filter that matches paths inside the repository and/or working directory.
+///
+/// We're not trying to get fully general here, but there is a common use case
+/// that we need to support. A monorepo might contain a toplevel project, rooted
+/// at the repo base, plus one or more subprojects in some kind of
+/// subdirectories. For the toplevel project, we need to express a match for a
+/// file anywhere in the repo *except* ones that match any of the subprojects.
+#[derive(Debug)]
+pub struct PathMatcher {
+    terms: Vec<PathMatcherTerm>,
+}
+
+impl PathMatcher {
+    /// Create a new matcher that includes only files in the specified repopath
+    /// prefix.
+    pub fn new_include(p: RepoPathBuf) -> Self {
+        let terms = vec![PathMatcherTerm::Include(p)];
+        PathMatcher { terms }
+    }
+
+    /// Modify this matcher to exclude any paths that *other* would include.
+    ///
+    /// This whole framework could surely be a lot more efficient, but unless
+    /// your repo has 1000 projects it's just not going to matter, I think.
+    pub fn make_disjoint(&mut self, other: &PathMatcher) -> &mut Self {
+        let mut new_terms = Vec::new();
+
+        for other_term in &other.terms {
+            if let PathMatcherTerm::Include(ref other_pfx) = other_term {
+                for term in &self.terms {
+                    if let PathMatcherTerm::Include(ref pfx) = term {
+                        // We only need to exclude terms in the other matcher
+                        // that are more specific than ours.
+                        if other_pfx.starts_with(pfx) {
+                            new_terms.push(PathMatcherTerm::Exclude(other_pfx.clone()));
+                        }
+                    }
+                }
+            }
+        }
+
+        new_terms.append(&mut self.terms);
+        self.terms = new_terms;
+        self
+    }
+
+    /// Test whether a repo-path matches.
+    pub fn repo_path_matches(&self, p: &RepoPath) -> bool {
+        for term in &self.terms {
+            match term {
+                PathMatcherTerm::Include(pfx) => {
+                    if p.starts_with(pfx) {
+                        return true;
+                    }
+                }
+
+                PathMatcherTerm::Exclude(pfx) => {
+                    if p.starts_with(pfx) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        false
+    }
+}
+
+#[derive(Debug)]
+enum PathMatcherTerm {
+    /// Include paths prefixed by the value.
+    Include(RepoPathBuf),
+
+    /// Exclude paths prefixed by the value.
+    Exclude(RepoPathBuf),
 }
 
 // Below we have helpers for trying to deal with git's paths properly, on the
@@ -590,13 +747,19 @@ fn bytes2path(b: &[u8]) -> &Path {
 }
 
 /// An owned reference to a pathname as understood by the backing repository.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[repr(transparent)]
 pub struct RepoPathBuf(Vec<u8>);
 
 impl std::convert::AsRef<RepoPath> for RepoPathBuf {
     fn as_ref(&self) -> &RepoPath {
         RepoPath::new(&self.0[..])
+    }
+}
+
+impl std::convert::AsRef<[u8]> for RepoPathBuf {
+    fn as_ref(&self) -> &[u8] {
+        &self.0[..]
     }
 }
 

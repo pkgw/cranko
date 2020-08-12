@@ -7,7 +7,6 @@ use crate::{
     errors::Result,
     graph::ProjectGraph,
     repository::{ChangeList, CommitId, Repository},
-    version::ReleaseMode,
 };
 
 /// The main Cranko CLI application state structure.
@@ -115,12 +114,12 @@ impl AppSession {
     }
 
     pub fn analyze_history_to_release(&self) -> Result<Vec<Vec<CommitId>>> {
-        let mut prefixes = Vec::with_capacity(self.graph.len());
+        let mut matchers = Vec::with_capacity(self.graph.len());
 
         for pid in 0..self.graph.len() {
-            prefixes.push(self.graph.lookup(pid).prefix());
+            matchers.push(&self.graph.lookup(pid).repo_paths);
         }
 
-        self.repo.analyze_history_to_release(&prefixes)
+        self.repo.analyze_history_to_release(&matchers)
     }
 }

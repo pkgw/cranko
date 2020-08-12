@@ -5,6 +5,8 @@
 
 use thiserror::Error;
 
+use crate::version::Version;
+
 #[derive(Debug, Error)]
 pub enum CliError {
     #[error("no internal or external subcommand `{0}` is available (install `cranko-{0}`?)")]
@@ -32,6 +34,9 @@ pub enum Error {
     #[error("{0}")]
     Git(#[from] git2::Error),
 
+    #[error("invalid \"rc\" changelog format in `{0}`")]
+    InvalidChangelogFormat(String),
+
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -54,11 +59,17 @@ pub enum Error {
     #[error("repo rewrite error: {0}")]
     RewriteFormatError(String),
 
+    #[error("{0}")]
+    Semver(#[from] semver::SemVerError),
+
     #[error("TOML serialization error: {0}")]
     TomlSer(#[from] toml::ser::Error),
 
     #[error("TOML format error: {0}")]
     TomlEdit(#[from] toml_edit::TomlError),
+
+    #[error("unsupported version-bump scheme \"{0}\" for version template {1:?}")]
+    UnsupportedBumpScheme(String, Version),
 }
 
 // Note: we cannot preserve the dynfmt::Error since it has an associated

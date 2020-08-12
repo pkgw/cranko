@@ -5,7 +5,10 @@
 
 use chrono::{offset::Local, Datelike};
 
-use crate::{errors::Result, repository::ReleasedProjectInfo};
+use crate::{
+    errors::{Error, Result},
+    repository::ReleasedProjectInfo,
+};
 
 /// A version number associated with a project.
 ///
@@ -25,57 +28,144 @@ impl std::fmt::Display for Version {
     }
 }
 
-/// A scheme for assigning a version number to a project.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum VersioningScheme {
-    /// Assigns a development-mode version (likely 0.0.0) with a YYYYMMDD date code included.
-    DevDatecode,
+impl Version {
+    /// Given a template version, parse a "bump scheme" from a textual
+    /// description.
+    ///
+    /// Not all bump schemes are compatible with all versioning styles, which is
+    /// why this operation depends on the version template and is fallible.
+    pub fn parse_bump_scheme(&self, text: &str) -> Result<VersionBumpScheme> {
+        match text {
+            "micro bump" => Ok(VersionBumpScheme::MicroBump),
+            "minor bump" => Ok(VersionBumpScheme::MinorBump),
+            "major bump" => Ok(VersionBumpScheme::MajorBump),
+            _ => Err(Error::UnsupportedBumpScheme(text.to_owned(), self.clone())),
+        }
+    }
 }
 
-impl VersioningScheme {
+/// A scheme for assigning a new version number to a project.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum VersionBumpScheme {
+    /// Assigns a development-mode version (likely 0.0.0) with a YYYYMMDD date code included.
+    DevDatecode,
+
+    /// Increment the third-most-significant version number, resetting any
+    /// less-significant entries.
+    MicroBump,
+
+    /// Increment the second-most-significant version number, resetting any
+    /// less-significant entries.
+    MinorBump,
+
+    /// Increment the most-significant version number, resetting any
+    /// less-significant entries.
+    MajorBump,
+}
+
+impl VersionBumpScheme {
     /// Generate a new version by applying a versioning scheme to a template
     /// version, in a specified release mode, potentially building off of
     /// information about the most recent prior release.
     pub fn apply(
         &self,
         template: &Version,
-        mode: ReleaseMode,
         latest_release: Option<&ReleasedProjectInfo>,
     ) -> Result<Version> {
         // This function inherently has to matrix over versioning schemes and
         // versioning systems, so it gets a little hairy.
         return match self {
-            VersioningScheme::DevDatecode => apply_dev_datecode(template, mode, latest_release),
+            VersionBumpScheme::DevDatecode => apply_dev_datecode(template, latest_release),
+            VersionBumpScheme::MicroBump => apply_micro_bump(template, latest_release),
+            VersionBumpScheme::MinorBump => apply_minor_bump(template, latest_release),
+            VersionBumpScheme::MajorBump => apply_major_bump(template, latest_release),
         };
 
         fn apply_dev_datecode(
             template: &Version,
-            _mode: ReleaseMode,
-            _latest_release: Option<&ReleasedProjectInfo>,
+            latest_release: Option<&ReleasedProjectInfo>,
         ) -> Result<Version> {
             let local = Local::now();
             let code = format!("{:04}{:02}{:02}", local.year(), local.month(), local.day());
 
             match template {
                 Version::Semver(_) => {
-                    let mut v = semver::Version::new(0, 0, 0);
+                    let mut v = if let Some(rpi) = latest_release {
+                        semver::Version::parse(&rpi.version)?
+                    } else {
+                        semver::Version::new(0, 0, 0)
+                    };
+
                     v.build.push(semver::Identifier::AlphaNumeric(code));
                     Ok(Version::Semver(v))
                 }
             }
         }
+
+        fn apply_micro_bump(
+            template: &Version,
+            latest_release: Option<&ReleasedProjectInfo>,
+        ) -> Result<Version> {
+            match template {
+                Version::Semver(_) => {
+                    let mut v = if let Some(rpi) = latest_release {
+                        semver::Version::parse(&rpi.version)?
+                    } else {
+                        semver::Version::new(0, 0, 0)
+                    };
+
+                    v.pre.clear();
+                    v.build.clear();
+                    v.patch += 1;
+
+                    Ok(Version::Semver(v))
+                }
+            }
+        }
+
+        fn apply_minor_bump(
+            template: &Version,
+            latest_release: Option<&ReleasedProjectInfo>,
+        ) -> Result<Version> {
+            match template {
+                Version::Semver(_) => {
+                    let mut v = if let Some(rpi) = latest_release {
+                        semver::Version::parse(&rpi.version)?
+                    } else {
+                        semver::Version::new(0, 0, 0)
+                    };
+
+                    v.pre.clear();
+                    v.build.clear();
+                    v.patch = 0;
+                    v.minor += 1;
+
+                    Ok(Version::Semver(v))
+                }
+            }
+        }
+
+        fn apply_major_bump(
+            template: &Version,
+            latest_release: Option<&ReleasedProjectInfo>,
+        ) -> Result<Version> {
+            match template {
+                Version::Semver(_) => {
+                    let mut v = if let Some(rpi) = latest_release {
+                        semver::Version::parse(&rpi.version)?
+                    } else {
+                        semver::Version::new(0, 0, 0)
+                    };
+
+                    v.pre.clear();
+                    v.build.clear();
+                    v.patch = 0;
+                    v.minor = 0;
+                    v.major += 1;
+
+                    Ok(Version::Semver(v))
+                }
+            }
+        }
     }
-}
-
-/// A release "mode" in which version numbers may be assigned.
-///
-/// Depending on this mode, different versioning schemes may be active. E.g.,
-/// continuous deployment vs. an explicit request to make a primary release.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ReleaseMode {
-    /// An automated, continuous-deployment style of release.
-    Development,
-
-    /// A user-requested "primary" release that will be officially published.
-    Primary,
 }

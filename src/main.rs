@@ -43,6 +43,10 @@ enum Commands {
     /// Create a new commit applying version numbers all projects
     Apply(ApplyCommand),
 
+    #[structopt(name = "confirm")]
+    /// Commit staged release requests to the `rc` branch
+    Confirm(ConfirmCommand),
+
     #[structopt(name = "help")]
     /// Prints this message or the help of the given subcommand
     Help(HelpCommand),
@@ -67,6 +71,7 @@ impl Command for Commands {
     fn execute(self) -> Result<i32> {
         match self {
             Commands::Apply(o) => o.execute(),
+            Commands::Confirm(o) => o.execute(),
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
             Commands::Stage(o) => o.execute(),
@@ -90,9 +95,31 @@ struct ApplyCommand {}
 impl Command for ApplyCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-        sess.apply_versions(version::ReleaseMode::Development)?;
+        //sess.apply_versions(version::ReleaseMode::Development)?;
         let changes = sess.rewrite()?;
         sess.make_release_commit(&changes)?;
+        Ok(0)
+    }
+}
+
+// confirm
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ConfirmCommand {}
+
+impl Command for ConfirmCommand {
+    fn execute(self) -> Result<i32> {
+        let mut sess = app::AppSession::initialize()?;
+        sess.populated_graph()?;
+
+        for proj in sess.graph().toposort()? {
+            println!(
+                "*** {} => {:?}",
+                proj.user_facing_name,
+                sess.repo.scan_rc_info(proj)?
+            );
+        }
+
         Ok(0)
     }
 }
@@ -163,14 +190,14 @@ impl Command for StageCommand {
         // Pull up the relevant repository history for all of those projects.
         let history = {
             let graph = sess.graph();
-            let mut prefixes = Vec::new();
+            let mut matchers = Vec::new();
 
             for projid in &idents {
                 let proj = graph.lookup(*projid);
-                prefixes.push(proj.prefix());
+                matchers.push(&proj.repo_paths);
             }
 
-            sess.repo.analyze_history_to_release(&prefixes[..])?
+            sess.repo.analyze_history_to_release(&matchers[..])?
         };
 
         // Update the changelogs
@@ -272,6 +299,7 @@ fn list_commands() -> BTreeSet<String> {
     }
 
     commands.insert("apply".to_owned());
+    commands.insert("confirm".to_owned());
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
     commands.insert("stage".to_owned());

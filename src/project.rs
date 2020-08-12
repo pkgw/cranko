@@ -12,9 +12,9 @@
 use crate::{
     changelog::ChangelogFormat,
     graph::ProjectGraph,
-    repository::{RepoPath, RepoPathBuf},
+    repository::{PathMatcher, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
-    version::{ReleaseMode, Version, VersioningScheme},
+    version::Version,
 };
 
 /// An internal, unique identifier for a project in this app session.
@@ -60,11 +60,21 @@ pub struct Project {
     /// a release commit.
     pub rewriters: Vec<Box<dyn Rewriter>>,
 
-    /// A directory prefix in the repository: any commits that affect files
-    /// within this prefix are assumed to affect this project. Should be empty
-    /// if all commits affect this project. Otherwise, should end with a
-    /// trailing slash for easy path combination.
+    /// The project's unique prefix in the repository.
+    ///
+    /// Should be empty if the prefix is the project root. Otherwise, should end
+    /// with a trailing slash for easy path combination.
+    ///
+    /// Note that actual path relevance matching should be done using the
+    /// `repo_paths` field, to handle common cases where a project has
+    /// sub-projects contained in subdirectories. When matching paths we will
+    /// generally want to exclude the sub-projects, which requires more
+    /// sophistication than a simple prefix match.
     prefix: RepoPathBuf,
+
+    /// A data structure describing the paths inside the repository that are
+    /// considered to affect this project.
+    pub repo_paths: PathMatcher,
 
     /// How this project's changelog is formatted and updated.
     pub changelog: ChangelogFormat,
@@ -93,6 +103,10 @@ impl Project {
     }
 
     /// Get this project's prefix in the repository filesystem.
+    ///
+    /// To check whether a particular path is relevant to this project, use the
+    /// `repo_paths` field, which will properly account for any projects in
+    /// subdirectorie relative to this project.
     pub fn prefix(&self) -> &RepoPath {
         &self.prefix
     }
@@ -163,7 +177,8 @@ impl<'a> ProjectBuilder<'a> {
             dev_scheme: VersioningScheme::DevDatecode,
             primary_scheme: VersioningScheme::DevDatecode, // XXX update
             rewriters: Vec::new(),
-            prefix,
+            prefix: prefix.clone(),
+            repo_paths: PathMatcher::new_include(prefix),
             changelog: ChangelogFormat::default(),
         })
     }
