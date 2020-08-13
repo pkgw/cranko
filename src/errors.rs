@@ -37,6 +37,9 @@ pub enum Error {
     #[error("invalid \"rc\" changelog format in `{0}`")]
     InvalidChangelogFormat(String),
 
+    #[error("invalid commit message format")]
+    InvalidCommitMessageFormat,
+
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -45,6 +48,9 @@ pub enum Error {
 
     #[error("no such project `{0}`")]
     NoSuchProject(String),
+
+    #[error("data are not parseable as Unicode")]
+    NotUnicodeError,
 
     #[error("cannot identify the upstream remote for the backing repository")]
     NoUpstreamRemote,
@@ -61,6 +67,9 @@ pub enum Error {
 
     #[error("{0}")]
     Semver(#[from] semver::SemVerError),
+
+    #[error("TOML deserialization error: {0}")]
+    TomlDe(#[from] toml::de::Error),
 
     #[error("TOML serialization error: {0}")]
     TomlSer(#[from] toml::ser::Error),

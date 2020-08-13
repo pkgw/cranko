@@ -113,6 +113,11 @@ impl Repository {
         })
     }
 
+    /// Get the name of the `rc`-type branch.
+    pub fn upstream_rc_name(&self) -> &str {
+        &self.upstream_rc_name
+    }
+
     /// Resolve a `RepoPath` repository path to a filesystem path in the working
     /// directory.
     pub fn resolve_workdir(&self, p: &RepoPath) -> PathBuf {
@@ -486,7 +491,6 @@ impl Repository {
     /// information into the rc branch.
     pub fn make_rc_commit(
         &mut self,
-        graph: &ProjectGraph,
         rcinfo: Vec<RcProjectInfo>,
         changes: &ChangeList,
     ) -> Result<()> {
@@ -544,16 +548,57 @@ impl Repository {
             )?)
         };
 
-        let commit_id = if let Some(release_commit) = maybe_rc_commit {
-            commit(&[&release_commit, &head_commit])?
+        if let Some(release_commit) = maybe_rc_commit {
+            commit(&[&release_commit, &head_commit])?;
         } else {
-            commit(&[&head_commit])?
+            commit(&[&head_commit])?;
         };
 
         // Unlike the release commit workflow, we don't switch to the new
         // branch.
 
         Ok(())
+    }
+
+    /// Get information about a `rc` release request from the HEAD commit.
+    pub fn parse_rc_info_from_head(&self) -> Result<RcCommitInfo> {
+        let head_ref = self.repo.head()?;
+        let head_commit = head_ref.peel_to_commit()?;
+        let msg = head_commit
+            .message()
+            .ok_or_else(|| Error::NotUnicodeError)?;
+
+        let mut data = String::new();
+        let mut in_body = false;
+
+        for line in msg.lines() {
+            if in_body {
+                if line == "+++" {
+                    in_body = false;
+                    break;
+                } else {
+                    data.push_str(line);
+                    data.push('\n');
+                }
+            } else if line.starts_with("+++ cranko-rc-info-v1") {
+                in_body = true;
+            }
+        }
+
+        if in_body {
+            println!("unterminated RC info body; trying to proceed anyway");
+        }
+
+        if data.len() == 0 {
+            return Err(Error::InvalidCommitMessageFormat);
+        }
+
+        let srci: SerializedRcCommitInfo = toml::from_str(&data)?;
+
+        Ok(RcCommitInfo {
+            committish: Some(CommitId(head_commit.id())),
+            projects: srci.projects,
+        })
     }
 }
 
@@ -578,7 +623,7 @@ pub struct ReleaseCommitInfo {
 impl ReleaseCommitInfo {
     /// Attempt to find info for a prior release of the named project.
     ///
-    /// Information may be missing of the project was only added to the
+    /// Information may be missing if the project was only added to the
     /// repository after this information was recorded.
     pub fn lookup_project(&self, proj: &Project) -> Option<&ReleasedProjectInfo> {
         for rpi in &self.projects {
@@ -625,6 +670,22 @@ pub struct RcCommitInfo {
     /// should contain at least one project, but doesn't necessarily include
     /// every project in the repo.
     pub projects: Vec<RcProjectInfo>,
+}
+
+impl RcCommitInfo {
+    /// Attempt to find info for a release request for the specified project.
+    pub fn lookup_project(&self, proj: &Project) -> Option<&RcProjectInfo> {
+        // TODO: redundant with ReleaseCommitInfo::lookup_project()
+
+        for rci in &self.projects {
+            if rci.qnames == *proj.qualified_names() {
+                return Some(rci);
+            }
+        }
+
+        // TODO: any more sophisticated search to try?
+        None
+    }
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]

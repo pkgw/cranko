@@ -8,6 +8,7 @@ edition = "2018"
 anyhow = "^1"
 cargo_metadata = "^0.10"
 chrono = "^0.4"
+ci_info = "^0.10"
 dynfmt = { version ="^0.1", default-features = false, features = ["curly"] }
 git2 = "^0.13"
 lru = "^0.6"

@@ -50,12 +50,6 @@ pub struct Project {
     /// release branch.
     pub version_age: usize,
 
-    /// The versioning scheme to use in ReleaseMode::Development releases.
-    dev_scheme: VersioningScheme,
-
-    /// The versioning scheme to use in ReleaseMode::Primary releases.
-    primary_scheme: VersioningScheme,
-
     /// Steps to perform when rewriting this project's metadata to produce
     /// a release commit.
     pub rewriters: Vec<Box<dyn Rewriter>>,
@@ -92,14 +86,6 @@ impl Project {
     /// Get a reference to this project's full qualified names.
     pub fn qualified_names(&self) -> &Vec<String> {
         &self.qnames
-    }
-
-    /// Get the versioning scheme used by this project for specific release mode.
-    pub fn versioning_scheme(&self, mode: ReleaseMode) -> VersioningScheme {
-        match mode {
-            ReleaseMode::Development => self.dev_scheme,
-            ReleaseMode::Primary => self.primary_scheme,
-        }
     }
 
     /// Get this project's prefix in the repository filesystem.
@@ -174,8 +160,6 @@ impl<'a> ProjectBuilder<'a> {
             user_facing_name: String::new(),
             version,
             version_age: 0,
-            dev_scheme: VersioningScheme::DevDatecode,
-            primary_scheme: VersioningScheme::DevDatecode, // XXX update
             rewriters: Vec::new(),
             prefix: prefix.clone(),
             repo_paths: PathMatcher::new_include(prefix),

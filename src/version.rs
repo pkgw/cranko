@@ -39,6 +39,7 @@ impl Version {
             "micro bump" => Ok(VersionBumpScheme::MicroBump),
             "minor bump" => Ok(VersionBumpScheme::MinorBump),
             "major bump" => Ok(VersionBumpScheme::MajorBump),
+            "dev-datecode" => Ok(VersionBumpScheme::DevDatecode),
             _ => Err(Error::UnsupportedBumpScheme(text.to_owned(), self.clone())),
         }
     }

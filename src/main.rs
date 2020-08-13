@@ -95,8 +95,27 @@ struct ApplyCommand {}
 impl Command for ApplyCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-        //sess.apply_versions(version::ReleaseMode::Development)?;
+        let info = ci_info::get();
+        let mut rci = None;
+
+        if info.ci {
+            if let Some(branch_name) = info.branch_name {
+                if branch_name == sess.repo.upstream_rc_name() {
+                    println!("computing new versions based on `rc` commit request data");
+                    rci = Some(sess.repo.parse_rc_info_from_head()?);
+                }
+            }
+        }
+
+        let rci = rci.unwrap_or_else(|| {
+            println!("computing new verions assuming development mode");
+            sess.default_dev_rc_info()
+        });
+
+        sess.apply_versions(&rci)?;
+
         let changes = sess.rewrite()?;
+
         sess.make_release_commit(&changes)?;
         Ok(0)
     }

@@ -14,7 +14,7 @@ use std::{
     collections::HashMap,
     fs::File,
     io::{prelude::*, BufReader},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use crate::{

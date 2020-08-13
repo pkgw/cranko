@@ -239,6 +239,21 @@ impl ProjectGraph {
         Ok(())
     }
 
+    /// Iterate over all projects in the graph, in no particular order.
+    ///
+    /// In most cases `toposort()` is preferable, but unlike that function,
+    /// this one is infallible.
+    pub fn projects(&self) -> GraphIter {
+        GraphIter {
+            graph: self,
+            node_idxs_iter: self
+                .graph
+                .node_indices()
+                .collect::<Vec<OurNodeIndex>>()
+                .into_iter(),
+        }
+    }
+
     /// Get an iterator to visit the projects in the graph in topologically
     /// sorted order.
     ///

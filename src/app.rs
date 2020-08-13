@@ -6,7 +6,7 @@
 use crate::{
     errors::Result,
     graph::ProjectGraph,
-    repository::{ChangeList, CommitId, RcProjectInfo, Repository},
+    repository::{ChangeList, CommitId, RcCommitInfo, RcProjectInfo, Repository},
 };
 
 /// The main Cranko CLI application state structure.
@@ -48,7 +48,6 @@ impl AppSession {
     pub fn populated_graph(&mut self) -> Result<&ProjectGraph> {
         if self.graph.len() == 0 {
             self.populate_graph()?;
-            self.graph.complete_loading()?;
         }
 
         Ok(&self.graph)
@@ -65,25 +64,31 @@ impl AppSession {
         })?;
 
         cargo.finalize(self)?;
+
+        self.graph.complete_loading()?;
         Ok(())
     }
 
-    /// Apply version numbers given the current repository state and a release mode.
-    pub fn apply_versions(&mut self, mode: ReleaseMode) -> Result<()> {
+    /// Apply version numbers given the current repository state and bump specifications.
+    pub fn apply_versions(&mut self, rcinfo: &RcCommitInfo) -> Result<()> {
         self.populate_graph()?;
+
         let latest_info = self.repo.get_latest_release_info()?;
 
         self.repo.check_dirty()?;
 
         for proj in self.graph.toposort_mut()? {
-            let scheme = proj.versioning_scheme(mode);
             let cur_version = proj.version.clone();
             let latest_release = latest_info.lookup_project(proj);
-            proj.version = scheme.apply(&cur_version, mode, latest_release)?;
-            println!(
-                "{}: {} => {}",
-                proj.user_facing_name, cur_version, proj.version
-            );
+
+            if let Some(rc) = rcinfo.lookup_project(proj) {
+                let scheme = proj.version.parse_bump_scheme(&rc.bump_spec)?;
+                proj.version = scheme.apply(&cur_version, latest_release)?;
+                println!(
+                    "{}: {} => {}",
+                    proj.user_facing_name, cur_version, proj.version
+                );
+            }
 
             // Bookkeeping so that we can produce updated release info.
             proj.version_age = match (latest_release, proj.version == cur_version) {
@@ -118,7 +123,7 @@ impl AppSession {
         rcinfo: Vec<RcProjectInfo>,
         changes: &ChangeList,
     ) -> Result<()> {
-        self.repo.make_rc_commit(&self.graph, rcinfo, &changes)?;
+        self.repo.make_rc_commit(rcinfo, &changes)?;
         Ok(())
     }
 
@@ -130,5 +135,18 @@ impl AppSession {
         }
 
         self.repo.analyze_history_to_release(&matchers)
+    }
+
+    pub fn default_dev_rc_info(&self) -> RcCommitInfo {
+        let mut rcinfo = RcCommitInfo::default();
+
+        for proj in self.graph.projects() {
+            rcinfo.projects.push(RcProjectInfo {
+                qnames: proj.qualified_names().to_owned(),
+                bump_spec: "dev-datecode".to_owned(),
+            })
+        }
+
+        rcinfo
     }
 }
