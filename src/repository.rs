@@ -201,6 +201,25 @@ impl Repository {
         Ok(Some(release_ref.peel_to_commit()?))
     }
 
+    fn try_get_rc_commit(&self) -> Result<Option<git2::Commit>> {
+        let rc_ref = match self.repo.resolve_reference_from_short_name(&format!(
+            "{}/{}",
+            self.upstream_name, self.upstream_rc_name
+        )) {
+            Ok(r) => r,
+            Err(e) => {
+                return if e.code() == git2::ErrorCode::NotFound {
+                    // No `rc` branch in the upstream, which is OK
+                    Ok(None)
+                } else {
+                    Err(e.into())
+                };
+            }
+        };
+
+        Ok(Some(rc_ref.peel_to_commit()?))
+    }
+
     /// Make a commit merging the current workdir state into the release branch.
     pub fn make_release_commit(
         &mut self,
@@ -420,16 +439,18 @@ impl Repository {
     ///
     /// Returns None if there's nothing wrong but this project doesn't seem to
     /// have been staged for release.
-    pub fn scan_rc_info(&self, proj: &Project) -> Result<Option<RcProjectInfo>> {
+    ///
+    /// Modified changelog files are register with the *changes* listing.
+    pub fn scan_rc_info(
+        &self,
+        proj: &Project,
+        changes: &mut ChangeList,
+    ) -> Result<Option<RcProjectInfo>> {
         let mut saw_changelog = false;
 
         let mut opts = git2::StatusOptions::new();
         opts.include_untracked(true);
         opts.include_ignored(true);
-
-        // TODO: DTRT if one project's prefix is a substring of the other. If we
-        // have multiple projects and one of them has a prefix of "", changes to
-        // any other project will mess up a naive scan.
 
         for entry in self.repo.statuses(Some(&mut opts))?.iter() {
             let path = RepoPath::new(entry.path_bytes());
@@ -443,6 +464,7 @@ impl Repository {
                 if status.is_conflicted() {
                     return Err(Error::DirtyRepository(path.escaped()));
                 } else if status.is_index_new() || status.is_index_modified() {
+                    changes.add_path(path);
                     saw_changelog = true;
                 } // TODO: handle/complain about some other statuses
             } else {
@@ -458,6 +480,80 @@ impl Repository {
         } else {
             Ok(None)
         }
+    }
+
+    /// Make a commit merging changelog modifications and and release request
+    /// information into the rc branch.
+    pub fn make_rc_commit(
+        &mut self,
+        graph: &ProjectGraph,
+        rcinfo: Vec<RcProjectInfo>,
+        changes: &ChangeList,
+    ) -> Result<()> {
+        // Gather useful info.
+
+        let maybe_rc_commit = self.try_get_rc_commit()?;
+        let head_ref = self.repo.head()?;
+        let head_commit = head_ref.peel_to_commit()?;
+        let sig = self.get_signature()?;
+        let local_ref_name = format!("refs/heads/{}", self.upstream_rc_name);
+
+        // Set up the release request info. This will be serialized into the
+        // commit message.
+
+        let mut info = SerializedRcCommitInfo::default();
+        info.projects = rcinfo;
+
+        let message = format!(
+            "Release request commit created with Cranko.
+
++++ cranko-rc-info-v1
+{}
++++
+",
+            toml::to_string(&info)?
+        );
+
+        // Create and save a new Tree containing the working-tree changes made
+        // during the rewrite process.
+
+        let tree_oid = {
+            let mut index = self.repo.index()?;
+
+            for p in &changes.paths {
+                index.add_path(p.as_path())?;
+            }
+
+            index.write_tree()?
+        };
+        let tree = self.repo.find_tree(tree_oid)?;
+
+        // Create the merged rc commit and save it under the
+        // local_ref_name.
+
+        let commit = |parents: &[&git2::Commit]| -> Result<git2::Oid> {
+            self.repo
+                .reference(&local_ref_name, parents[0].id(), true, "update rc")?;
+            Ok(self.repo.commit(
+                Some(&local_ref_name), // update_ref
+                &sig,                  // author
+                &sig,                  // committer
+                &message,
+                &tree,
+                parents,
+            )?)
+        };
+
+        let commit_id = if let Some(release_commit) = maybe_rc_commit {
+            commit(&[&release_commit, &head_commit])?
+        } else {
+            commit(&[&head_commit])?
+        };
+
+        // Unlike the release commit workflow, we don't switch to the new
+        // branch.
+
+        Ok(())
     }
 }
 

@@ -6,7 +6,7 @@
 use crate::{
     errors::Result,
     graph::ProjectGraph,
-    repository::{ChangeList, CommitId, Repository},
+    repository::{ChangeList, CommitId, RcProjectInfo, Repository},
 };
 
 /// The main Cranko CLI application state structure.
@@ -110,6 +110,15 @@ impl AppSession {
 
     pub fn make_release_commit(&mut self, changes: &ChangeList) -> Result<()> {
         self.repo.make_release_commit(&self.graph, &changes)?;
+        Ok(())
+    }
+
+    pub fn make_rc_commit(
+        &mut self,
+        rcinfo: Vec<RcProjectInfo>,
+        changes: &ChangeList,
+    ) -> Result<()> {
+        self.repo.make_rc_commit(&self.graph, rcinfo, &changes)?;
         Ok(())
     }
 

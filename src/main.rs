@@ -112,13 +112,22 @@ impl Command for ConfirmCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
+        let mut changes = repository::ChangeList::default();
+        let mut rcinfo = Vec::new();
+
         for proj in sess.graph().toposort()? {
-            println!(
-                "*** {} => {:?}",
-                proj.user_facing_name,
-                sess.repo.scan_rc_info(proj)?
-            );
+            if let Some(info) = sess.repo.scan_rc_info(proj, &mut changes)? {
+                rcinfo.push(info);
+            }
         }
+
+        if rcinfo.len() < 1 {
+            println!("no releases seem to have been staged; use \"cranko stage\"?");
+            return Ok(0);
+        }
+
+        sess.make_rc_commit(rcinfo, &changes)?;
+        println!("staged rc commit to \"rc\" branch");
 
         Ok(0)
     }
