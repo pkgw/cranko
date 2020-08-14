@@ -11,5 +11,15 @@ steps:
   displayName: "Install gcc-multilib (linux)"
   condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'))
 
+# Bootstrap with the unmodified checkout at 0.0.0 versions.
+
+- bash: cargo build --all
+  displayName: "cargo build (bootstrap)"
+
+- bash: cargo run -- apply
+  displayName: "cranko apply (using bootstrapped build)"
+
+# Now that we've applied versions, mainline test workflow
+
 - bash: cargo test --all
   displayName: "cargo test"
