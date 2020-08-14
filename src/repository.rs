@@ -965,6 +965,16 @@ impl RepoPathBuf {
     pub fn truncate(&mut self, len: usize) {
         self.0.truncate(len);
     }
+
+    pub fn push<C: AsRef<[u8]>>(&mut self, component: C) {
+        let n = self.0.len();
+
+        if n > 0 && self.0[n - 1] != b'/' {
+            self.0.push(b'/');
+        }
+
+        self.0.extend(component.as_ref());
+    }
 }
 
 impl std::ops::Deref for RepoPathBuf {

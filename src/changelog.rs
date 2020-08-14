@@ -8,7 +8,7 @@
 //! has to do with looking at the repository history since the most recent
 //! release(s). That's exactly the information contained in a release changelog.
 
-//use chrono::{offset::Local, Datelike};
+use chrono::{offset::Local, Datelike};
 use dynfmt::{Format, SimpleCurlyFormat};
 use std::{
     collections::HashMap,
@@ -21,7 +21,7 @@ use crate::{
     app::AppSession,
     errors::{Error, Result},
     project::Project,
-    repository::{CommitId, RcProjectInfo, RepoPath, Repository},
+    repository::{ChangeList, CommitId, RcProjectInfo, RepoPath, RepoPathBuf, Repository},
 };
 
 /// How to format the changelog for a given project.
@@ -67,6 +67,18 @@ impl ChangelogFormat {
             ChangelogFormat::Markdown(f) => f.scan_rc_info(proj, repo),
         }
     }
+
+    /// Modify the RC changelog file to include the final release information.
+    pub fn finalize_changelog(
+        &self,
+        proj: &Project,
+        repo: &Repository,
+        changes: &mut ChangeList,
+    ) -> Result<()> {
+        match self {
+            ChangelogFormat::Markdown(f) => f.finalize_changelog(proj, repo, changes),
+        }
+    }
 }
 
 /// Settings for Markdown-formatted changelogs.
@@ -82,18 +94,22 @@ impl Default for MarkdownFormat {
     fn default() -> Self {
         MarkdownFormat {
             basename: "CHANGELOG.md".to_owned(),
-            release_header_format: "# Version {version} ({yyyy_mm_dd})\n\n".to_owned(),
-            stage_header_format: "# rc: {bump_spec}\n\n".to_owned(),
-            footer_format: "\n".to_owned(),
+            release_header_format: "# Version {version} ({yyyy_mm_dd})\n".to_owned(),
+            stage_header_format: "# rc: {bump_spec}\n".to_owned(),
+            footer_format: "".to_owned(),
         }
     }
 }
 
 impl MarkdownFormat {
+    fn changelog_repopath(&self, proj: &Project) -> RepoPathBuf {
+        let mut pfx = proj.prefix().to_owned();
+        pfx.push(&self.basename);
+        pfx
+    }
+
     fn changelog_path(&self, proj: &Project, repo: &Repository) -> PathBuf {
-        let mut changelog_path = repo.resolve_workdir(proj.prefix());
-        changelog_path.push(&self.basename);
-        changelog_path
+        repo.resolve_workdir(&self.changelog_repopath(proj))
     }
 
     fn draft_release_update(
@@ -121,8 +137,7 @@ impl MarkdownFormat {
             }
         };
 
-        // TODO: write out as a tempfile, atomic rename, etc. (Though this is
-        // less critical since the changelog is tracked in version control.)
+        // TODO: port to atomicwrites
 
         let mut f = File::create(changelog_path)?;
 
@@ -131,7 +146,7 @@ impl MarkdownFormat {
         let mut headfoot_args = HashMap::new();
         headfoot_args.insert("bump_spec", "micro bump");
         let header = SimpleCurlyFormat.format(&self.stage_header_format, &headfoot_args)?;
-        write!(f, "{}", header)?;
+        writeln!(f, "{}", header)?;
 
         // Commit summaries! Note: if we're staging muliple projects and the
         // same commit affects many of them, we'll reload the same commit many
@@ -144,7 +159,7 @@ impl MarkdownFormat {
             let mut prefix = "- ";
 
             for line in textwrap::wrap_iter(&message, WRAP_WIDTH) {
-                write!(f, "{}{}\n", prefix, line)?;
+                writeln!(f, "{}{}", prefix, line)?;
                 prefix = "  ";
             }
         }
@@ -152,7 +167,7 @@ impl MarkdownFormat {
         // Footer
 
         let footer = SimpleCurlyFormat.format(&self.footer_format, &headfoot_args)?;
-        write!(f, "{}", footer)?;
+        writeln!(f, "{}", footer)?;
 
         // Write back all of the previous contents, and we're done.
         f.write_all(&prev_log[..])?;
@@ -205,5 +220,85 @@ impl MarkdownFormat {
             qnames: proj.qualified_names().clone(),
             bump_spec,
         })
+    }
+
+    fn finalize_changelog(
+        &self,
+        proj: &Project,
+        repo: &Repository,
+        changes: &mut ChangeList,
+    ) -> Result<()> {
+        // Prepare the substitution template
+        let mut header_args = HashMap::new();
+        header_args.insert("version", proj.version.to_string());
+        let now = Local::now();
+        header_args.insert(
+            "yyyy_mm_dd",
+            format!("{:04}-{:02}-{:02}", now.year(), now.month(), now.day()),
+        );
+
+        let changelog_path = self.changelog_path(proj, repo);
+        let cur_f = File::open(&changelog_path)?;
+        let cur_reader = BufReader::new(cur_f);
+
+        let new_af = atomicwrites::AtomicFile::new(
+            &changelog_path,
+            atomicwrites::OverwriteBehavior::AllowOverwrite,
+        );
+        let r = new_af.write(|new_f| {
+            // Pipe the current changelog into the new one, replacing the `rc`
+            // header with the final one.
+
+            enum State {
+                BeforeHeader,
+                BlanksAfterHeader,
+                AfterHeader,
+            }
+            let mut state = State::BeforeHeader;
+
+            for maybe_line in cur_reader.lines() {
+                let line = maybe_line?;
+
+                match state {
+                    State::BeforeHeader => {
+                        if line.trim().is_empty() {
+                            continue;
+                        }
+
+                        if !line.starts_with("# rc:") {
+                            return Err(Error::InvalidChangelogFormat(
+                                changelog_path.display().to_string(),
+                            ));
+                        }
+
+                        state = State::BlanksAfterHeader;
+                        let header =
+                            SimpleCurlyFormat.format(&self.release_header_format, &header_args)?;
+                        writeln!(new_f, "{}", header)?;
+                    }
+
+                    State::BlanksAfterHeader => {
+                        if !line.trim().is_empty() {
+                            state = State::AfterHeader;
+                            writeln!(new_f, "{}", line)?;
+                        }
+                    }
+
+                    State::AfterHeader => {
+                        writeln!(new_f, "{}", line)?;
+                    }
+                }
+            }
+
+            Ok(())
+        });
+
+        changes.add_path(&self.changelog_repopath(proj));
+
+        match r {
+            Err(atomicwrites::Error::Internal(e)) => Err(e.into()),
+            Err(atomicwrites::Error::User(e)) => Err(e),
+            Ok(()) => Ok(()),
+        }
     }
 }

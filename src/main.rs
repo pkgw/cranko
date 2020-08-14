@@ -113,9 +113,8 @@ impl Command for ApplyCommand {
         });
 
         sess.apply_versions(&rci)?;
-
-        let changes = sess.rewrite()?;
-
+        let mut changes = sess.rewrite()?;
+        sess.apply_changelogs(&rci, &mut changes)?;
         sess.make_release_commit(&changes)?;
         Ok(0)
     }

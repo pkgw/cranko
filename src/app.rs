@@ -149,4 +149,21 @@ impl AppSession {
 
         rcinfo
     }
+
+    // Rewrite the changelogs of packages staged for release to include their
+    // final version numbers and other release information.
+    pub fn apply_changelogs(&self, rcinfo: &RcCommitInfo, changes: &mut ChangeList) -> Result<()> {
+        // This step could plausibly be implemented in the "rewriter" framework,
+        // probably? I dodn't have a great reason for doing otherwise, other
+        // than that it seemed easier at the time.
+
+        for proj in self.graph.toposort()? {
+            if let Some(_) = rcinfo.lookup_project(proj) {
+                proj.changelog
+                    .finalize_changelog(proj, &self.repo, changes)?;
+            }
+        }
+
+        Ok(())
+    }
 }
