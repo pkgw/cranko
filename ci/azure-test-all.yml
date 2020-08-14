@@ -19,6 +19,9 @@ steps:
 - bash: cargo run -- apply
   displayName: "cranko apply (using bootstrapped build)"
 
+- bash: git show HEAD
+  displayName: "git show HEAD"  # show what cranko apply did
+
 # Now that we've applied versions, mainline test workflow
 
 - bash: cargo test --all
