@@ -24,5 +24,11 @@ steps:
 
 # Now that we've applied versions, mainline test workflow
 
-- bash: cargo test --all
-  displayName: "cargo test"
+- bash: cargo build --all --release
+  displayName: "cargo build (release)"
+
+- bash: cargo test --all --release
+  displayName: "cargo test (release)"
+
+- bash: find . -name cranko-target.txt -execdir cat '{}' ';' -quit
+  displayName: "Get target triple"
