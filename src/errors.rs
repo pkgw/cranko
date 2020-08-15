@@ -1,7 +1,7 @@
 // Copyright 2020 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
-//! Error handline for the CLI application.
+//! Error handling for the CLI application.
 
 use thiserror::Error;
 
