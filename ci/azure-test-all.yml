@@ -43,20 +43,26 @@ steps:
       version="$(cargo run -- show version cranko)"
       target="$(find . -name cranko-target.txt -execdir cat '{}' ';' -quit)"
       echo "##vso[task.setvariable variable=rustTarget;]$target"
-      tar="$(Build.ArtifactStagingDirectory)/binary-$target/cranko-$version-$target.tar.gz"
+      artifact_dir="$(Build.ArtifactStagingDirectory)/binary-$target"
+      mkdir -p "$artifact_dir"
+      tar="$artifact_dir/cranko-$version-$target.tar.gz"
       tar cf "$tar" cranko -C target/release
     displayName: "Package binary (non-Windows)"
-    condition: and(succeeded(), ne(variables['Agent.OS'], 'Windows'))
+    condition: and(succeeded(), ne(variables['Agent.OS'], 'Windows_NT'))
 
   - bash: |
       version="$(cargo run -- show version cranko)"
       target="$(find . -name cranko-target.txt -execdir cat '{}' ';' -quit)"
       echo "##vso[task.setvariable variable=rustTarget;]$target"
-      zip="$(Build.ArtifactStagingDirectory)/binary-$target/cranko-$version-$target.zip"
+      # at the moment, need to convert Windows paths to Cygwin:
+      staging=$(echo "$(Build.ArtifactStagingDirectory)" | sed -e 's|\\|\/|g' -e 's|^\([A-Za-z]\)\:/\(.*\)|/\L\1\E/\2|')
+      artifact_dir="$staging/binary-$target"
+      mkdir -p "$artifact_dir"
+      zip="$artifact_dir/cranko-$version-$target.zip"
       cd target/release
       zip -u "$zip" cranko
     displayName: "Package binary (Windows)"
-    condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows'))
+    condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
 
   - task: PublishPipelineArtifact@1
     displayName: Publish packaged binary artifact
