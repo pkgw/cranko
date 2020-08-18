@@ -48,7 +48,7 @@ steps:
       tar="$artifact_dir/cranko-$version-$target.tar.gz"
       ls -l target/release # XXX TEMP
       cd target/release
-      tar cf "$tar" cranko
+      tar czf "$tar" cranko
     displayName: "Package binary (non-Windows)"
     condition: and(succeeded(), ne(variables['Agent.OS'], 'Windows_NT'))
 
