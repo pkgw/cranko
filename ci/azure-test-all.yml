@@ -40,18 +40,19 @@ steps:
 
 - ${{ if eq(parameters.canaryBuild, false) }}:
   - bash: |
-      version="$(cargo run -- show version cranko)"
+      version="$(cargo run --release -- show version cranko)"
       target="$(find . -name cranko-target.txt -execdir cat '{}' ';' -quit)"
       echo "##vso[task.setvariable variable=rustTarget;]$target"
       artifact_dir="$(Build.ArtifactStagingDirectory)/binary-$target"
       mkdir -p "$artifact_dir"
       tar="$artifact_dir/cranko-$version-$target.tar.gz"
+      ls -l target/release # XXX TEMP
       tar cf "$tar" cranko -C target/release
     displayName: "Package binary (non-Windows)"
     condition: and(succeeded(), ne(variables['Agent.OS'], 'Windows_NT'))
 
   - bash: |
-      version="$(cargo run -- show version cranko)"
+      version="$(cargo run --release -- show version cranko)"
       target="$(find . -name cranko-target.txt -execdir cat '{}' ';' -quit)"
       echo "##vso[task.setvariable variable=rustTarget;]$target"
       # at the moment, need to convert Windows paths to Cygwin:
@@ -59,8 +60,9 @@ steps:
       artifact_dir="$staging/binary-$target"
       mkdir -p "$artifact_dir"
       zip="$artifact_dir/cranko-$version-$target.zip"
+      ls -l target/release # XXX TEMP
       cd target/release
-      zip -u "$zip" cranko
+      zip -u "$zip" cranko.exe
     displayName: "Package binary (Windows)"
     condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
 
