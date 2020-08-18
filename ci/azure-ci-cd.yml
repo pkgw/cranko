@@ -89,9 +89,11 @@ stages:
           # NB: make sure to properly handle both `master` and `rc` cases!
 
           - bash: |
-              echo Dummy deployment step
-            displayName: Dummy step
+              cd $(Pipeline.Workspace)
+              mkdir collection
+              cp binary-*/* collection/
+            displayName: Collect release artifacts
 
-          # - publish: $(Pipeline.Workspace)/subdir
-          #   displayName: Publish some files
-          #   artifact: artifact-name
+          - publish: $(Pipeline.Workspace)/collection
+            displayName: Publish release artifacts
+            artifact: artifacts
