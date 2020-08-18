@@ -213,7 +213,6 @@ enum ShowCommands {
     Version(ShowVersionCommand),
 }
 
-
 impl Command for ShowCommand {
     fn execute(self) -> Result<i32> {
         match self.command {
@@ -227,7 +226,6 @@ struct ShowVersionCommand {
     // TODO: add something like `--ifdev=latest` to print "latest"
     // instead of 0.0.0-dev.0 if we're not on a release commit for
     // this project.
-
     #[structopt(help = "Name(s) of the project(s) to query")]
     proj_names: Vec<String>,
 }
