@@ -79,8 +79,8 @@ stages:
     pool:
       vmImage: ubuntu-16.04
 
-    # variables:
-    # - group: Deployment Credentials
+    variables:
+    - group: Deployment Credentials
 
     strategy:
       runOnce:
@@ -111,3 +111,10 @@ stages:
               ./cranko tag
             displayName: Prepare release commit and tags
             condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'rc'))
+
+          - bash: |
+              git -c "credential.helper=!f() { echo username=token; echo password=$GITHUB_TOKEN; };f" push --tags origin release:release
+            displayName: Update release branch
+            condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'rc'))
+            env:
+              GITHUB_TOKEN: $(GITHUB_TOKEN)
