@@ -80,3 +80,17 @@ steps:
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)/binary-$(rustTarget)'
       artifactName: binary-$(rustTarget)
+
+  # XXX Darwin to Linux
+  - ${{ if eq(variables.agentOS, "Darwin") }}:
+    - bash: |
+        artifact_dir="$(Build.ArtifactStagingDirectory)/git"
+        mkdir -p "$artifact_dir"
+        git bundle "$artifact_dir/release.bundle" master..release
+      displayName: "Bundle release commit"
+
+    - task: PublishPipelineArtifact@1
+      displayName: Publish git bundle artifact
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/git'
+        artifactName: git
