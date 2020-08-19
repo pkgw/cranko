@@ -1,3 +1,3 @@
 # rc: micro bump
 
-Not emerging.
+Won't emerge.
