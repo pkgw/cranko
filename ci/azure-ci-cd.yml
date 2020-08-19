@@ -91,19 +91,10 @@ stages:
 
           - bash: |
               set -x
-              env
-              pwd
-              ls -la
-              git status
-              git branch -a
-            displayName: TEMP DEBUG
-
-          - bash: |
-              set -x
+              git branch release
               git pull --ff-only $(Pipeline.Workspace)/git/release.bundle
               git status
               git branch -a
-              git branch -c release
               git show
             displayName: Pull release commit
 
