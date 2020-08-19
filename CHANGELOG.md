@@ -1,3 +1,3 @@
 # rc: micro bump
 
-Won't emerge.
+Attempt to publish 0.0.1!
