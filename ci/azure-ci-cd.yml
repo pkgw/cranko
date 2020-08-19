@@ -87,12 +87,13 @@ stages:
         deploy:
           steps:
           # NB: make sure to properly handle both `master` and `rc` cases!
+          - checkout: self
 
           - bash: |
               set -x
               env
               pwd
-              ls
+              ls -la
               git status
             displayName: TEMP DEBUG
 
