@@ -85,7 +85,7 @@ steps:
   - bash: |
       artifact_dir="$(Build.ArtifactStagingDirectory)/git"
       mkdir -p "$artifact_dir"
-      git bundle "$artifact_dir/release.bundle" master..release
+      git bundle create "$artifact_dir/release.bundle" master..release
     displayName: "Bundle release commit"
     condition: and(succeeded(), eq(variables['Agent.OS'], 'Darwin'))
 
