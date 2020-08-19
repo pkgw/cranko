@@ -19,56 +19,57 @@ stages:
       TOOLCHAIN: stable
       OTHER_TARGET: i686-unknown-linux-gnu
 
-  #- job: Linux_canary
-  #  pool:
-  #    vmImage: ubuntu-16.04
-  #  steps:
-  #    - template: azure-test-all.yml
-  #      parameters:
-  #        canaryBuild: true
-  #  strategy:
-  #    matrix:
-  #      beta:
-  #        TOOLCHAIN: beta
-  #      nightly:
-  #        TOOLCHAIN: nightly
-  #  variables:
-  #    OTHER_TARGET: i686-unknown-linux-gnu
-  #
-  #- job: macOS
-  #  pool:
-  #    vmImage: macos-10.15
-  #  steps:
-  #    - template: azure-test-all.yml
-  #  variables:
-  #    TOOLCHAIN: stable
-  #    OTHER_TARGET: x86_64-apple-ios
-  #
-  #- job: Windows
-  #  pool:
-  #    vmImage: windows-2019
-  #  steps:
-  #    - template: azure-test-all.yml
-  #  strategy:
-  #    matrix:
-  #      x86_64-msvc:
-  #        TOOLCHAIN: stable-x86_64-pc-windows-msvc
-  #        OTHER_TARGET: i686-pc-windows-msvc
-  #      x86_64-gnu:
-  #        TOOLCHAIN: nightly-x86_64-pc-windows-gnu
-  #        OTHER_TARGET: i686-pc-windows-gnu
-  #
-  #- job: rustfmt
-  #  pool:
-  #    vmImage: ubuntu-16.04
-  #  steps:
-  #    - template: azure-install-rust.yml
-  #    - bash: rustup component add rustfmt
-  #      displayName: "Install rustfmt"
-  #    - bash: cargo fmt --all -- --check
-  #      displayName: "Check rustfmt (cargo)"
-  #  variables:
-  #    TOOLCHAIN: stable
+  # As far as I can tell, there is no way to matrix over a template *parameter*?
+  - job: Linux_canary
+    pool:
+      vmImage: ubuntu-16.04
+    steps:
+      - template: azure-test-all.yml
+        parameters:
+          canaryBuild: true
+    strategy:
+      matrix:
+        beta:
+          TOOLCHAIN: beta
+        nightly:
+          TOOLCHAIN: nightly
+    variables:
+      OTHER_TARGET: i686-unknown-linux-gnu
+
+  - job: macOS
+    pool:
+      vmImage: macos-10.15
+    steps:
+      - template: azure-test-all.yml
+    variables:
+      TOOLCHAIN: stable
+      OTHER_TARGET: x86_64-apple-ios
+
+  - job: Windows
+    pool:
+      vmImage: windows-2019
+    steps:
+      - template: azure-test-all.yml
+    strategy:
+      matrix:
+        x86_64-msvc:
+          TOOLCHAIN: stable-x86_64-pc-windows-msvc
+          OTHER_TARGET: i686-pc-windows-msvc
+        x86_64-gnu:
+          TOOLCHAIN: nightly-x86_64-pc-windows-gnu
+          OTHER_TARGET: i686-pc-windows-gnu
+
+  - job: rustfmt
+    pool:
+      vmImage: ubuntu-16.04
+    steps:
+      - template: azure-install-rust.yml
+      - bash: rustup component add rustfmt
+        displayName: "Install rustfmt"
+      - bash: cargo fmt --all -- --check
+        displayName: "Check rustfmt (cargo)"
+    variables:
+      TOOLCHAIN: stable
 
 - stage: Deploy
   condition: and(succeeded('BuildAndTest'), not(eq(variables['build.reason'], 'PullRequest')))
