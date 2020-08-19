@@ -91,7 +91,7 @@ stages:
 
           - bash: |
               set -x
-              git branch release
+              git switch -c release
               git pull --ff-only $(Pipeline.Workspace)/git/release.bundle
               git status
               git branch -a
