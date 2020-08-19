@@ -3,9 +3,12 @@
 
 //! State of the backing version control repository.
 
-//use dynfmt::{Format, SimpleCurlyFormat};
+use dynfmt::{Format, SimpleCurlyFormat};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     errors::{Error, Result},
@@ -116,6 +119,11 @@ impl Repository {
     /// Get the name of the `rc`-type branch.
     pub fn upstream_rc_name(&self) -> &str {
         &self.upstream_rc_name
+    }
+
+    /// Get the name of the `release`-type branch.
+    pub fn upstream_release_name(&self) -> &str {
+        &self.upstream_release_name
     }
 
     /// Resolve a `RepoPath` repository path to a filesystem path in the working
@@ -316,6 +324,47 @@ impl Repository {
         // Phew, all done!
 
         Ok(())
+    }
+
+    /// Get information about a release from the HEAD commit.
+    pub fn parse_release_info_from_head(&self) -> Result<ReleaseCommitInfo> {
+        let head_ref = self.repo.head()?;
+        let head_commit = head_ref.peel_to_commit()?;
+        let msg = head_commit
+            .message()
+            .ok_or_else(|| Error::NotUnicodeError)?;
+
+        let mut data = String::new();
+        let mut in_body = false;
+
+        for line in msg.lines() {
+            if in_body {
+                if line == "+++" {
+                    in_body = false;
+                    break;
+                } else {
+                    data.push_str(line);
+                    data.push('\n');
+                }
+            } else if line.starts_with("+++ cranko-release-info-v1") {
+                in_body = true;
+            }
+        }
+
+        if in_body {
+            println!("unterminated release info body; trying to proceed anyway");
+        }
+
+        if data.len() == 0 {
+            return Err(Error::InvalidCommitMessageFormat);
+        }
+
+        let srci: SerializedReleaseCommitInfo = toml::from_str(&data)?;
+
+        Ok(ReleaseCommitInfo {
+            committish: Some(CommitId(head_commit.id())),
+            projects: srci.projects,
+        })
     }
 
     /// Look at the commits between HEAD and the latest release and analyze
@@ -599,6 +648,25 @@ impl Repository {
             committish: Some(CommitId(head_commit.id())),
             projects: srci.projects,
         })
+    }
+
+    /// Create a tag for a project release poining to HEAD.
+    pub fn tag_project_at_head(&self, proj: &Project) -> Result<()> {
+        let head_ref = self.repo.head()?;
+        let head_commit = head_ref.peel_to_commit()?;
+        let sig = self.get_signature()?;
+
+        let mut tagname_args = HashMap::new();
+        tagname_args.insert("project_slug", proj.user_facing_name.to_owned());
+        tagname_args.insert("version", proj.version.to_string());
+        let tagname = SimpleCurlyFormat.format(&self.release_tag_name_format, &tagname_args)?;
+
+        self.repo
+            .tag(&tagname, head_commit.as_object(), &sig, &tagname, false)?;
+
+        println!("Created {}", &tagname);
+
+        Ok(())
     }
 }
 

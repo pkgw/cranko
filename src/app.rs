@@ -6,7 +6,9 @@
 use crate::{
     errors::Result,
     graph::ProjectGraph,
-    repository::{ChangeList, CommitId, RcCommitInfo, RcProjectInfo, Repository},
+    repository::{
+        ChangeList, CommitId, RcCommitInfo, RcProjectInfo, ReleaseCommitInfo, Repository,
+    },
 };
 
 /// The main Cranko CLI application state structure.
@@ -162,6 +164,26 @@ impl AppSession {
                 proj.changelog
                     .finalize_changelog(proj, &self.repo, changes)?;
             }
+        }
+
+        Ok(())
+    }
+
+    /// Create version control tags for new releases.
+    pub fn create_tags(&mut self, rcinfo: &ReleaseCommitInfo) -> Result<()> {
+        self.populate_graph()?;
+
+        for proj in self.graph.toposort_mut()? {
+            let rc = match rcinfo.lookup_project(proj) {
+                Some(rc) => rc,
+                None => continue,
+            };
+
+            if rc.age != 0 {
+                continue;
+            }
+
+            self.repo.tag_project_at_head(proj)?;
         }
 
         Ok(())

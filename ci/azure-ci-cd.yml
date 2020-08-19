@@ -19,56 +19,56 @@ stages:
       TOOLCHAIN: stable
       OTHER_TARGET: i686-unknown-linux-gnu
 
-  - job: Linux_canary
-    pool:
-      vmImage: ubuntu-16.04
-    steps:
-      - template: azure-test-all.yml
-        parameters:
-          canaryBuild: true
-    strategy:
-      matrix:
-        beta:
-          TOOLCHAIN: beta
-        nightly:
-          TOOLCHAIN: nightly
-    variables:
-      OTHER_TARGET: i686-unknown-linux-gnu
-
-  - job: macOS
-    pool:
-      vmImage: macos-10.15
-    steps:
-      - template: azure-test-all.yml
-    variables:
-      TOOLCHAIN: stable
-      OTHER_TARGET: x86_64-apple-ios
-
-  - job: Windows
-    pool:
-      vmImage: windows-2019
-    steps:
-      - template: azure-test-all.yml
-    strategy:
-      matrix:
-        x86_64-msvc:
-          TOOLCHAIN: stable-x86_64-pc-windows-msvc
-          OTHER_TARGET: i686-pc-windows-msvc
-        x86_64-gnu:
-          TOOLCHAIN: nightly-x86_64-pc-windows-gnu
-          OTHER_TARGET: i686-pc-windows-gnu
-
-  - job: rustfmt
-    pool:
-      vmImage: ubuntu-16.04
-    steps:
-      - template: azure-install-rust.yml
-      - bash: rustup component add rustfmt
-        displayName: "Install rustfmt"
-      - bash: cargo fmt --all -- --check
-        displayName: "Check rustfmt (cargo)"
-    variables:
-      TOOLCHAIN: stable
+  #- job: Linux_canary
+  #  pool:
+  #    vmImage: ubuntu-16.04
+  #  steps:
+  #    - template: azure-test-all.yml
+  #      parameters:
+  #        canaryBuild: true
+  #  strategy:
+  #    matrix:
+  #      beta:
+  #        TOOLCHAIN: beta
+  #      nightly:
+  #        TOOLCHAIN: nightly
+  #  variables:
+  #    OTHER_TARGET: i686-unknown-linux-gnu
+  #
+  #- job: macOS
+  #  pool:
+  #    vmImage: macos-10.15
+  #  steps:
+  #    - template: azure-test-all.yml
+  #  variables:
+  #    TOOLCHAIN: stable
+  #    OTHER_TARGET: x86_64-apple-ios
+  #
+  #- job: Windows
+  #  pool:
+  #    vmImage: windows-2019
+  #  steps:
+  #    - template: azure-test-all.yml
+  #  strategy:
+  #    matrix:
+  #      x86_64-msvc:
+  #        TOOLCHAIN: stable-x86_64-pc-windows-msvc
+  #        OTHER_TARGET: i686-pc-windows-msvc
+  #      x86_64-gnu:
+  #        TOOLCHAIN: nightly-x86_64-pc-windows-gnu
+  #        OTHER_TARGET: i686-pc-windows-gnu
+  #
+  #- job: rustfmt
+  #  pool:
+  #    vmImage: ubuntu-16.04
+  #  steps:
+  #    - template: azure-install-rust.yml
+  #    - bash: rustup component add rustfmt
+  #      displayName: "Install rustfmt"
+  #    - bash: cargo fmt --all -- --check
+  #      displayName: "Check rustfmt (cargo)"
+  #  variables:
+  #    TOOLCHAIN: stable
 
 - stage: Deploy
   condition: and(succeeded('BuildAndTest'), not(eq(variables['build.reason'], 'PullRequest')))
@@ -87,6 +87,7 @@ stages:
         deploy:
           steps:
           # NB: make sure to properly handle both `master` and `rc` cases!
+          - checkout: self
 
           - bash: |
               cd $(Pipeline.Workspace)
@@ -97,3 +98,16 @@ stages:
           - publish: $(Pipeline.Workspace)/collection
             displayName: Publish release artifacts
             artifact: artifacts
+
+          # if we're on the `rc` branch, the release has been fully vetted and
+          # the artifacts have been published -- time to lock it in.
+
+          - bash: |
+              git switch -c release
+              git pull --ff-only $(Pipeline.Workspace)/git/release.bundle
+              git status
+              git show
+              tar xzf $(Pipeline.Workspace)/binary-i686-unknown-linux-gnu/cranko-*.tar.gz
+              ./cranko tag
+            displayName: Prepare release commit and tags
+            condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'rc'))
