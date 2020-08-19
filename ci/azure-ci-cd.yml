@@ -100,10 +100,10 @@ stages:
 
           - bash: |
               set -x
-              git pull $(Pipeline.Workspace)/git/release.bundle
+              git pull --ff-only $(Pipeline.Workspace)/git/release.bundle
               git status
               git branch -a
-              git switch release
+              git branch -c release
               git show
             displayName: Pull release commit
 
