@@ -56,7 +56,7 @@ enum Commands {
     ListCommands(ListCommandsCommand),
 
     #[structopt(name = "show")]
-    /// Print out various useful pieces of information.
+    /// Print out various useful pieces of information
     Show(ShowCommand),
 
     #[structopt(name = "stage")]
@@ -66,6 +66,10 @@ enum Commands {
     #[structopt(name = "status")]
     /// Report release status inside the active repo
     Status(StatusCommand),
+
+    #[structopt(name = "tag")]
+    /// Create tags for new releases
+    Tag(TagCommand),
 
     #[structopt(external_subcommand)]
     External(Vec<String>),
@@ -81,6 +85,7 @@ impl Command for Commands {
             Commands::Show(o) => o.execute(),
             Commands::Stage(o) => o.execute(),
             Commands::Status(o) => o.execute(),
+            Commands::Tag(o) => o.execute(),
             Commands::External(args) => do_external(args),
         }
     }
@@ -323,6 +328,30 @@ impl Command for StatusCommand {
     }
 }
 
+// tag
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct TagCommand {}
+
+impl Command for TagCommand {
+    fn execute(self) -> Result<i32> {
+        let mut sess = app::AppSession::initialize()?;
+        let info = ci_info::get();
+
+        if !info.ci {
+            println!("warning: this command should only be run in CI");
+        } else if let Some(branch_name) = info.branch_name {
+            if branch_name != sess.repo.upstream_release_name() {
+                println!("warning: this command should only be run on the release branch");
+            }
+        }
+
+        let rci = sess.repo.parse_release_info_from_head()?;
+        sess.create_tags(&rci)?;
+        Ok(0)
+    }
+}
+
 /// Run an external command by executing a subprocess.
 fn do_external(all_args: Vec<String>) -> Result<i32> {
     let (cmd, args) = all_args.split_first().unwrap();
@@ -393,6 +422,7 @@ fn list_commands() -> BTreeSet<String> {
     commands.insert("show".to_owned());
     commands.insert("stage".to_owned());
     commands.insert("status".to_owned());
+    commands.insert("tag".to_owned());
 
     commands
 }
