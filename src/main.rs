@@ -55,6 +55,10 @@ enum Commands {
     /// List available subcommands
     ListCommands(ListCommandsCommand),
 
+    #[structopt(name = "show")]
+    /// Print out various useful pieces of information.
+    Show(ShowCommand),
+
     #[structopt(name = "stage")]
     /// Mark one or more projects as planned for release
     Stage(StageCommand),
@@ -74,6 +78,7 @@ impl Command for Commands {
             Commands::Confirm(o) => o.execute(),
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
+            Commands::Show(o) => o.execute(),
             Commands::Stage(o) => o.execute(),
             Commands::Status(o) => o.execute(),
             Commands::External(args) => do_external(args),
@@ -189,6 +194,62 @@ impl Command for ListCommandsCommand {
             println!("    {}", command);
         }
 
+        Ok(0)
+    }
+}
+
+// show
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ShowCommand {
+    #[structopt(subcommand)]
+    command: ShowCommands,
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+enum ShowCommands {
+    #[structopt(name = "version")]
+    /// Print the current version number of a project
+    Version(ShowVersionCommand),
+}
+
+impl Command for ShowCommand {
+    fn execute(self) -> Result<i32> {
+        match self.command {
+            ShowCommands::Version(o) => o.execute(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ShowVersionCommand {
+    // TODO: add something like `--ifdev=latest` to print "latest"
+    // instead of 0.0.0-dev.0 if we're not on a release commit for
+    // this project.
+    #[structopt(help = "Name(s) of the project(s) to query")]
+    proj_names: Vec<String>,
+}
+
+impl Command for ShowVersionCommand {
+    fn execute(self) -> Result<i32> {
+        let mut sess = app::AppSession::initialize()?;
+        sess.populated_graph()?;
+
+        // Get the list of projects that we're interested in.
+        //
+        // TODO: better validation and more flexible querying; if no names are
+        // provided, default to staging any changed projects.
+        let mut q = graph::GraphQueryBuilder::default();
+        q.names(self.proj_names);
+        let idents = sess.graph().query_ids(q)?;
+
+        if idents.len() != 1 {
+            println!("error: must specify exactly one project to show");
+            return Ok(1);
+        }
+
+        let proj = sess.graph().lookup(idents[0]);
+        println!("{}", proj.version);
         Ok(0)
     }
 }
@@ -329,6 +390,7 @@ fn list_commands() -> BTreeSet<String> {
     commands.insert("confirm".to_owned());
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
+    commands.insert("show".to_owned());
     commands.insert("stage".to_owned());
     commands.insert("status".to_owned());
 

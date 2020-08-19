@@ -21,3 +21,6 @@ textwrap = "^0.12"
 thiserror = "1.0"
 toml = "^0.5"
 toml_edit = "^0.2"
+
+[features]
+vendored-openssl = ["git2/vendored-openssl"]

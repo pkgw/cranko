@@ -1,3 +1,3 @@
 # rc: micro bump
 
-First release, testing the CI workflow!
+Testing release with artifacts

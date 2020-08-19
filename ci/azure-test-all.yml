@@ -1,3 +1,8 @@
+parameters:
+- name: canaryBuild
+  type: boolean
+  default: false
+
 steps:
 - checkout: self
   fetchDepth: 1
@@ -11,7 +16,8 @@ steps:
   displayName: "Install gcc-multilib (linux)"
   condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'))
 
-# Bootstrap with the unmodified checkout at 0.0.0 versions.
+# Bootstrap a binary for the buildhost arch with the unmodified checkout at
+# 0.0.0 versions.
 
 - bash: cargo build --all
   displayName: "cargo build (bootstrap)"
@@ -24,5 +30,53 @@ steps:
 
 # Now that we've applied versions, mainline test workflow
 
-- bash: cargo test --all
-  displayName: "cargo test"
+- bash: cargo build --all --release
+  displayName: "cargo build (release)"
+
+- bash: cargo test --all --release
+  displayName: "cargo test (release)"
+
+# For non-canary builds, export artifacts.
+
+- ${{ if eq(parameters.canaryBuild, false) }}:
+  - bash: |
+      version="$(cargo run --release -- show version cranko)"
+      target="$(find . -name cranko-target.txt -execdir cat '{}' ';' -quit)"
+      echo "##vso[task.setvariable variable=rustTarget;]$target"
+      artifact_dir="$(Build.ArtifactStagingDirectory)/binary-$target"
+      mkdir -p "$artifact_dir"
+      tar="$artifact_dir/cranko-$version-$target.tar.gz"
+      ls -l target/release # XXX TEMP
+      cd target/release
+      tar czf "$tar" cranko
+    displayName: "Package binary (non-Windows)"
+    condition: and(succeeded(), ne(variables['Agent.OS'], 'Windows_NT'))
+
+  - bash: |
+      version="$(cargo run --release -- show version cranko)"
+      echo "##vso[task.setvariable variable=crankoVersion;]$version"
+      target="$(find . -name cranko-target.txt -execdir cat '{}' ';' -quit)"
+      echo "##vso[task.setvariable variable=rustTarget;]$target"
+      # at the moment, need to convert Windows paths to Cygwin:
+      staging=$(echo "$(Build.ArtifactStagingDirectory)" | sed -e 's|\\|\/|g' -e 's|^\([A-Za-z]\)\:/\(.*\)|/\L\1\E/\2|')
+      artifact_dir="$staging/binary-$target"
+      mkdir -p "$artifact_dir"
+      mkdir -p temp_binary_archive
+      cp target/release/cranko.exe temp_binary_archive/
+    displayName: "Prep package binary (Windows)"
+    condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
+
+  - task: ArchiveFiles@2
+    displayName: "Package binary (Windows)"
+    inputs:
+      rootFolderOrFile: temp_binary_archive/cranko.exe
+      includeRootFolder: false
+      archiveType: 'zip'
+      archiveFile: "$(Build.ArtifactStagingDirectory)/binary-$(rustTarget)/cranko-$(crankoVersion)-$(rustTarget).zip"
+    condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish packaged binary artifact
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/binary-$(rustTarget)'
+      artifactName: binary-$(rustTarget)
