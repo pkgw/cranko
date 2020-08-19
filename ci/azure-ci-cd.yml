@@ -10,15 +10,15 @@ trigger:
 stages:
 - stage: BuildAndTest
   jobs:
-  #- job: Linux
-  #  pool:
-  #    vmImage: ubuntu-16.04
-  #  steps:
-  #    - template: azure-test-all.yml
-  #  variables:
-  #    TOOLCHAIN: stable
-  #    OTHER_TARGET: i686-unknown-linux-gnu
-  #
+  - job: Linux
+    pool:
+      vmImage: ubuntu-16.04
+    steps:
+      - template: azure-test-all.yml
+    variables:
+      TOOLCHAIN: stable
+      OTHER_TARGET: i686-unknown-linux-gnu
+
   #- job: Linux_canary
   #  pool:
   #    vmImage: ubuntu-16.04
@@ -34,16 +34,16 @@ stages:
   #        TOOLCHAIN: nightly
   #  variables:
   #    OTHER_TARGET: i686-unknown-linux-gnu
-
-  - job: macOS
-    pool:
-      vmImage: macos-10.15
-    steps:
-      - template: azure-test-all.yml
-    variables:
-      TOOLCHAIN: stable
-      OTHER_TARGET: x86_64-apple-ios
-
+  #
+  #- job: macOS
+  #  pool:
+  #    vmImage: macos-10.15
+  #  steps:
+  #    - template: azure-test-all.yml
+  #  variables:
+  #    TOOLCHAIN: stable
+  #    OTHER_TARGET: x86_64-apple-ios
+  #
   #- job: Windows
   #  pool:
   #    vmImage: windows-2019
@@ -90,15 +90,6 @@ stages:
           - checkout: self
 
           - bash: |
-              set -x
-              git switch -c release
-              git pull --ff-only $(Pipeline.Workspace)/git/release.bundle
-              git status
-              git branch -a
-              git show
-            displayName: Pull release commit
-
-          - bash: |
               cd $(Pipeline.Workspace)
               mkdir collection
               cp binary-*/* collection/
@@ -107,3 +98,16 @@ stages:
           - publish: $(Pipeline.Workspace)/collection
             displayName: Publish release artifacts
             artifact: artifacts
+
+          # if we're on the `rc` branch, the release has been fully vetted and
+          # the artifacts have been published -- time to lock it in.
+
+          - bash: |
+              git switch -c release
+              git pull --ff-only $(Pipeline.Workspace)/git/release.bundle
+              git status
+              git show
+              tar xzf $(Pipeline.Workspace)/binary-i686-unknown-linux-gnu/cranko-*.tar.gz
+              ./cranko tag
+            displayName: Prepare release commit and tags
+            condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'rc'))

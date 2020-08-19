@@ -81,17 +81,16 @@ steps:
       targetPath: '$(Build.ArtifactStagingDirectory)/binary-$(rustTarget)'
       artifactName: binary-$(rustTarget)
 
-  # XXX Darwin to Linux
   - bash: |
       artifact_dir="$(Build.ArtifactStagingDirectory)/git"
       mkdir -p "$artifact_dir"
       git bundle create "$artifact_dir/release.bundle" origin/master..HEAD
     displayName: "Bundle release commit"
-    condition: and(succeeded(), eq(variables['Agent.OS'], 'Darwin'))
+    condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'))
 
   - task: PublishPipelineArtifact@1
     displayName: Publish git bundle artifact
-    condition: and(succeeded(), eq(variables['Agent.OS'], 'Darwin'))
+    condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'))
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)/git'
       artifactName: git
