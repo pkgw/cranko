@@ -82,7 +82,7 @@ steps:
       artifactName: binary-$(rustTarget)
 
   # XXX Darwin to Linux
-  - ${{ if eq(variables.agentOS, 'Darwin') }}:
+  - ${{ if eq(variables['Agent.OS'], 'Darwin') }}:
     - bash: |
         artifact_dir="$(Build.ArtifactStagingDirectory)/git"
         mkdir -p "$artifact_dir"
