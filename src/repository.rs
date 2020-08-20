@@ -184,8 +184,8 @@ impl Repository {
     /// Get information about the state of the projects in the repository as
     /// of the latest release commit.
     pub fn get_latest_release_info(&self) -> Result<ReleaseCommitInfo> {
-        if let Some(_c) = self.try_get_release_commit()? {
-            unimplemented!("get info from commit!");
+        if let Some(c) = self.try_get_release_commit()? {
+            Ok(self.parse_release_info_from_commit(c)?)
         } else {
             Ok(ReleaseCommitInfo::default())
         }
@@ -330,9 +330,12 @@ impl Repository {
     pub fn parse_release_info_from_head(&self) -> Result<ReleaseCommitInfo> {
         let head_ref = self.repo.head()?;
         let head_commit = head_ref.peel_to_commit()?;
-        let msg = head_commit
-            .message()
-            .ok_or_else(|| Error::NotUnicodeError)?;
+        self.parse_release_info_from_commit(head_commit)
+    }
+
+    /// Get information about a release from the HEAD commit.
+    fn parse_release_info_from_commit(&self, commit: git2::Commit) -> Result<ReleaseCommitInfo> {
+        let msg = commit.message().ok_or_else(|| Error::NotUnicodeError)?;
 
         let mut data = String::new();
         let mut in_body = false;
@@ -362,7 +365,7 @@ impl Repository {
         let srci: SerializedReleaseCommitInfo = toml::from_str(&data)?;
 
         Ok(ReleaseCommitInfo {
-            committish: Some(CommitId(head_commit.id())),
+            committish: Some(CommitId(commit.id())),
             projects: srci.projects,
         })
     }
