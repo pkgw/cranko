@@ -353,7 +353,8 @@ impl GraphQueryBuilder {
         self
     }
 
-    fn is_empty(&self) -> bool {
+    /// Return true if the query is empty.
+    pub fn is_empty(&self) -> bool {
         self.names.len() == 0
     }
 }

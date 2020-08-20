@@ -285,6 +285,13 @@ impl Command for ShowVersionCommand {
 
 #[derive(Debug, PartialEq, StructOpt)]
 struct StageCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force staging even in unexpected conditions"
+    )]
+    force: bool,
+
     #[structopt(help = "Name(s) of the project(s) to stage for release")]
     proj_names: Vec<String>,
 }
@@ -294,13 +301,35 @@ impl Command for StageCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
+        if let Err(e) = sess.repo.check_dirty() {
+            if self.force {
+                warn!("staging despite dirty repo due to --force");
+            } else {
+                return Err(e).context("refusing to stage (override with `--force`)");
+            }
+        }
+
+        match sess.execution_environment() {
+            app::ExecutionEnvironment::NotCi => {}
+
+            _ => {
+                warn!("`cranko stage` seems to be running in a CI environment; this is not recommended");
+            }
+        }
+
         // Get the list of projects that we're interested in.
-        //
-        // TODO: better validation and more flexible querying; if no names are
-        // provided, default to staging any changed projects.
         let mut q = graph::GraphQueryBuilder::default();
         q.names(self.proj_names);
-        let idents = sess.graph().query_ids(q)?;
+        let empty_query = q.is_empty();
+        let idents = sess
+            .graph()
+            .query_or_all(q)
+            .context("could not select projects for staging")?;
+
+        if idents.len() == 0 {
+            info!("no projects selected");
+            return Ok(0);
+        }
 
         // Pull up the relevant repository history for all of those projects.
         let history = {
@@ -316,10 +345,31 @@ impl Command for StageCommand {
         };
 
         // Update the changelogs
+        let mut n_staged = 0;
+
         for i in 0..idents.len() {
             let proj = sess.graph().lookup(idents[i]);
             let changes = &history[i][..];
-            proj.changelog.draft_release_update(proj, &sess, changes)?;
+
+            if changes.len() == 0 {
+                if !empty_query {
+                    warn!("no changes detected for project {}", proj.user_facing_name);
+                }
+            } else {
+                println!(
+                    "{}: {} relevant commits",
+                    proj.user_facing_name,
+                    changes.len()
+                );
+                proj.changelog.draft_release_update(proj, &sess, changes)?;
+                n_staged += 1;
+            }
+        }
+
+        if empty_query && n_staged != 1 {
+            info!("{} of {} projects staged", n_staged, idents.len());
+        } else if n_staged != idents.len() {
+            info!("{} of {} selected projects staged", n_staged, idents.len());
         }
 
         Ok(0)
