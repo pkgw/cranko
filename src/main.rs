@@ -9,6 +9,7 @@
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
 use anyhow::Result;
+use log::{info, warn};
 use std::{
     collections::BTreeSet,
     env, fs,
@@ -21,6 +22,7 @@ mod changelog;
 mod errors;
 mod graph;
 mod loaders;
+mod logger;
 mod project;
 mod repository;
 mod rewriters;
@@ -93,6 +95,13 @@ impl Command for Commands {
 
 fn main() -> Result<()> {
     let opts = CrankoOptions::from_args();
+
+    if let Err(e) = logger::Logger::init() {
+        eprintln!("error: cannot initialize logging backend: {}", e);
+        std::process::exit(1);
+    }
+    log::set_max_level(log::LevelFilter::Info);
+
     let exitcode = opts.command.execute()?;
     std::process::exit(exitcode);
 }
