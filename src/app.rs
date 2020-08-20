@@ -20,6 +20,9 @@ pub struct AppSession {
 
     /// The graph of projects contained within the repo.
     graph: ProjectGraph,
+
+    /// Information about the CI environment that we may be running in.
+    ci_info: ci_info::types::CiInfo,
 }
 
 impl AppSession {
@@ -30,8 +33,54 @@ impl AppSession {
     pub fn initialize() -> Result<AppSession> {
         let repo = Repository::open_from_env()?;
         let graph = ProjectGraph::default();
+        let ci_info = ci_info::get();
 
-        Ok(AppSession { graph, repo })
+        Ok(AppSession {
+            graph,
+            repo,
+            ci_info,
+        })
+    }
+
+    /// Characterize the repository environment in which this process is
+    /// running.
+    pub fn execution_environment(&self) -> ExecutionEnvironment {
+        if !self.ci_info.ci {
+            ExecutionEnvironment::NotCi
+        } else {
+            let maybe_pr = self.ci_info.pr;
+            let maybe_branch = self.ci_info.branch_name.as_ref().map(|s| s.as_ref());
+            let rc_name = self.repo.upstream_rc_name();
+            let release_name = self.repo.upstream_release_name();
+
+            if maybe_branch.is_none() {
+                warn!("cannot determine the current branch name in this CI environment");
+            }
+
+            if let Some(true) = maybe_pr {
+                if maybe_branch == Some(rc_name) {
+                    warn!("cranko seems to be running in a pull request to the `rc` branch; this is not recommended");
+                }
+
+                if maybe_branch == Some(release_name) {
+                    warn!("cranko seems to be running in a pull request to the `release` branch; this is not recommended");
+                }
+
+                return ExecutionEnvironment::CiPullRequest;
+            }
+
+            if maybe_branch == Some(rc_name) {
+                return ExecutionEnvironment::CiRcBranch;
+            }
+
+            if maybe_branch == Some(release_name) {
+                warn!(
+                    "cranko seems to be running in CI on the `release` branch; this is not recommended"
+                );
+            }
+
+            ExecutionEnvironment::CiDevelopmentBranch
+        }
     }
 
     /// Get the graph of projects inside this app session.
@@ -190,4 +239,24 @@ impl AppSession {
 
         Ok(())
     }
+}
+
+/// Different categorizations of the environment in which the program is running.
+pub enum ExecutionEnvironment {
+    /// This program is running in a CI environment, in response to an
+    /// externally submitted pull request.
+    CiPullRequest,
+
+    /// The program is running in a CI environment, in response to an update to
+    /// the main development branch.
+    CiDevelopmentBranch,
+
+    /// The program is running in a CI environment, in response to an update
+    /// to the `rc`-type branch. The HEAD commit should include Cranko release
+    /// request information.
+    CiRcBranch,
+
+    /// The program does not appear to be running in a CI environment. We infer
+    /// that we're running in an individual development environment.
+    NotCi,
 }

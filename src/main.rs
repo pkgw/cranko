@@ -114,22 +114,25 @@ struct ApplyCommand {}
 impl Command for ApplyCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-        let info = ci_info::get();
         let mut rci = None;
 
-        if info.ci {
-            if let Some(branch_name) = info.branch_name {
-                if branch_name == sess.repo.upstream_rc_name() {
-                    println!("computing new versions based on `rc` commit request data");
-                    rci = Some(sess.repo.parse_rc_info_from_head()?);
-                }
+        match sess.execution_environment() {
+            app::ExecutionEnvironment::NotCi => {
+                info!("no CI environment detected; assigning versions in development mode");
+            }
+
+            app::ExecutionEnvironment::CiDevelopmentBranch
+            | app::ExecutionEnvironment::CiPullRequest => {
+                info!("detected CI environment but not `rc` branch; assigning versions in development mode");
+            }
+
+            app::ExecutionEnvironment::CiRcBranch => {
+                info!("computing new versions based on `rc` commit request data");
+                rci = Some(sess.repo.parse_rc_info_from_head()?);
             }
         }
 
-        let rci = rci.unwrap_or_else(|| {
-            println!("computing new verions assuming development mode");
-            sess.default_dev_rc_info()
-        });
+        let rci = rci.unwrap_or_else(|| sess.default_dev_rc_info());
 
         sess.apply_versions(&rci)?;
         let mut changes = sess.rewrite()?;
@@ -354,14 +357,18 @@ struct TagCommand {}
 impl Command for TagCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-        let info = ci_info::get();
 
-        if !info.ci {
-            println!("warning: this command should only be run in CI");
-        } else if let Some(branch_name) = info.branch_name {
-            if branch_name != sess.repo.upstream_release_name() {
-                println!("warning: this command should only be run on the release branch");
+        match sess.execution_environment() {
+            app::ExecutionEnvironment::NotCi => {
+                warn!("this command should only be run in CI on the `rc` branch");
             }
+
+            app::ExecutionEnvironment::CiDevelopmentBranch
+            | app::ExecutionEnvironment::CiPullRequest => {
+                warn!("this command should only be run on the `rc` branch");
+            }
+
+            app::ExecutionEnvironment::CiRcBranch => {}
         }
 
         let rci = sess.repo.parse_release_info_from_head()?;
