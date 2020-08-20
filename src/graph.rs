@@ -311,6 +311,21 @@ impl ProjectGraph {
 
         Ok(idents)
     }
+
+    /// Process a query, returning all projects if the query is empty
+    pub fn query_or_all(&self, query: GraphQueryBuilder) -> Result<Vec<ProjectId>> {
+        if !query.is_empty() {
+            self.query_ids(query)
+        } else {
+            let mut idents = Vec::with_capacity(self.projects.len());
+
+            for proj in self.toposort()? {
+                idents.push(proj.ident());
+            }
+
+            Ok(idents)
+        }
+    }
 }
 
 /// Builder structure for querying projects in the graph.
@@ -336,6 +351,10 @@ impl GraphQueryBuilder {
     pub fn names<T: std::fmt::Display>(&mut self, names: impl IntoIterator<Item = T>) -> &mut Self {
         self.names = names.into_iter().map(|s| s.to_string()).collect();
         self
+    }
+
+    fn is_empty(&self) -> bool {
+        self.names.len() == 0
     }
 }
 

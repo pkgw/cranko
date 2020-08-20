@@ -8,7 +8,7 @@
 //!
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::{error, info, warn};
 use std::{
     collections::BTreeSet,
@@ -329,18 +329,29 @@ impl Command for StageCommand {
 // status
 
 #[derive(Debug, PartialEq, StructOpt)]
-struct StatusCommand {}
+struct StatusCommand {
+    #[structopt(help = "Name(s) of the project(s) to query (default: all)")]
+    proj_names: Vec<String>,
+}
 
 impl Command for StatusCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
+
+        let mut q = graph::GraphQueryBuilder::default();
+        q.names(self.proj_names);
+        let idents = sess
+            .graph()
+            .query_or_all(q)
+            .context("cannot get requested statuses")?;
+
         let rci = sess.repo.get_latest_release_info()?;
         let oids = sess.analyze_history_to_release()?;
-        let graph = sess.graph();
 
-        for proj in graph.toposort()? {
-            let n = oids[proj.ident()].len();
+        for ident in idents {
+            let n = oids[ident].len();
+            let proj = sess.graph().lookup(ident);
 
             if let Some(latest) = rci.lookup_project(proj) {
                 println!(
