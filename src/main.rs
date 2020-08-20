@@ -313,15 +313,24 @@ impl Command for StatusCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
+        let rci = sess.repo.get_latest_release_info()?;
         let oids = sess.analyze_history_to_release()?;
         let graph = sess.graph();
 
         for proj in graph.toposort()? {
-            println!("{}: {}", proj.user_facing_name, proj.version);
-            println!(
-                "  number of relevant commits since release: {}",
-                oids[proj.ident()].len()
-            );
+            let n = oids[proj.ident()].len();
+
+            if let Some(latest) = rci.lookup_project(proj) {
+                println!(
+                    "{}: {} relevant commit(s) since {}",
+                    proj.user_facing_name, n, latest.version
+                );
+            } else {
+                println!(
+                    "{}: {} relevant commit(s) since start of history (no releases on record)",
+                    proj.user_facing_name, n
+                );
+            }
         }
 
         Ok(0)
