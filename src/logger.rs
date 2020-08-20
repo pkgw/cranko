@@ -62,6 +62,15 @@ impl Logger {
     pub fn init() -> Result<(), log::SetLoggerError> {
         log::set_logger(&*LOGGER)
     }
+
+    pub fn print_cause(err: &(dyn std::error::Error + 'static)) {
+        if let Ok(mut inner) = LOGGER.inner.write() {
+            let _r = inner.stderr.set_color(&LOGGER.error_cspec);
+            let _r = write!(&mut inner.stderr, "caused by:");
+            let _r = inner.stderr.reset();
+            let _r = writeln!(&mut inner.stderr, " {}", err);
+        }
+    }
 }
 
 impl Log for Logger {

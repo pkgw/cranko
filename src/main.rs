@@ -9,7 +9,7 @@
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
 use anyhow::Result;
-use log::{info, warn};
+use log::{error, info, warn};
 use std::{
     collections::BTreeSet,
     env, fs,
@@ -102,7 +102,17 @@ fn main() -> Result<()> {
     }
     log::set_max_level(log::LevelFilter::Info);
 
-    let exitcode = opts.command.execute()?;
+    let exitcode = match opts.command.execute() {
+        Ok(c) => c,
+        Err(e) => {
+            error!("{}", e);
+            e.chain()
+                .skip(1)
+                .for_each(|cause| logger::Logger::print_cause(cause));
+            1
+        }
+    };
+
     std::process::exit(exitcode);
 }
 
