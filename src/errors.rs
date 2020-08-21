@@ -2,6 +2,9 @@
 // Licensed under the MIT License.
 
 //! Error handling for the CLI application.
+//!
+//! **Note** this enum approach is not great and leaks all sorts of
+//! implementation details. I need to go through and clean it up.
 
 use thiserror::Error;
 
@@ -13,6 +16,7 @@ pub enum CliError {
     NoSuchSubcommand(String),
 }
 
+#[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("operation on bare repositories is not allowed")]
@@ -30,6 +34,10 @@ pub enum Error {
     // See comment in From implementation below
     #[error("templating error: {0}")]
     Dynfmt(String),
+
+    /// A generic error having to do with the program's execution environment.
+    #[error("{0}")]
+    Environment(String),
 
     #[error("{0}")]
     Git(#[from] git2::Error),

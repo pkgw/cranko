@@ -74,9 +74,7 @@ impl AppSession {
             }
 
             if maybe_branch == Some(release_name) {
-                warn!(
-                    "cranko seems to be running in CI on the `release` branch; this is not recommended"
-                );
+                return ExecutionEnvironment::CiReleaseBranch;
             }
 
             ExecutionEnvironment::CiDevelopmentBranch
@@ -221,20 +219,13 @@ impl AppSession {
     }
 
     /// Create version control tags for new releases.
-    pub fn create_tags(&mut self, rcinfo: &ReleaseCommitInfo) -> Result<()> {
+    pub fn create_tags(&mut self, rel_info: &ReleaseCommitInfo) -> Result<()> {
         self.populate_graph()?;
 
         for proj in self.graph.toposort_mut()? {
-            let rc = match rcinfo.lookup_project(proj) {
-                Some(rc) => rc,
-                None => continue,
-            };
-
-            if rc.age != 0 {
-                continue;
+            if let Some(rel) = rel_info.lookup_if_released(proj) {
+                self.repo.tag_project_at_head(proj, rel)?;
             }
-
-            self.repo.tag_project_at_head(proj)?;
         }
 
         Ok(())
@@ -248,13 +239,20 @@ pub enum ExecutionEnvironment {
     CiPullRequest,
 
     /// The program is running in a CI environment, in response to an update to
-    /// the main development branch.
+    /// the main development branch (e.g. ,`master`).
     CiDevelopmentBranch,
 
     /// The program is running in a CI environment, in response to an update
     /// to the `rc`-type branch. The HEAD commit should include Cranko release
     /// request information.
     CiRcBranch,
+
+    /// The program is running in a CI environment, on the `release`-type
+    /// branch. The HEAD commit should include Cranko release information. In
+    /// the Cranko model, CI should not be invoked upon updates to the release
+    /// branch, but during `rc` processing `cranko apply` will switch the active
+    /// branch from `rc` to `release`.
+    CiReleaseBranch,
 
     /// The program does not appear to be running in a CI environment. We infer
     /// that we're running in an individual development environment.

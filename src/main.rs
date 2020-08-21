@@ -140,6 +140,15 @@ impl Command for ApplyCommand {
                 info!("computing new versions based on `rc` commit request data");
                 rci = Some(sess.repo.parse_rc_info_from_head()?);
             }
+
+            app::ExecutionEnvironment::CiReleaseBranch => {
+                // error instead of warning?
+                warn!(
+                    "detected CI environment on `release` branch; doing nothing because
+                    versions should already be applied"
+                );
+                return Ok(0);
+            }
         }
 
         let rci = rci.unwrap_or_else(|| sess.default_dev_rc_info());
@@ -435,11 +444,12 @@ impl Command for TagCommand {
             }
 
             app::ExecutionEnvironment::CiDevelopmentBranch
-            | app::ExecutionEnvironment::CiPullRequest => {
-                warn!("this command should only be run on the `rc` branch");
+            | app::ExecutionEnvironment::CiPullRequest
+            | app::ExecutionEnvironment::CiRcBranch => {
+                warn!("this command should only be run on the `release` branch");
             }
 
-            app::ExecutionEnvironment::CiRcBranch => {}
+            app::ExecutionEnvironment::CiReleaseBranch => {}
         }
 
         let rci = sess.repo.parse_release_info_from_head()?;

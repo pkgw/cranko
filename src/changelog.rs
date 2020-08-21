@@ -13,7 +13,7 @@ use dynfmt::{Format, SimpleCurlyFormat};
 use std::{
     collections::HashMap,
     fs::File,
-    io::{prelude::*, BufReader},
+    io::{prelude::*, BufReader, Cursor},
     path::PathBuf,
 };
 
