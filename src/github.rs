@@ -226,21 +226,15 @@ impl Command for CreateReleaseCommand {
 pub struct UploadArtifactCommand {
     #[structopt(
         long = "overwrite",
-        help = "Overwrite the artifact if it already exists in the release (default: error out)"
+        help = "Overwrite artifacts if they already exist in the release (default: error out)"
     )]
     overwrite: bool,
 
-    #[structopt(
-        long = "name",
-        help = "The artifact name to use in the release (defaults to input file basename)"
-    )]
-    name: Option<String>,
-
-    #[structopt(help = "The released project for which to upload a file")]
+    #[structopt(help = "The released project for which to upload content")]
     proj_name: String,
 
-    #[structopt(help = "The path to the file to upload")]
-    path: PathBuf,
+    #[structopt(help = "The path(s) to the file(s) to upload", required = true)]
+    paths: Vec<PathBuf>,
 }
 
 impl Command for UploadArtifactCommand {
@@ -271,20 +265,6 @@ impl Command for UploadArtifactCommand {
                 )
             })?;
 
-        // Make sure the file exists before we go creating the release!
-        let file = File::open(&self.path)?;
-
-        let name = match self.name {
-            Some(n) => n,
-            None => self
-                .path
-                .file_name()
-                .ok_or_else(|| anyhow!("input file has no name component??"))?
-                .to_str()
-                .ok_or_else(|| anyhow!("input file cannot be stringified"))?
-                .to_owned(),
-        };
-
         // Get information about the release
 
         let proj = sess.graph().lookup(ident);
@@ -300,56 +280,70 @@ impl Command for UploadArtifactCommand {
 
         info!("upload url = {}", upload_url);
 
-        // If we're in overwrite mode, delete the artifact if it already
-        // exists. This is racy, but the API doesn't give us a better method.
+        // Upload artifacts
 
-        if self.overwrite {
-            for asset_info in metadata["assets"].members() {
-                // The `json` docs make it seem like I should just be able to
-                // write `asset_info["name"] == name`, but empirically that's
-                // not working.
-                if asset_info["name"].as_str() == Some(&name) {
-                    info!("deleting preexisting asset (id {})", asset_info["id"]);
+        for path in &self.paths {
+            // Make sure the file exists!
+            let file = File::open(path)?;
 
-                    let del_url = info.api_url(&format!("releases/assets/{}", asset_info["id"]));
-                    let resp = client.delete(&del_url).send()?;
-                    let status = resp.status();
+            let name = path
+                .file_name()
+                .ok_or_else(|| anyhow!("input file has no name component??"))?
+                .to_str()
+                .ok_or_else(|| anyhow!("input file name cannot be stringified"))?
+                .to_owned();
 
-                    if !status.is_success() {
-                        error!("API response: {}", resp.text()?);
-                        return Err(anyhow!("deletion of pre-existing asset {} failed", name));
+            // If we're in overwrite mode, delete the artifact if it already
+            // exists. This is racy, but the API doesn't give us a better method.
+
+            if self.overwrite {
+                for asset_info in metadata["assets"].members() {
+                    // The `json` docs make it seem like I should just be able to
+                    // write `asset_info["name"] == name`, but empirically that's
+                    // not working.
+                    if asset_info["name"].as_str() == Some(&name) {
+                        info!("deleting preexisting asset (id {})", asset_info["id"]);
+
+                        let del_url =
+                            info.api_url(&format!("releases/assets/{}", asset_info["id"]));
+                        let resp = client.delete(&del_url).send()?;
+                        let status = resp.status();
+
+                        if !status.is_success() {
+                            error!("API response: {}", resp.text()?);
+                            return Err(anyhow!("deletion of pre-existing asset {} failed", name));
+                        }
                     }
                 }
             }
-        }
 
-        // Ready to upload now.
+            // Ready to upload now.
 
-        info!("uploading {} => {}", self.path.display(), name);
-        let url = reqwest::Url::parse_with_params(&upload_url, &[("name", &name)])?;
-        let resp = client
-            .post(url)
-            .header(
-                reqwest::header::ACCEPT,
-                "application/vnd.github.manifold-preview",
-            )
-            .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
-            .body(file)
-            .send()?;
-        let status = resp.status();
-        let mut parsed = json::parse(&resp.text()?)?;
+            info!("uploading {} => {}", path.display(), name);
+            let url = reqwest::Url::parse_with_params(&upload_url, &[("name", &name)])?;
+            let resp = client
+                .post(url)
+                .header(
+                    reqwest::header::ACCEPT,
+                    "application/vnd.github.manifold-preview",
+                )
+                .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
+                .body(file)
+                .send()?;
+            let status = resp.status();
+            let mut parsed = json::parse(&resp.text()?)?;
 
-        if !status.is_success() {
-            error!("API response: {}", parsed);
-            return Err(anyhow!("creation of asset {} failed", name));
+            if !status.is_success() {
+                error!("API response: {}", parsed);
+                return Err(anyhow!("creation of asset {} failed", name));
+            }
+
+            if let Some(s) = parsed["url"].take_string() {
+                info!("   ... asset url = {}", s);
+            }
         }
 
         info!("success!");
-
-        if let Some(s) = parsed["url"].take_string() {
-            info!("asset url = {}", s);
-        }
-
         Ok(0)
     }
 }
