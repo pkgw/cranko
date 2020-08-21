@@ -178,22 +178,26 @@ impl Command for ConfirmCommand {
         sess.populated_graph()?;
 
         let mut changes = repository::ChangeList::default();
-        let mut rcinfo = Vec::new();
+        let mut rc_info = Vec::new();
 
         for proj in sess.graph().toposort()? {
             if let Some(info) = sess.repo.scan_rc_info(proj, &mut changes)? {
-                rcinfo.push(info);
+                // TODO: apply bump and print out expected new version and other helpful info
+                info!("{}: {}", proj.user_facing_name, info.bump_spec);
+                rc_info.push(info);
             }
         }
 
-        if rcinfo.len() < 1 {
-            println!("no releases seem to have been staged; use \"cranko stage\"?");
+        if rc_info.len() < 1 {
+            warn!("no releases seem to have been staged; use \"cranko stage\"?");
             return Ok(0);
         }
 
-        sess.make_rc_commit(rcinfo, &changes)?;
-        println!("staged rc commit to \"rc\" branch");
-
+        sess.make_rc_commit(rc_info, &changes)?;
+        info!(
+            "staged rc commit to `{}` branch",
+            sess.repo.upstream_rc_name()
+        );
         Ok(0)
     }
 }
