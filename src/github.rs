@@ -84,64 +84,28 @@ impl GitHubInformation {
         format!("https://api.github.com/repos/{}/{}", self.slug, rest)
     }
 
-    /// Get information about the release, possibly creating it in the
-    /// process. We can't mark the release as a draft, because then the API
-    /// doesn't return any information for it.
+    /// Get information about an existing release.
     fn get_release_metadata(
         &self,
+        sess: &AppSession,
+        proj: &Project,
+        rel: &ReleasedProjectInfo,
         client: &mut reqwest::blocking::Client,
-        tmptag: &str,
     ) -> Result<JsonValue> {
-        // Does the release already exist?
+        let tag_name = sess.repo.get_tag_name(proj, rel)?;
+        let query_url = self.api_url(&format!("releases/tags/{}", tag_name));
 
-        let query_url = self.api_url(&format!("releases/tags/{}", tmptag));
         let resp = client.get(&query_url).send()?;
         if resp.status().is_success() {
-            return Ok(json::parse(&resp.text()?)?);
+            Ok(json::parse(&resp.text()?)?)
+        } else {
+            Err(Error::Environment(format!(
+                "no GitHub release for tag `{}`: {}",
+                tag_name,
+                resp.text()
+                    .unwrap_or_else(|_| "[non-textual server response]".to_owned())
+            )))
         }
-
-        // No. Looks like we have to create it. XXX: some hardcoded tag
-        // handling.
-
-        let release_name = if tmptag == "continuous" {
-            "Continuous Deployment release".into()
-        } else {
-            format!("{} (not yet human-verified)", tmptag)
-        };
-
-        let release_description = if tmptag == "continuous" {
-            format!("Continuous deployment")
-        } else {
-            format!("Automatically generated for tag {}", tmptag)
-        };
-
-        let release_info = object! {
-            "tag_name" => tmptag.clone(),
-            "name" => release_name,
-            "body" => release_description,
-            "draft" => false,
-            "prerelease" => true
-        };
-
-        let create_url = self.api_url("releases");
-        let resp = client
-            .post(&create_url)
-            .body(json::stringify(release_info))
-            .send()?;
-        let status = resp.status();
-        let parsed = json::parse(&resp.text()?)?;
-
-        if status.is_success() {
-            info!("created the GitHub release");
-        } else {
-            info!(
-                "did not create GitHub release; assuming someone else did; {}",
-                parsed
-            );
-            // XXXX resend initial request???
-        }
-
-        Ok(parsed)
     }
 
     /// Create a new GitHub release.
@@ -149,8 +113,8 @@ impl GitHubInformation {
         &self,
         sess: &AppSession,
         proj: &Project,
-        cid: &CommitId,
         rel: &ReleasedProjectInfo,
+        cid: &CommitId,
         client: &mut reqwest::blocking::Client,
     ) -> Result<JsonValue> {
         let tag_name = sess.repo.get_tag_name(proj, rel)?;
@@ -229,7 +193,7 @@ impl Command for CreateReleaseCommand {
             let proj = sess.graph().lookup(*ident);
 
             if let Some(rel) = rel_info.lookup_if_released(proj) {
-                info.create_release(&sess, proj, rel_commit, &rel, &mut client)?;
+                info.create_release(&sess, proj, &rel, rel_commit, &mut client)?;
                 n_released += 1;
             } else if !empty_query {
                 warn!(
@@ -272,12 +236,6 @@ pub struct UploadArtifactCommand {
     )]
     name: Option<String>,
 
-    #[structopt(
-        long = "tag",
-        help = "The release tag to target (default is to infer from CI environment)"
-    )]
-    tag: Option<String>,
-
     #[structopt(help = "The released project for which to upload a file")]
     proj_name: String,
 
@@ -287,13 +245,31 @@ pub struct UploadArtifactCommand {
 
 impl Command for UploadArtifactCommand {
     fn execute(self) -> anyhow::Result<i32> {
-        use reqwest::header;
-
         let mut sess = AppSession::initialize()?;
         let info = GitHubInformation::new(&sess)?;
+
         sess.populated_graph()?;
 
+        let rel_info = sess
+            .repo
+            .parse_release_info_from_head()
+            .context("expected Cranko release metadata in the HEAD commit but could not load it")?;
+
         let mut client = info.make_blocking_client()?;
+
+        let ident = sess
+            .graph()
+            .lookup_ident(&self.proj_name)
+            .ok_or_else(|| anyhow!("no such project `{}`", self.proj_name))?;
+
+        let rel = rel_info
+            .lookup_if_released(sess.graph().lookup(ident))
+            .ok_or_else(|| {
+                anyhow!(
+                    "project `{}` does not seem to be freshly released",
+                    self.proj_name
+                )
+            })?;
 
         // Make sure the file exists before we go creating the release!
         let file = File::open(&self.path)?;
@@ -303,19 +279,19 @@ impl Command for UploadArtifactCommand {
             None => self
                 .path
                 .file_name()
-                .ok_or_else(|| Error::Environment(format!("input file has no name component??")))?
+                .ok_or_else(|| anyhow!("input file has no name component??"))?
                 .to_str()
-                .ok_or_else(|| Error::Environment(format!("input file cannot be stringified")))?
+                .ok_or_else(|| anyhow!("input file cannot be stringified"))?
                 .to_owned(),
         };
 
         // Get information about the release
-        // XXXX NOT FINISHED
 
-        let mut metadata = info.get_release_metadata(&mut client, "TEMPTAG")?;
+        let proj = sess.graph().lookup(ident);
+        let mut metadata = info.get_release_metadata(&sess, proj, rel, &mut client)?;
         let upload_url = metadata["upload_url"]
             .take_string()
-            .ok_or_else(|| Error::Environment(format!("no upload_url in release metadata?")))?;
+            .ok_or_else(|| anyhow!("no upload_url in release metadata?"))?;
         let upload_url = {
             // The returned value includes template `{?name,label}` at the end.
             let v: Vec<&str> = upload_url.split('{').collect();
@@ -341,11 +317,7 @@ impl Command for UploadArtifactCommand {
 
                     if !status.is_success() {
                         error!("API response: {}", resp.text()?);
-                        return Err(Error::Environment(format!(
-                            "deletion of pre-existing asset {} failed",
-                            name
-                        ))
-                        .into());
+                        return Err(anyhow!("deletion of pre-existing asset {} failed", name));
                     }
                 }
             }
@@ -357,8 +329,11 @@ impl Command for UploadArtifactCommand {
         let url = reqwest::Url::parse_with_params(&upload_url, &[("name", &name)])?;
         let resp = client
             .post(url)
-            .header(header::ACCEPT, "application/vnd.github.manifold-preview")
-            .header(header::CONTENT_TYPE, "application/octet-stream")
+            .header(
+                reqwest::header::ACCEPT,
+                "application/vnd.github.manifold-preview",
+            )
+            .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
             .body(file)
             .send()?;
         let status = resp.status();
@@ -366,7 +341,7 @@ impl Command for UploadArtifactCommand {
 
         if !status.is_success() {
             error!("API response: {}", parsed);
-            return Err(Error::Environment(format!("creation of asset {} failed", name)).into());
+            return Err(anyhow!("creation of asset {} failed", name));
         }
 
         info!("success!");

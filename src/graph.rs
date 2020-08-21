@@ -77,6 +77,13 @@ impl ProjectGraph {
         &mut self.projects[ident]
     }
 
+    /// Get a project ID from its user-facing name.
+    ///
+    /// None indicates that the name is not found.
+    pub fn lookup_ident<S: AsRef<str>>(&self, name: S) -> Option<ProjectId> {
+        self.name_to_id.get(name.as_ref()).map(|id| *id)
+    }
+
     /// Add a dependency between two projects in the graph.
     pub fn add_dependency(&mut self, depender_id: ProjectId, dependee_id: ProjectId) {
         let depender_nix = self.node_ixs[depender_id];
