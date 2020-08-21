@@ -20,6 +20,7 @@ use structopt::StructOpt;
 mod app;
 mod changelog;
 mod errors;
+mod github;
 mod graph;
 mod loaders;
 mod logger;
@@ -48,6 +49,10 @@ enum Commands {
     #[structopt(name = "confirm")]
     /// Commit staged release requests to the `rc` branch
     Confirm(ConfirmCommand),
+
+    #[structopt(name = "github")]
+    /// GitHub release utilities
+    Github(github::GithubCommand),
 
     #[structopt(name = "help")]
     /// Prints this message or the help of the given subcommand
@@ -82,6 +87,7 @@ impl Command for Commands {
         match self {
             Commands::Apply(o) => o.execute(),
             Commands::Confirm(o) => o.execute(),
+            Commands::Github(o) => o.execute(),
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
             Commands::Show(o) => o.execute(),
@@ -523,6 +529,7 @@ fn list_commands() -> BTreeSet<String> {
 
     commands.insert("apply".to_owned());
     commands.insert("confirm".to_owned());
+    commands.insert("github".to_owned());
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
     commands.insert("show".to_owned());

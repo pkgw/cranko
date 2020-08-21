@@ -42,6 +42,9 @@ pub enum Error {
     #[error("{0}")]
     Git(#[from] git2::Error),
 
+    #[error("{0}")]
+    HttpHeader(#[from] reqwest::header::InvalidHeaderValue),
+
     #[error("invalid \"rc\" changelog format in `{0}`")]
     InvalidChangelogFormat(String),
 
@@ -50,6 +53,9 @@ pub enum Error {
 
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("JSON error: {0}")]
+    Json(#[from] json::Error),
 
     #[error("multiple projects with same name {0} (?!)")]
     NamingClash(String),
@@ -65,6 +71,9 @@ pub enum Error {
 
     #[error("reference to resource {0} contained outside of the repository")]
     OutsideOfRepository(String),
+
+    #[error("{0}")]
+    Reqwest(#[from] reqwest::Error),
 
     /// Used when our rewriting logic encounters an unexpected file structure,
     /// missing template, etc -- not for I/O errors encountered in process.

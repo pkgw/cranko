@@ -79,6 +79,23 @@ impl ChangelogFormat {
             ChangelogFormat::Markdown(f) => f.finalize_changelog(proj, repo, changes),
         }
     }
+
+    /// Read most recent changelog stanza *as of the specified commit*.
+    ///
+    /// For now, this text is presumed to be formatted in CommonMark format.
+    ///
+    /// Note that this operation ignores the working tree in an effort to provide
+    /// more reliability.
+    pub fn scan_changelog(
+        &self,
+        proj: &Project,
+        repo: &Repository,
+        cid: &CommitId,
+    ) -> Result<String> {
+        match self {
+            ChangelogFormat::Markdown(f) => f.scan_changelog(proj, repo, cid),
+        }
+    }
 }
 
 /// Settings for Markdown-formatted changelogs.
@@ -300,5 +317,45 @@ impl MarkdownFormat {
             Err(atomicwrites::Error::User(e)) => Err(e),
             Ok(()) => Ok(()),
         }
+    }
+
+    fn scan_changelog(&self, proj: &Project, repo: &Repository, cid: &CommitId) -> Result<String> {
+        let changelog_path = self.changelog_repopath(proj);
+        let data = repo.get_file_at_commit(cid, &changelog_path)?;
+        let reader = Cursor::new(data);
+
+        enum State {
+            BeforeHeader,
+            InChangelog,
+        }
+        let mut state = State::BeforeHeader;
+        let mut changelog = String::new();
+
+        // In a slight tweak from other methods here, we ignore everything
+        // before a "# " header.
+        for maybe_line in reader.lines() {
+            let line = maybe_line?;
+
+            match state {
+                State::BeforeHeader => {
+                    if line.starts_with("# ") {
+                        changelog.push_str(&line);
+                        changelog.push('\n');
+                        state = State::InChangelog;
+                    }
+                }
+
+                State::InChangelog => {
+                    if line.starts_with("# ") {
+                        break;
+                    } else {
+                        changelog.push_str(&line);
+                        changelog.push('\n');
+                    }
+                }
+            }
+        }
+
+        Ok(changelog)
     }
 }
