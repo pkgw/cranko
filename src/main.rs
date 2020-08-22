@@ -8,7 +8,7 @@
 //!
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
 use std::{
     collections::BTreeSet,
@@ -42,10 +42,6 @@ trait Command {
 
 #[derive(Debug, PartialEq, StructOpt)]
 enum Commands {
-    #[structopt(name = "apply")]
-    /// Create a new commit applying version numbers all projects
-    Apply(ApplyCommand),
-
     #[structopt(name = "confirm")]
     /// Commit staged release requests to the `rc` branch
     Confirm(ConfirmCommand),
@@ -62,6 +58,10 @@ enum Commands {
     /// List available subcommands
     ListCommands(ListCommandsCommand),
 
+    #[structopt(name = "release-workflow")]
+    /// Specialized operations for releases in the just-in-time versioning workflow
+    ReleaseWorkflow(ReleaseWorkflowCommand),
+
     #[structopt(name = "show")]
     /// Print out various useful pieces of information
     Show(ShowCommand),
@@ -74,10 +74,6 @@ enum Commands {
     /// Report release status inside the active repo
     Status(StatusCommand),
 
-    #[structopt(name = "tag")]
-    /// Create tags for new releases
-    Tag(TagCommand),
-
     #[structopt(external_subcommand)]
     External(Vec<String>),
 }
@@ -85,15 +81,14 @@ enum Commands {
 impl Command for Commands {
     fn execute(self) -> Result<i32> {
         match self {
-            Commands::Apply(o) => o.execute(),
             Commands::Confirm(o) => o.execute(),
             Commands::Github(o) => o.execute(),
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
+            Commands::ReleaseWorkflow(o) => o.execute(),
             Commands::Show(o) => o.execute(),
             Commands::Stage(o) => o.execute(),
             Commands::Status(o) => o.execute(),
-            Commands::Tag(o) => o.execute(),
             Commands::External(args) => do_external(args),
         }
     }
@@ -120,51 +115,6 @@ fn main() -> Result<()> {
     };
 
     std::process::exit(exitcode);
-}
-
-// apply
-
-#[derive(Debug, PartialEq, StructOpt)]
-struct ApplyCommand {}
-
-impl Command for ApplyCommand {
-    fn execute(self) -> Result<i32> {
-        let mut sess = app::AppSession::initialize()?;
-        let mut rci = None;
-
-        match sess.execution_environment() {
-            app::ExecutionEnvironment::NotCi => {
-                info!("no CI environment detected; assigning versions in development mode");
-            }
-
-            app::ExecutionEnvironment::CiDevelopmentBranch
-            | app::ExecutionEnvironment::CiPullRequest => {
-                info!("detected CI environment but not `rc` branch; assigning versions in development mode");
-            }
-
-            app::ExecutionEnvironment::CiRcBranch => {
-                info!("computing new versions based on `rc` commit request data");
-                rci = Some(sess.repo.parse_rc_info_from_head()?);
-            }
-
-            app::ExecutionEnvironment::CiReleaseBranch => {
-                // error instead of warning?
-                warn!(
-                    "detected CI environment on `release` branch; doing nothing because
-                    versions should already be applied"
-                );
-                return Ok(0);
-            }
-        }
-
-        let rci = rci.unwrap_or_else(|| sess.default_dev_rc_info());
-
-        sess.apply_versions(&rci)?;
-        let mut changes = sess.rewrite()?;
-        sess.apply_changelogs(&rci, &mut changes)?;
-        sess.make_release_commit(&changes)?;
-        Ok(0)
-    }
 }
 
 // confirm
@@ -240,6 +190,196 @@ impl Command for ListCommandsCommand {
             println!("    {}", command);
         }
 
+        Ok(0)
+    }
+}
+
+// release-workflow
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ReleaseWorkflowCommand {
+    #[structopt(subcommand)]
+    command: ReleaseWorkflowCommands,
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+enum ReleaseWorkflowCommands {
+    #[structopt(name = "apply-versions")]
+    /// Apply version numbers to all projects in the working tree.
+    ApplyVersions(ReleaseWorkflowApplyVersionsCommand),
+
+    #[structopt(name = "commit")]
+    /// Commit changes as a new release
+    Commit(ReleaseWorkflowCommitCommand),
+
+    #[structopt(name = "tag")]
+    /// Create version-control tags for new releases
+    Tag(ReleaseWorkflowTagCommand),
+}
+
+impl Command for ReleaseWorkflowCommand {
+    fn execute(self) -> Result<i32> {
+        match self.command {
+            ReleaseWorkflowCommands::ApplyVersions(o) => o.execute(),
+            ReleaseWorkflowCommands::Commit(o) => o.execute(),
+            ReleaseWorkflowCommands::Tag(o) => o.execute(),
+        }
+    }
+}
+
+// release-workflow apply-versions
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ReleaseWorkflowApplyVersionsCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force operation even in unexpected conditions"
+    )]
+    force: bool,
+}
+
+impl Command for ReleaseWorkflowApplyVersionsCommand {
+    fn execute(self) -> Result<i32> {
+        let mut sess = app::AppSession::initialize()?;
+        sess.populated_graph()?;
+
+        sess.repo.check_dirty()?;
+
+        let mut rci = None;
+        let mut dev_mode = true;
+
+        match sess.execution_environment() {
+            app::ExecutionEnvironment::NotCi => {
+                warn!("no CI environment detected; this is unexpected for this command");
+                if !self.force {
+                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+                }
+            }
+
+            app::ExecutionEnvironment::CiDevelopmentBranch
+            | app::ExecutionEnvironment::CiPullRequest => {
+                info!("detected development-mode CI environment");
+            }
+
+            app::ExecutionEnvironment::CiRcBranch => {
+                info!("computing new versions based on `rc` commit request data");
+                rci = Some(sess.repo.parse_rc_info_from_head()?);
+                dev_mode = false;
+            }
+
+            app::ExecutionEnvironment::CiReleaseBranch => {
+                warn!(
+                    "detected CI environment on `release` branch; this is unexpected for this command"
+                );
+                if !self.force {
+                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+                }
+            }
+        }
+
+        let rci = rci.unwrap_or_else(|| sess.default_dev_rc_info());
+
+        sess.apply_versions(&rci)?;
+        let mut changes = sess.rewrite()?;
+
+        if !dev_mode {
+            sess.apply_changelogs(&rci, &mut changes)?;
+        }
+
+        Ok(0)
+    }
+}
+
+// release-workflow commit
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ReleaseWorkflowCommitCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force operation even in unexpected conditions"
+    )]
+    force: bool,
+}
+
+impl Command for ReleaseWorkflowCommitCommand {
+    fn execute(self) -> Result<i32> {
+        let mut sess = app::AppSession::initialize()?;
+        sess.populated_graph()?;
+
+        match sess.execution_environment() {
+            app::ExecutionEnvironment::NotCi => {
+                warn!("no CI environment detected; this is unexpected for this command");
+                if !self.force {
+                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+                }
+            }
+
+            app::ExecutionEnvironment::CiDevelopmentBranch
+            | app::ExecutionEnvironment::CiPullRequest
+            | app::ExecutionEnvironment::CiReleaseBranch => {
+                warn!("CI environment detected but not on `rc` branch; this is unexpected for this command");
+                if !self.force {
+                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+                }
+            }
+
+            app::ExecutionEnvironment::CiRcBranch => {}
+        }
+
+        // We don't actually need the information, but this step helps us verify
+        // that everything is as expected.
+        sess.repo
+            .parse_rc_info_from_head()
+            .context("expected HEAD to contain `rc` information")?;
+
+        sess.make_release_commit()?;
+        Ok(0)
+    }
+}
+
+// release-workflow tag
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ReleaseWorkflowTagCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force operation even in unexpected conditions"
+    )]
+    force: bool,
+}
+
+impl Command for ReleaseWorkflowTagCommand {
+    fn execute(self) -> Result<i32> {
+        let mut sess = app::AppSession::initialize()?;
+
+        // Note here that the active checkout should have been switched to the
+        // `release` branch by `release-workflow commit` or an equivalent; but
+        // the CI run should still have been *triggered* for the `rc` branch.
+        match sess.execution_environment() {
+            app::ExecutionEnvironment::NotCi => {
+                warn!("no CI environment detected; this is unexpected for this command");
+                if !self.force {
+                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+                }
+            }
+
+            app::ExecutionEnvironment::CiDevelopmentBranch
+            | app::ExecutionEnvironment::CiPullRequest
+            | app::ExecutionEnvironment::CiReleaseBranch => {
+                warn!("CI environment detected but not on `rc` branch; this is unexpected for this command");
+                if !self.force {
+                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+                }
+            }
+
+            app::ExecutionEnvironment::CiRcBranch => {}
+        }
+
+        let rci = sess.repo.parse_release_info_from_head()?;
+        sess.create_tags(&rci)?;
         Ok(0)
     }
 }
@@ -441,35 +581,6 @@ impl Command for StatusCommand {
     }
 }
 
-// tag
-
-#[derive(Debug, PartialEq, StructOpt)]
-struct TagCommand {}
-
-impl Command for TagCommand {
-    fn execute(self) -> Result<i32> {
-        let mut sess = app::AppSession::initialize()?;
-
-        match sess.execution_environment() {
-            app::ExecutionEnvironment::NotCi => {
-                warn!("this command should only be run in CI on the `rc` branch");
-            }
-
-            app::ExecutionEnvironment::CiDevelopmentBranch
-            | app::ExecutionEnvironment::CiPullRequest
-            | app::ExecutionEnvironment::CiRcBranch => {
-                warn!("this command should only be run on the `release` branch");
-            }
-
-            app::ExecutionEnvironment::CiReleaseBranch => {}
-        }
-
-        let rci = sess.repo.parse_release_info_from_head()?;
-        sess.create_tags(&rci)?;
-        Ok(0)
-    }
-}
-
 /// Run an external command by executing a subprocess.
 fn do_external(all_args: Vec<String>) -> Result<i32> {
     let (cmd, args) = all_args.split_first().unwrap();
@@ -533,15 +644,14 @@ fn list_commands() -> BTreeSet<String> {
         }
     }
 
-    commands.insert("apply".to_owned());
     commands.insert("confirm".to_owned());
     commands.insert("github".to_owned());
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
+    commands.insert("release-workflow".to_owned());
     commands.insert("show".to_owned());
     commands.insert("stage".to_owned());
     commands.insert("status".to_owned());
-    commands.insert("tag".to_owned());
 
     commands
 }

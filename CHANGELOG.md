@@ -1,3 +1,8 @@
+# cranko 0.0.3 (2020-08-22)
+
+- Split `apply` into two separate steps, subcommands of a new `release-workflow`
+  command along with `tag`.
+
 # cranko 0.0.2 (2020-08-22)
 
 - Add `github` subcommand with some useful utilities
