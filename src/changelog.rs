@@ -111,7 +111,7 @@ impl Default for MarkdownFormat {
     fn default() -> Self {
         MarkdownFormat {
             basename: "CHANGELOG.md".to_owned(),
-            release_header_format: "# Version {version} ({yyyy_mm_dd})\n".to_owned(),
+            release_header_format: "# {project_slug} {version} ({yyyy_mm_dd})\n".to_owned(),
             stage_header_format: "# rc: {bump_spec}\n".to_owned(),
             footer_format: "".to_owned(),
         }
@@ -247,6 +247,7 @@ impl MarkdownFormat {
     ) -> Result<()> {
         // Prepare the substitution template
         let mut header_args = HashMap::new();
+        header_args.insert("project_slug", proj.user_facing_name.to_owned());
         header_args.insert("version", proj.version.to_string());
         let now = Local::now();
         header_args.insert(
