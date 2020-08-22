@@ -365,6 +365,7 @@ impl Command for StageCommand {
 
         // Update the changelogs
         let mut n_staged = 0;
+        let rel_info = sess.repo.get_latest_release_info()?;
 
         for i in 0..idents.len() {
             let proj = sess.graph().lookup(idents[i]);
@@ -380,7 +381,8 @@ impl Command for StageCommand {
                     proj.user_facing_name,
                     changes.len()
                 );
-                proj.changelog.draft_release_update(proj, &sess, changes)?;
+                proj.changelog
+                    .draft_release_update(proj, &sess, changes, rel_info.commit)?;
                 n_staged += 1;
             }
         }
