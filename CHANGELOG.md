@@ -1,5 +1,10 @@
 # rc: micro bump
 
+- Split `apply` into two separate steps, subcommands of a new `release-workflow`
+  command along with `tag`.
+
+# cranko 0.0.2 (2020-08-22)
+
 - Add `github` subcommand with some useful utilities
 - Wire those up in the Cranko CI/CD pipeline
 - Add logging infrastructure and start making the CLI UI nicer

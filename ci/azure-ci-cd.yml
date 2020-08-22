@@ -110,7 +110,7 @@ stages:
               git status
               git show
               tar xzf $(Pipeline.Workspace)/binary-x86_64-unknown-linux-gnu/cranko-*.tar.gz
-              ./cranko tag
+              ./cranko release-workflow tag
             displayName: Prepare release commit and tags
             condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'rc'))
 

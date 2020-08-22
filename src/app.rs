@@ -122,11 +122,7 @@ impl AppSession {
 
     /// Apply version numbers given the current repository state and bump specifications.
     pub fn apply_versions(&mut self, rcinfo: &RcCommitInfo) -> Result<()> {
-        self.populate_graph()?;
-
         let latest_info = self.repo.get_latest_release_info()?;
-
-        self.repo.check_dirty()?;
 
         for proj in self.graph.toposort_mut()? {
             let cur_version = proj.version.clone();
@@ -164,9 +160,8 @@ impl AppSession {
         Ok(changes)
     }
 
-    pub fn make_release_commit(&mut self, changes: &ChangeList) -> Result<()> {
-        self.repo.make_release_commit(&self.graph, &changes)?;
-        Ok(())
+    pub fn make_release_commit(&mut self) -> Result<()> {
+        self.repo.make_release_commit(&self.graph)
     }
 
     pub fn make_rc_commit(

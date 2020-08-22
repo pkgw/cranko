@@ -265,12 +265,8 @@ impl Repository {
         Ok(Some(rc_ref.peel_to_commit()?))
     }
 
-    /// Make a commit merging the current workdir state into the release branch.
-    pub fn make_release_commit(
-        &mut self,
-        graph: &ProjectGraph,
-        changes: &ChangeList,
-    ) -> Result<()> {
+    /// Make a commit merging the current index state into the release branch.
+    pub fn make_release_commit(&mut self, graph: &ProjectGraph) -> Result<()> {
         // Gather useful info.
 
         let maybe_release_commit = self.try_get_release_commit()?;
@@ -280,11 +276,11 @@ impl Repository {
         let local_ref_name = format!("refs/heads/{}", self.upstream_release_name);
 
         // Set up the project release info. This will be serialized into the
-        // commit message. (In principle, we could attempt to extract this
-        // information from the Git Tree associated with the release commit, but
-        // not only would that be harder to implement, it would introduce all
-        // sorts of fragility into the system as data formats change. Better to
-        // just save the data as data.)
+        // commit message. (In principle, other commands could attempt to
+        // extract this information from the Git Tree associated with the
+        // release commit, but not only would that be harder to implement, it
+        // would introduce all sorts of fragility into the system as data
+        // formats change. Better to just save the data as data.)
 
         let mut info = SerializedReleaseCommitInfo::default();
 
@@ -307,16 +303,10 @@ impl Repository {
             toml::to_string(&info)?
         );
 
-        // Create and save a new Tree containing the working-tree changes made
-        // during the rewrite process.
+        // Turn the current index into a Tree.
 
         let tree_oid = {
             let mut index = self.repo.index()?;
-
-            for p in &changes.paths {
-                index.add_path(p.as_path())?;
-            }
-
             index.write_tree()?
         };
         let tree = self.repo.find_tree(tree_oid)?;
@@ -347,6 +337,7 @@ impl Repository {
         // commit. By construction, nothing on the filesystem should actually
         // change.
 
+        info!("switching HEAD to `{}`", local_ref_name);
         self.repo.set_head(&local_ref_name)?;
         self.repo.reset(
             self.repo.find_commit(commit_id)?.as_object(),
