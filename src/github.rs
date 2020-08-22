@@ -221,9 +221,9 @@ impl Command for CreateReleaseCommand {
     }
 }
 
-/// Upload an artifact file to a GitHub release.
+/// Upload one or more artifact files to a GitHub release.
 #[derive(Debug, PartialEq, StructOpt)]
-pub struct UploadArtifactCommand {
+pub struct UploadArtifactsCommand {
     #[structopt(
         long = "overwrite",
         help = "Overwrite artifacts if they already exist in the release (default: error out)"
@@ -237,7 +237,7 @@ pub struct UploadArtifactCommand {
     paths: Vec<PathBuf>,
 }
 
-impl Command for UploadArtifactCommand {
+impl Command for UploadArtifactsCommand {
     fn execute(self) -> anyhow::Result<i32> {
         let mut sess = AppSession::initialize()?;
         let info = GitHubInformation::new(&sess)?;
@@ -354,9 +354,9 @@ pub enum GithubCommands {
     /// Create one or more new GitHub releases
     CreateRelease(CreateReleaseCommand),
 
-    #[structopt(name = "upload-artifact")]
-    /// Upload a file as a GitHub release artifact
-    UploadArtifact(UploadArtifactCommand),
+    #[structopt(name = "upload-artifacts")]
+    /// Upload one or more files as GitHub release artifacts
+    UploadArtifacts(UploadArtifactsCommand),
 }
 
 #[derive(Debug, PartialEq, StructOpt)]
@@ -369,7 +369,7 @@ impl Command for GithubCommand {
     fn execute(self) -> anyhow::Result<i32> {
         match self.command {
             GithubCommands::CreateRelease(o) => o.execute(),
-            GithubCommands::UploadArtifact(o) => o.execute(),
+            GithubCommands::UploadArtifacts(o) => o.execute(),
         }
     }
 }
