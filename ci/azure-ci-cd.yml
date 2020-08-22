@@ -101,7 +101,8 @@ stages:
             artifact: artifacts
 
           # if we're on the `rc` branch, the release has been fully vetted and
-          # the artifacts have been published -- time to lock it in.
+          # the artifacts have been published -- time switch back to the `release`
+          # branch and lock things in.
 
           - bash: |
               git switch -c release
@@ -116,6 +117,14 @@ stages:
           - bash: |
               git -c "credential.helper=!f() { echo username=token; echo password=$GITHUB_TOKEN; };f" push --tags origin release:release
             displayName: Update release branch
+            condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'rc'))
+            env:
+              GITHUB_TOKEN: $(GITHUB_TOKEN)
+
+          - bash: |
+              ./cranko github create-release cranko
+              ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/collection/*
+            displayName: Create GitHub release
             condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'rc'))
             env:
               GITHUB_TOKEN: $(GITHUB_TOKEN)
