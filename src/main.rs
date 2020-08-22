@@ -8,7 +8,8 @@
 //!
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use log::{error, info, warn};
 use std::{
     collections::BTreeSet,
     env, fs,
@@ -19,8 +20,10 @@ use structopt::StructOpt;
 mod app;
 mod changelog;
 mod errors;
+mod github;
 mod graph;
 mod loaders;
+mod logger;
 mod project;
 mod repository;
 mod rewriters;
@@ -46,6 +49,10 @@ enum Commands {
     #[structopt(name = "confirm")]
     /// Commit staged release requests to the `rc` branch
     Confirm(ConfirmCommand),
+
+    #[structopt(name = "github")]
+    /// GitHub release utilities
+    Github(github::GithubCommand),
 
     #[structopt(name = "help")]
     /// Prints this message or the help of the given subcommand
@@ -80,6 +87,7 @@ impl Command for Commands {
         match self {
             Commands::Apply(o) => o.execute(),
             Commands::Confirm(o) => o.execute(),
+            Commands::Github(o) => o.execute(),
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
             Commands::Show(o) => o.execute(),
@@ -93,7 +101,24 @@ impl Command for Commands {
 
 fn main() -> Result<()> {
     let opts = CrankoOptions::from_args();
-    let exitcode = opts.command.execute()?;
+
+    if let Err(e) = logger::Logger::init() {
+        eprintln!("error: cannot initialize logging backend: {}", e);
+        std::process::exit(1);
+    }
+    log::set_max_level(log::LevelFilter::Info);
+
+    let exitcode = match opts.command.execute() {
+        Ok(c) => c,
+        Err(e) => {
+            error!("{}", e);
+            e.chain()
+                .skip(1)
+                .for_each(|cause| logger::Logger::print_cause(cause));
+            1
+        }
+    };
+
     std::process::exit(exitcode);
 }
 
@@ -105,22 +130,34 @@ struct ApplyCommand {}
 impl Command for ApplyCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-        let info = ci_info::get();
         let mut rci = None;
 
-        if info.ci {
-            if let Some(branch_name) = info.branch_name {
-                if branch_name == sess.repo.upstream_rc_name() {
-                    println!("computing new versions based on `rc` commit request data");
-                    rci = Some(sess.repo.parse_rc_info_from_head()?);
-                }
+        match sess.execution_environment() {
+            app::ExecutionEnvironment::NotCi => {
+                info!("no CI environment detected; assigning versions in development mode");
+            }
+
+            app::ExecutionEnvironment::CiDevelopmentBranch
+            | app::ExecutionEnvironment::CiPullRequest => {
+                info!("detected CI environment but not `rc` branch; assigning versions in development mode");
+            }
+
+            app::ExecutionEnvironment::CiRcBranch => {
+                info!("computing new versions based on `rc` commit request data");
+                rci = Some(sess.repo.parse_rc_info_from_head()?);
+            }
+
+            app::ExecutionEnvironment::CiReleaseBranch => {
+                // error instead of warning?
+                warn!(
+                    "detected CI environment on `release` branch; doing nothing because
+                    versions should already be applied"
+                );
+                return Ok(0);
             }
         }
 
-        let rci = rci.unwrap_or_else(|| {
-            println!("computing new verions assuming development mode");
-            sess.default_dev_rc_info()
-        });
+        let rci = rci.unwrap_or_else(|| sess.default_dev_rc_info());
 
         sess.apply_versions(&rci)?;
         let mut changes = sess.rewrite()?;
@@ -141,22 +178,26 @@ impl Command for ConfirmCommand {
         sess.populated_graph()?;
 
         let mut changes = repository::ChangeList::default();
-        let mut rcinfo = Vec::new();
+        let mut rc_info = Vec::new();
 
         for proj in sess.graph().toposort()? {
             if let Some(info) = sess.repo.scan_rc_info(proj, &mut changes)? {
-                rcinfo.push(info);
+                // TODO: apply bump and print out expected new version and other helpful info
+                info!("{}: {}", proj.user_facing_name, info.bump_spec);
+                rc_info.push(info);
             }
         }
 
-        if rcinfo.len() < 1 {
-            println!("no releases seem to have been staged; use \"cranko stage\"?");
+        if rc_info.len() < 1 {
+            warn!("no releases seem to have been staged; use \"cranko stage\"?");
             return Ok(0);
         }
 
-        sess.make_rc_commit(rcinfo, &changes)?;
-        println!("staged rc commit to \"rc\" branch");
-
+        sess.make_rc_commit(rc_info, &changes)?;
+        info!(
+            "staged rc commit to `{}` branch",
+            sess.repo.upstream_rc_name()
+        );
         Ok(0)
     }
 }
@@ -263,6 +304,13 @@ impl Command for ShowVersionCommand {
 
 #[derive(Debug, PartialEq, StructOpt)]
 struct StageCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force staging even in unexpected conditions"
+    )]
+    force: bool,
+
     #[structopt(help = "Name(s) of the project(s) to stage for release")]
     proj_names: Vec<String>,
 }
@@ -272,13 +320,35 @@ impl Command for StageCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
+        if let Err(e) = sess.repo.check_dirty() {
+            if self.force {
+                warn!("staging despite dirty repo due to --force");
+            } else {
+                return Err(e).context("refusing to stage (override with `--force`)");
+            }
+        }
+
+        match sess.execution_environment() {
+            app::ExecutionEnvironment::NotCi => {}
+
+            _ => {
+                warn!("`cranko stage` seems to be running in a CI environment; this is not recommended");
+            }
+        }
+
         // Get the list of projects that we're interested in.
-        //
-        // TODO: better validation and more flexible querying; if no names are
-        // provided, default to staging any changed projects.
         let mut q = graph::GraphQueryBuilder::default();
         q.names(self.proj_names);
-        let idents = sess.graph().query_ids(q)?;
+        let empty_query = q.is_empty();
+        let idents = sess
+            .graph()
+            .query_or_all(q)
+            .context("could not select projects for staging")?;
+
+        if idents.len() == 0 {
+            info!("no projects selected");
+            return Ok(0);
+        }
 
         // Pull up the relevant repository history for all of those projects.
         let history = {
@@ -294,10 +364,33 @@ impl Command for StageCommand {
         };
 
         // Update the changelogs
+        let mut n_staged = 0;
+        let rel_info = sess.repo.get_latest_release_info()?;
+
         for i in 0..idents.len() {
             let proj = sess.graph().lookup(idents[i]);
             let changes = &history[i][..];
-            proj.changelog.draft_release_update(proj, &sess, changes)?;
+
+            if changes.len() == 0 {
+                if !empty_query {
+                    warn!("no changes detected for project {}", proj.user_facing_name);
+                }
+            } else {
+                println!(
+                    "{}: {} relevant commits",
+                    proj.user_facing_name,
+                    changes.len()
+                );
+                proj.changelog
+                    .draft_release_update(proj, &sess, changes, rel_info.commit)?;
+                n_staged += 1;
+            }
+        }
+
+        if empty_query && n_staged != 1 {
+            info!("{} of {} projects staged", n_staged, idents.len());
+        } else if n_staged != idents.len() {
+            info!("{} of {} selected projects staged", n_staged, idents.len());
         }
 
         Ok(0)
@@ -307,21 +400,41 @@ impl Command for StageCommand {
 // status
 
 #[derive(Debug, PartialEq, StructOpt)]
-struct StatusCommand {}
+struct StatusCommand {
+    #[structopt(help = "Name(s) of the project(s) to query (default: all)")]
+    proj_names: Vec<String>,
+}
 
 impl Command for StatusCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
-        let oids = sess.analyze_history_to_release()?;
-        let graph = sess.graph();
 
-        for proj in graph.toposort()? {
-            println!("{}: {}", proj.user_facing_name, proj.version);
-            println!(
-                "  number of relevant commits since release: {}",
-                oids[proj.ident()].len()
-            );
+        let mut q = graph::GraphQueryBuilder::default();
+        q.names(self.proj_names);
+        let idents = sess
+            .graph()
+            .query_or_all(q)
+            .context("cannot get requested statuses")?;
+
+        let rci = sess.repo.get_latest_release_info()?;
+        let oids = sess.analyze_history_to_release()?;
+
+        for ident in idents {
+            let n = oids[ident].len();
+            let proj = sess.graph().lookup(ident);
+
+            if let Some(latest) = rci.lookup_project(proj) {
+                println!(
+                    "{}: {} relevant commit(s) since {}",
+                    proj.user_facing_name, n, latest.version
+                );
+            } else {
+                println!(
+                    "{}: {} relevant commit(s) since start of history (no releases on record)",
+                    proj.user_facing_name, n
+                );
+            }
         }
 
         Ok(0)
@@ -336,14 +449,19 @@ struct TagCommand {}
 impl Command for TagCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-        let info = ci_info::get();
 
-        if !info.ci {
-            println!("warning: this command should only be run in CI");
-        } else if let Some(branch_name) = info.branch_name {
-            if branch_name != sess.repo.upstream_release_name() {
-                println!("warning: this command should only be run on the release branch");
+        match sess.execution_environment() {
+            app::ExecutionEnvironment::NotCi => {
+                warn!("this command should only be run in CI on the `rc` branch");
             }
+
+            app::ExecutionEnvironment::CiDevelopmentBranch
+            | app::ExecutionEnvironment::CiPullRequest
+            | app::ExecutionEnvironment::CiRcBranch => {
+                warn!("this command should only be run on the `release` branch");
+            }
+
+            app::ExecutionEnvironment::CiReleaseBranch => {}
         }
 
         let rci = sess.repo.parse_release_info_from_head()?;
@@ -417,6 +535,7 @@ fn list_commands() -> BTreeSet<String> {
 
     commands.insert("apply".to_owned());
     commands.insert("confirm".to_owned());
+    commands.insert("github".to_owned());
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
     commands.insert("show".to_owned());

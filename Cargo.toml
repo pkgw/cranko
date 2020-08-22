@@ -1,6 +1,6 @@
 [package]
 name = "cranko"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Peter Williams <peter@newton.cx>"]
 edition = "2018"
 
@@ -11,12 +11,18 @@ cargo_metadata = "^0.10"
 chrono = "^0.4"
 ci_info = "^0.10"
 dynfmt = { version ="^0.1", default-features = false, features = ["curly"] }
+git-url-parse = "^0.2"
 git2 = "^0.13"
+json = "^0.12"
+lazy_static = "^1.4"
+log = "^0.4"
 lru = "^0.6"
 petgraph = "^0.5"
+reqwest = { version = "^0.10", features = ["blocking"] }
 semver = "^0.9"
 serde = { version = "^1.0", features = ["derive"] }
 structopt = "^0.3"
+termcolor = "^1.1"
 textwrap = "^0.12"
 thiserror = "1.0"
 toml = "^0.5"

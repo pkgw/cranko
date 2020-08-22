@@ -77,6 +77,13 @@ impl ProjectGraph {
         &mut self.projects[ident]
     }
 
+    /// Get a project ID from its user-facing name.
+    ///
+    /// None indicates that the name is not found.
+    pub fn lookup_ident<S: AsRef<str>>(&self, name: S) -> Option<ProjectId> {
+        self.name_to_id.get(name.as_ref()).map(|id| *id)
+    }
+
     /// Add a dependency between two projects in the graph.
     pub fn add_dependency(&mut self, depender_id: ProjectId, dependee_id: ProjectId) {
         let depender_nix = self.node_ixs[depender_id];
@@ -311,6 +318,21 @@ impl ProjectGraph {
 
         Ok(idents)
     }
+
+    /// Process a query, returning all projects if the query is empty
+    pub fn query_or_all(&self, query: GraphQueryBuilder) -> Result<Vec<ProjectId>> {
+        if !query.is_empty() {
+            self.query_ids(query)
+        } else {
+            let mut idents = Vec::with_capacity(self.projects.len());
+
+            for proj in self.toposort()? {
+                idents.push(proj.ident());
+            }
+
+            Ok(idents)
+        }
+    }
 }
 
 /// Builder structure for querying projects in the graph.
@@ -336,6 +358,11 @@ impl GraphQueryBuilder {
     pub fn names<T: std::fmt::Display>(&mut self, names: impl IntoIterator<Item = T>) -> &mut Self {
         self.names = names.into_iter().map(|s| s.to_string()).collect();
         self
+    }
+
+    /// Return true if the query is empty.
+    pub fn is_empty(&self) -> bool {
+        self.names.len() == 0
     }
 }
 

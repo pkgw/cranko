@@ -4,6 +4,7 @@
 //! State of the backing version control repository.
 
 use dynfmt::{Format, SimpleCurlyFormat};
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -126,6 +127,20 @@ impl Repository {
         &self.upstream_release_name
     }
 
+    /// Get the URL of the upstream repository.
+    pub fn upstream_url(&self) -> Result<String> {
+        let upstream = self.repo.find_remote(&self.upstream_name)?;
+        Ok(upstream
+            .url()
+            .ok_or_else(|| {
+                Error::Environment(format!(
+                    "URL of upstream remote {} not parseable as Unicode",
+                    self.upstream_name
+                ))
+            })?
+            .to_owned())
+    }
+
     /// Resolve a `RepoPath` repository path to a filesystem path in the working
     /// directory.
     pub fn resolve_workdir(&self, p: &RepoPath) -> PathBuf {
@@ -154,7 +169,7 @@ impl Repository {
         F: FnMut(&RepoPath) -> (),
     {
         // We have to use a callback here since the IndexEntries iter holds a
-        // ref to the index, which wherefore has to be immovable (pinned) during
+        // ref to the index, which therefore has to be immovable (pinned) during
         // the iteration process.
         let index = self.repo.index()?;
 
@@ -181,11 +196,28 @@ impl Repository {
         Ok(())
     }
 
+    /// Get the binary content of the file at the specified path, at the time of
+    /// the specified commit.
+    pub fn get_file_at_commit(&self, cid: &CommitId, path: &RepoPath) -> Result<Vec<u8>> {
+        let commit = self.repo.find_commit(cid.0)?;
+        let tree = commit.tree()?;
+        let entry = tree.get_path(path.as_path())?;
+        let object = entry.to_object(&self.repo)?;
+        let blob = object.as_blob().ok_or_else(|| {
+            Error::Environment(format!(
+                "path `{}` should correspond to a Git blob but does not",
+                path.escaped(),
+            ))
+        })?;
+
+        Ok(blob.content().to_owned())
+    }
+
     /// Get information about the state of the projects in the repository as
     /// of the latest release commit.
     pub fn get_latest_release_info(&self) -> Result<ReleaseCommitInfo> {
-        if let Some(_c) = self.try_get_release_commit()? {
-            unimplemented!("get info from commit!");
+        if let Some(c) = self.try_get_release_commit()? {
+            Ok(self.parse_release_info_from_commit(c)?)
         } else {
             Ok(ReleaseCommitInfo::default())
         }
@@ -264,6 +296,7 @@ impl Repository {
             });
         }
 
+        // TODO: summary should say (e.g.) "Release cranko 0.1.0" if possible.
         let message = format!(
             "Release commit created with Cranko.
 
@@ -330,9 +363,12 @@ impl Repository {
     pub fn parse_release_info_from_head(&self) -> Result<ReleaseCommitInfo> {
         let head_ref = self.repo.head()?;
         let head_commit = head_ref.peel_to_commit()?;
-        let msg = head_commit
-            .message()
-            .ok_or_else(|| Error::NotUnicodeError)?;
+        self.parse_release_info_from_commit(head_commit)
+    }
+
+    /// Get information about a release from the HEAD commit.
+    fn parse_release_info_from_commit(&self, commit: git2::Commit) -> Result<ReleaseCommitInfo> {
+        let msg = commit.message().ok_or_else(|| Error::NotUnicodeError)?;
 
         let mut data = String::new();
         let mut in_body = false;
@@ -362,7 +398,7 @@ impl Repository {
         let srci: SerializedReleaseCommitInfo = toml::from_str(&data)?;
 
         Ok(ReleaseCommitInfo {
-            committish: Some(CommitId(head_commit.id())),
+            commit: Some(CommitId(commit.id())),
             projects: srci.projects,
         })
     }
@@ -645,26 +681,36 @@ impl Repository {
         let srci: SerializedRcCommitInfo = toml::from_str(&data)?;
 
         Ok(RcCommitInfo {
-            committish: Some(CommitId(head_commit.id())),
+            commit: Some(CommitId(head_commit.id())),
             projects: srci.projects,
         })
     }
 
-    /// Create a tag for a project release poining to HEAD.
-    pub fn tag_project_at_head(&self, proj: &Project) -> Result<()> {
+    /// Get a tag name for a release of this project.
+    pub fn get_tag_name(&self, proj: &Project, rel: &ReleasedProjectInfo) -> Result<String> {
+        let mut tagname_args = HashMap::new();
+        tagname_args.insert("project_slug", proj.user_facing_name.to_owned());
+        tagname_args.insert("version", rel.version.clone());
+        Ok(SimpleCurlyFormat
+            .format(&self.release_tag_name_format, &tagname_args)?
+            .to_string())
+    }
+
+    /// Create a tag for a project release pointing to HEAD.
+    pub fn tag_project_at_head(&self, proj: &Project, rel: &ReleasedProjectInfo) -> Result<()> {
         let head_ref = self.repo.head()?;
         let head_commit = head_ref.peel_to_commit()?;
         let sig = self.get_signature()?;
-
-        let mut tagname_args = HashMap::new();
-        tagname_args.insert("project_slug", proj.user_facing_name.to_owned());
-        tagname_args.insert("version", proj.version.to_string());
-        let tagname = SimpleCurlyFormat.format(&self.release_tag_name_format, &tagname_args)?;
+        let tagname = self.get_tag_name(proj, rel)?;
 
         self.repo
             .tag(&tagname, head_commit.as_object(), &sig, &tagname, false)?;
 
-        println!("Created {}", &tagname);
+        info!(
+            "created tag {} pointing at HEAD ({})",
+            &tagname,
+            head_commit.as_object().short_id()?.as_str().unwrap()
+        );
 
         Ok(())
     }
@@ -679,7 +725,7 @@ pub struct ReleaseCommitInfo {
     /// The Git commit-ish that this object describes. May be None when there is
     /// no upstream `release` branch, in which case this struct will contain no
     /// genuine information.
-    pub committish: Option<CommitId>,
+    pub commit: Option<CommitId>,
 
     /// A list of projects and their release information as of this commit. This
     /// list includes every tracked project in this commit. Not all of those
@@ -702,6 +748,14 @@ impl ReleaseCommitInfo {
 
         // TODO: any more sophisticated search to try?
         None
+    }
+
+    /// Find information about a project release if it occurred at this moment.
+    ///
+    /// This function is like `lookup_project()`, but also returns None if the
+    /// "age" of any identified release is not zero.
+    pub fn lookup_if_released(&self, proj: &Project) -> Option<&ReleasedProjectInfo> {
+        self.lookup_project(proj).filter(|rel| rel.age == 0)
     }
 }
 
@@ -732,7 +786,7 @@ pub struct ReleasedProjectInfo {
 #[derive(Debug, Default)]
 pub struct RcCommitInfo {
     /// The Git commit-ish that this object describes.
-    pub committish: Option<CommitId>,
+    pub commit: Option<CommitId>,
 
     /// A list of projects and their "rc" information as of this commit. This
     /// should contain at least one project, but doesn't necessarily include
