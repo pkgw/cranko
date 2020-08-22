@@ -45,9 +45,12 @@ impl ChangelogFormat {
         proj: &Project,
         sess: &AppSession,
         changes: &[CommitId],
+        prev_release_commit: Option<CommitId>,
     ) -> Result<()> {
         match self {
-            ChangelogFormat::Markdown(f) => f.draft_release_update(proj, sess, changes),
+            ChangelogFormat::Markdown(f) => {
+                f.draft_release_update(proj, sess, changes, prev_release_commit)
+            }
         }
     }
 
@@ -111,7 +114,7 @@ impl Default for MarkdownFormat {
     fn default() -> Self {
         MarkdownFormat {
             basename: "CHANGELOG.md".to_owned(),
-            release_header_format: "# Version {version} ({yyyy_mm_dd})\n".to_owned(),
+            release_header_format: "# {project_slug} {version} ({yyyy_mm_dd})\n".to_owned(),
             stage_header_format: "# rc: {bump_spec}\n".to_owned(),
             footer_format: "".to_owned(),
         }
@@ -134,61 +137,70 @@ impl MarkdownFormat {
         proj: &Project,
         sess: &AppSession,
         changes: &[CommitId],
+        prev_release_commit: Option<CommitId>,
     ) -> Result<()> {
-        let changelog_path = self.changelog_path(proj, &sess.repo);
+        // Populate the previous changelog from the most recent `release`
+        // commit, if available. This gives the opportunity to refer to the
+        // historical changelog entries for stylistic reference and potentially
+        // fix mistakes.
 
-        let prev_log = {
-            match File::open(&changelog_path) {
-                Ok(mut f) => {
-                    let mut data = Vec::new();
-                    f.read_to_end(&mut data)?;
-                    data
-                }
-                Err(e) => {
-                    if e.kind() == std::io::ErrorKind::NotFound {
-                        Vec::new() // no existing changelog? no problem!
-                    } else {
-                        return Err(e.into());
-                    }
-                }
-            }
+        let changelog_repopath = self.changelog_repopath(proj);
+
+        let prev_log = if let Some(prc) = prev_release_commit {
+            sess.repo.get_file_at_commit(&prc, &changelog_repopath)?
+        } else {
+            Vec::new()
         };
 
-        // TODO: port to atomicwrites
+        // Now populate the augmented log.
 
-        let mut f = File::create(changelog_path)?;
+        let changelog_path = self.changelog_path(proj, &sess.repo);
 
-        // Header
+        let new_af = atomicwrites::AtomicFile::new(
+            &changelog_path,
+            atomicwrites::OverwriteBehavior::AllowOverwrite,
+        );
 
-        let mut headfoot_args = HashMap::new();
-        headfoot_args.insert("bump_spec", "micro bump");
-        let header = SimpleCurlyFormat.format(&self.stage_header_format, &headfoot_args)?;
-        writeln!(f, "{}", header)?;
+        let r = new_af.write(|new_f| {
+            // Header
 
-        // Commit summaries! Note: if we're staging muliple projects and the
-        // same commit affects many of them, we'll reload the same commit many
-        // times when generating changelogs.
+            let mut headfoot_args = HashMap::new();
+            headfoot_args.insert("bump_spec", "micro bump");
+            let header = SimpleCurlyFormat.format(&self.stage_header_format, &headfoot_args)?;
+            writeln!(new_f, "{}", header)?;
 
-        const WRAP_WIDTH: usize = 78;
+            // Commit summaries! Note: if we're staging muliple projects and the
+            // same commit affects many of them, we'll reload the same commit many
+            // times when generating changelogs.
 
-        for cid in changes {
-            let message = sess.repo.get_commit_summary(*cid)?;
-            let mut prefix = "- ";
+            const WRAP_WIDTH: usize = 78;
 
-            for line in textwrap::wrap_iter(&message, WRAP_WIDTH) {
-                writeln!(f, "{}{}", prefix, line)?;
-                prefix = "  ";
+            for cid in changes {
+                let message = sess.repo.get_commit_summary(*cid)?;
+                let mut prefix = "- ";
+
+                for line in textwrap::wrap_iter(&message, WRAP_WIDTH) {
+                    writeln!(new_f, "{}{}", prefix, line)?;
+                    prefix = "  ";
+                }
             }
+
+            // Footer
+
+            let footer = SimpleCurlyFormat.format(&self.footer_format, &headfoot_args)?;
+            writeln!(new_f, "{}", footer)?;
+
+            // Write back all of the previous contents, and we're done.
+            new_f.write_all(&prev_log[..])?;
+
+            Ok(())
+        });
+
+        match r {
+            Err(atomicwrites::Error::Internal(e)) => Err(e.into()),
+            Err(atomicwrites::Error::User(e)) => Err(e),
+            Ok(()) => Ok(()),
         }
-
-        // Footer
-
-        let footer = SimpleCurlyFormat.format(&self.footer_format, &headfoot_args)?;
-        writeln!(f, "{}", footer)?;
-
-        // Write back all of the previous contents, and we're done.
-        f.write_all(&prev_log[..])?;
-        Ok(())
     }
 
     fn is_changelog_path_for(&self, proj: &Project, path: &RepoPath) -> bool {
@@ -247,6 +259,7 @@ impl MarkdownFormat {
     ) -> Result<()> {
         // Prepare the substitution template
         let mut header_args = HashMap::new();
+        header_args.insert("project_slug", proj.user_facing_name.to_owned());
         header_args.insert("version", proj.version.to_string());
         let now = Local::now();
         header_args.insert(
