@@ -512,12 +512,12 @@ impl Command for StageCommand {
                     history.n_commits()
                 );
 
-                proj.changelog.draft_release_update(
-                    proj,
-                    &sess,
-                    history.commits(),
-                    rel_info.commit,
-                )?;
+                // Because Changelog is a boxed trait object, it can't accept
+                // generic types :-(
+                let commits: Vec<repository::CommitId> =
+                    history.commits().into_iter().map(|c| *c).collect();
+                proj.changelog
+                    .draft_release_update(proj, &sess, &commits[..], rel_info.commit)?;
                 n_staged += 1;
             }
         }

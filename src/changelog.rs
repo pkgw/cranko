@@ -24,95 +24,69 @@ use crate::{
     repository::{ChangeList, CommitId, RcProjectInfo, RepoPath, RepoPathBuf, Repository},
 };
 
-/// How to format the changelog for a given project.
-#[derive(Debug)]
-pub enum ChangelogFormat {
-    /// A standard Markdown-formatted changelog.
-    Markdown(MarkdownFormat),
-}
-
-impl Default for ChangelogFormat {
-    fn default() -> Self {
-        ChangelogFormat::Markdown(MarkdownFormat::default())
-    }
-}
-
-impl ChangelogFormat {
-    /// Rewrite the changelog file with stub contents derived from the
-    /// repository history.
-    pub fn draft_release_update<'a, T: IntoIterator<Item = &'a CommitId>>(
+/// A type that defines how the changelog for a given project is managed.
+pub trait Changelog: std::fmt::Debug {
+    /// Rewrite the changelog file(s) with stub contents derived from the
+    /// repository history, prepended to whatever contents existed at the
+    /// previous release commit.
+    fn draft_release_update(
         &self,
         proj: &Project,
         sess: &AppSession,
-        changes: T,
+        changes: &[CommitId],
         prev_release_commit: Option<CommitId>,
-    ) -> Result<()> {
-        match self {
-            ChangelogFormat::Markdown(f) => {
-                f.draft_release_update(proj, sess, changes, prev_release_commit)
-            }
-        }
-    }
+    ) -> Result<()>;
 
     /// Test whether a path in the working directory, relative to the working
     /// directory root, corresponds to a changelog file. Used in "cranko
     /// confirm" to detect staged projects and make sure that there are no
     /// functional changes.
-    pub fn is_changelog_path_for(&self, proj: &Project, path: &RepoPath) -> bool {
-        match self {
-            ChangelogFormat::Markdown(f) => f.is_changelog_path_for(proj, path),
-        }
-    }
+    fn is_changelog_path_for(&self, proj: &Project, path: &RepoPath) -> bool;
 
-    /// Scan an RC changelog to extract metadata about the proposed release.
-    pub fn scan_rc_info(&self, proj: &Project, repo: &Repository) -> Result<RcProjectInfo> {
-        match self {
-            ChangelogFormat::Markdown(f) => f.scan_rc_info(proj, repo),
-        }
-    }
+    /// Scan the changelog(s) in the project's working directory to extract
+    /// metadata about a proposed release of the project. The idea is that we
+    /// (ab)use the changelog to allow the user to codify the release metadata
+    /// used in the RcProjectInfo type.
+    fn scan_rc_info(&self, proj: &Project, repo: &Repository) -> Result<RcProjectInfo>;
 
-    /// Modify the RC changelog file to include the final release information.
-    pub fn finalize_changelog(
+    /// Rewrite the changelog file(s) in the project's working directory, which
+    /// are in the "rc" format that includes release candidate metadata, to
+    /// instead include the final release information.
+    fn finalize_changelog(
         &self,
         proj: &Project,
         repo: &Repository,
         changes: &mut ChangeList,
-    ) -> Result<()> {
-        match self {
-            ChangelogFormat::Markdown(f) => f.finalize_changelog(proj, repo, changes),
-        }
-    }
+    ) -> Result<()>;
 
-    /// Read most recent changelog stanza *as of the specified commit*.
+    /// Read most recent changelog text *as of the specified commit*.
     ///
     /// For now, this text is presumed to be formatted in CommonMark format.
     ///
     /// Note that this operation ignores the working tree in an effort to provide
     /// more reliability.
-    pub fn scan_changelog(
-        &self,
-        proj: &Project,
-        repo: &Repository,
-        cid: &CommitId,
-    ) -> Result<String> {
-        match self {
-            ChangelogFormat::Markdown(f) => f.scan_changelog(proj, repo, cid),
-        }
-    }
+    fn scan_changelog(&self, proj: &Project, repo: &Repository, cid: &CommitId) -> Result<String>;
+}
+
+/// Create a new default Changelog implementation.
+///
+/// This uses the Markdown format.
+pub fn default() -> Box<dyn Changelog> {
+    Box::new(MarkdownChangelog::default())
 }
 
 /// Settings for Markdown-formatted changelogs.
 #[derive(Debug)]
-pub struct MarkdownFormat {
+pub struct MarkdownChangelog {
     basename: String,
     release_header_format: String,
     stage_header_format: String,
     footer_format: String,
 }
 
-impl Default for MarkdownFormat {
+impl Default for MarkdownChangelog {
     fn default() -> Self {
-        MarkdownFormat {
+        MarkdownChangelog {
             basename: "CHANGELOG.md".to_owned(),
             release_header_format: "# {project_slug} {version} ({yyyy_mm_dd})\n".to_owned(),
             stage_header_format: "# rc: {bump_spec}\n".to_owned(),
@@ -121,7 +95,7 @@ impl Default for MarkdownFormat {
     }
 }
 
-impl MarkdownFormat {
+impl MarkdownChangelog {
     fn changelog_repopath(&self, proj: &Project) -> RepoPathBuf {
         let mut pfx = proj.prefix().to_owned();
         pfx.push(&self.basename);
@@ -131,12 +105,14 @@ impl MarkdownFormat {
     fn changelog_path(&self, proj: &Project, repo: &Repository) -> PathBuf {
         repo.resolve_workdir(&self.changelog_repopath(proj))
     }
+}
 
-    fn draft_release_update<'a, T: IntoIterator<Item = &'a CommitId>>(
+impl Changelog for MarkdownChangelog {
+    fn draft_release_update(
         &self,
         proj: &Project,
         sess: &AppSession,
-        changes: T,
+        changes: &[CommitId],
         prev_release_commit: Option<CommitId>,
     ) -> Result<()> {
         // Populate the previous changelog from the most recent `release`
