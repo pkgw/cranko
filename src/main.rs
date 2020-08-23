@@ -534,10 +534,21 @@ impl Command for StageCommand {
         // Update the changelogs
         let mut n_staged = 0;
         let rel_info = sess.repo.get_latest_release_info()?;
+        let mut changes = repository::ChangeList::default();
 
         for i in 0..idents.len() {
             let proj = sess.graph().lookup(idents[i]);
             let history = histories.lookup(idents[i]);
+
+            if let Some(_) = sess.repo.scan_rc_info(proj, &mut changes)? {
+                if !empty_query {
+                    warn!(
+                        "skipping {}: it appears to have already been staged",
+                        proj.user_facing_name
+                    );
+                }
+                continue;
+            }
 
             if history.n_commits() == 0 {
                 if !empty_query {
@@ -560,7 +571,9 @@ impl Command for StageCommand {
             }
         }
 
-        if empty_query && n_staged != 1 {
+        if empty_query && n_staged == 0 {
+            info!("nothing further to stage at this time");
+        } else if empty_query && n_staged != 1 {
             info!("{} of {} projects staged", n_staged, idents.len());
         } else if n_staged != idents.len() {
             info!("{} of {} selected projects staged", n_staged, idents.len());
