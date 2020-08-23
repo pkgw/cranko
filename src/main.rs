@@ -120,12 +120,29 @@ fn main() -> Result<()> {
 // confirm
 
 #[derive(Debug, PartialEq, StructOpt)]
-struct ConfirmCommand {}
+struct ConfirmCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force operation even in unexpected conditions"
+    )]
+    force: bool,
+}
 
 impl Command for ConfirmCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
+
+        if let Err(e) = sess.ensure_changelog_clean() {
+            warn!(
+                "not recommended to confirm with a modified working tree ({})",
+                e
+            );
+            if !self.force {
+                return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+            }
+        }
 
         let mut changes = repository::ChangeList::default();
         let mut rc_info = Vec::new();
@@ -244,7 +261,7 @@ impl Command for ReleaseWorkflowApplyVersionsCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
-        sess.repo.check_dirty()?;
+        sess.ensure_fully_clean()?;
 
         let mut rci = None;
         let mut dev_mode = true;
@@ -460,11 +477,13 @@ impl Command for StageCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
-        if let Err(e) = sess.repo.check_dirty() {
-            if self.force {
-                warn!("staging despite dirty repo due to --force");
-            } else {
-                return Err(e).context("refusing to stage (override with `--force`)");
+        if let Err(e) = sess.ensure_changelog_clean() {
+            warn!(
+                "not recommended to stage with a modified working tree ({})",
+                e
+            );
+            if !self.force {
+                return Err(anyhow!("refusing to proceed (use `--force` to override)"));
             }
         }
 

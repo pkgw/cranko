@@ -180,20 +180,35 @@ impl Repository {
         Ok(())
     }
 
-    /// Check that the repository is clean. We allow untracked and ignored files
-    /// but otherwise don't want any modifications, etc.
-    pub fn check_dirty(&self) -> Result<()> {
+    /// Check if the working tree is clean. Returns None if there are no
+    /// modifications and Some(escaped_path) if there are any. (The escaped_path
+    /// will be the first one encountered in the check, an essentially arbitrary
+    /// selection.) Modifications to any of the paths matched by `ok_matchers`
+    /// are allowed.
+    pub fn check_if_dirty(&self, ok_matchers: &[PathMatcher]) -> Result<Option<String>> {
         // Default options are what we want.
         let mut opts = git2::StatusOptions::new();
 
         for entry in self.repo.statuses(Some(&mut opts))?.iter() {
             // Is this correct / sufficient?
             if entry.status() != git2::Status::CURRENT {
-                return Err(Error::DirtyRepository(escape_pathlike(entry.path_bytes())));
+                let repo_path = RepoPath::new(entry.path_bytes());
+                let mut is_ok = false;
+
+                for matcher in ok_matchers {
+                    if matcher.repo_path_matches(repo_path) {
+                        is_ok = true;
+                        break;
+                    }
+                }
+
+                if !is_ok {
+                    return Ok(Some(repo_path.escaped()));
+                }
             }
         }
 
-        Ok(())
+        Ok(None)
     }
 
     /// Get the binary content of the file at the specified path, at the time of

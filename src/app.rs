@@ -6,9 +6,11 @@
 use log::warn;
 
 use crate::{
-    errors::Result,
+    errors::{Error, Result},
     graph::{ProjectGraph, RepoHistories},
-    repository::{ChangeList, RcCommitInfo, RcProjectInfo, ReleaseCommitInfo, Repository},
+    repository::{
+        ChangeList, PathMatcher, RcCommitInfo, RcProjectInfo, ReleaseCommitInfo, Repository,
+    },
 };
 
 /// The main Cranko CLI application state structure.
@@ -76,6 +78,35 @@ impl AppSession {
             }
 
             ExecutionEnvironment::CiDevelopmentBranch
+        }
+    }
+
+    /// Check that the working tree is completely clean. We allow untracked and
+    /// ignored files but otherwise don't want any modifications, etc. Returns Ok
+    /// if clean, Err if not.
+    pub fn ensure_fully_clean(&self) -> Result<()> {
+        if let Some(changed_path) = self.repo.check_if_dirty(&[])? {
+            Err(Error::DirtyRepository(changed_path))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Check that the working tree is clean, excepting modifications to any
+    /// files interpreted as changelogs. Returns Ok if clean, Err if not.
+    pub fn ensure_changelog_clean(&self) -> Result<()> {
+        let mut matchers: Vec<Result<PathMatcher>> = self
+            .graph
+            .projects()
+            .map(|p| p.changelog.create_path_matcher(p))
+            .collect();
+        let matchers: Result<Vec<PathMatcher>> = matchers.drain(..).collect();
+        let matchers = matchers?;
+
+        if let Some(changed_path) = self.repo.check_if_dirty(&matchers[..])? {
+            Err(Error::DirtyRepository(changed_path))
+        } else {
+            Ok(())
         }
     }
 
