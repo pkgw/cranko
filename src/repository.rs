@@ -180,20 +180,35 @@ impl Repository {
         Ok(())
     }
 
-    /// Check that the repository is clean. We allow untracked and ignored files
-    /// but otherwise don't want any modifications, etc.
-    pub fn check_dirty(&self) -> Result<()> {
+    /// Check if the working tree is clean. Returns None if there are no
+    /// modifications and Some(escaped_path) if there are any. (The escaped_path
+    /// will be the first one encountered in the check, an essentially arbitrary
+    /// selection.) Modifications to any of the paths matched by `ok_matchers`
+    /// are allowed.
+    pub fn check_if_dirty(&self, ok_matchers: &[PathMatcher]) -> Result<Option<String>> {
         // Default options are what we want.
         let mut opts = git2::StatusOptions::new();
 
         for entry in self.repo.statuses(Some(&mut opts))?.iter() {
             // Is this correct / sufficient?
             if entry.status() != git2::Status::CURRENT {
-                return Err(Error::DirtyRepository(escape_pathlike(entry.path_bytes())));
+                let repo_path = RepoPath::new(entry.path_bytes());
+                let mut is_ok = false;
+
+                for matcher in ok_matchers {
+                    if matcher.repo_path_matches(repo_path) {
+                        is_ok = true;
+                        break;
+                    }
+                }
+
+                if !is_ok {
+                    return Ok(Some(repo_path.escaped()));
+                }
             }
         }
 
-        Ok(())
+        Ok(None)
     }
 
     /// Get the binary content of the file at the specified path, at the time of
@@ -217,7 +232,7 @@ impl Repository {
     /// of the latest release commit.
     pub fn get_latest_release_info(&self) -> Result<ReleaseCommitInfo> {
         if let Some(c) = self.try_get_release_commit()? {
-            Ok(self.parse_release_info_from_commit(c)?)
+            Ok(self.parse_release_info_from_commit(&c)?)
         } else {
             Ok(ReleaseCommitInfo::default())
         }
@@ -354,11 +369,11 @@ impl Repository {
     pub fn parse_release_info_from_head(&self) -> Result<ReleaseCommitInfo> {
         let head_ref = self.repo.head()?;
         let head_commit = head_ref.peel_to_commit()?;
-        self.parse_release_info_from_commit(head_commit)
+        self.parse_release_info_from_commit(&head_commit)
     }
 
     /// Get information about a release from the HEAD commit.
-    fn parse_release_info_from_commit(&self, commit: git2::Commit) -> Result<ReleaseCommitInfo> {
+    fn parse_release_info_from_commit(&self, commit: &git2::Commit) -> Result<ReleaseCommitInfo> {
         let msg = commit.message().ok_or_else(|| Error::NotUnicodeError)?;
 
         let mut data = String::new();
@@ -394,114 +409,168 @@ impl Repository {
         })
     }
 
-    /// Look at the commits between HEAD and the latest release and analyze
-    /// their diffs to categorize which commits affect which projects.
+    /// Figure out which commits in the history affect each project since its
+    /// last release.
     ///
-    /// TODO: say that a subproject was modified but not released in the most
-    /// recent release commit -- something that we want to allow for
-    /// practicality. For that project we will need to reach farther back in the
-    /// history than the tip of `release`, which will force this algorithm to
-    /// become a lot more complicated.
-    pub fn analyze_history_to_release(
-        &self,
-        matchers: &[&PathMatcher],
-    ) -> Result<Vec<Vec<CommitId>>> {
-        // Set up to walk the history.
+    /// This gets a little tricky since not all projects in the repo are
+    /// released in lockstep. For each individiual project, we need to analyze
+    /// the history from HEAD to its most recent release commit. I worry about
+    /// the efficiency of this so we trace all the histories at once to try to
+    /// improve that.
+    pub fn analyze_histories(&self, projects: &[Project]) -> Result<Vec<RepoHistory>> {
+        // Here we (ab)use the fact that we know the project IDs are just a
+        // simple usize sequence 0..n.
+        let mut histories = vec![
+            RepoHistory {
+                commits: Vec::new(),
+                release_commit: None,
+            };
+            projects.len()
+        ];
 
-        let mut walk = self.repo.revwalk()?;
+        // First we dig through the history of the `release` branch to figure
+        // out the most recent release for each project. In `release_commits`,
+        // None indicates that the project has not yet been released. Here we
+        // just naively scan the full project list every time -- unlikely that
+        // it would be worthwhile to try something more clever?
 
-        walk.push_head()?;
+        let latest_release_commit = self.try_get_release_commit()?;
 
-        if let Some(release_commit) = self.try_get_release_commit()? {
-            walk.hide(release_commit.id())?;
+        if let Some(mut commit) = latest_release_commit {
+            let mut n_found = 0;
+
+            loop {
+                let rel_info = self.parse_release_info_from_commit(&commit)?;
+
+                for (i, proj) in projects.iter().enumerate() {
+                    if histories[i].release_commit.is_none()
+                        && rel_info.lookup_if_released(proj).is_some()
+                    {
+                        histories[i].release_commit = Some(CommitId(commit.id()));
+                        n_found += 1;
+                    }
+                }
+
+                if n_found == projects.len() {
+                    break; // ok, we got them all!
+                }
+
+                if commit.parent_count() == 1 {
+                    // If a `release` commit has one parent, it is the first
+                    // Cranko release commit in the project history, and all
+                    // further parent commits are just regular code from
+                    // `master` (because all other Cranko release commits merge
+                    // the main branch into the release branch). Therefore any
+                    // leftover projects must have no Cranko releases on record.
+                    break;
+                }
+
+                commit = commit.parent(0)?;
+            }
         }
 
-        // Set up our results table.
+        // Now that we have those, trace the history from HEAD to latest release
+        // for each project, with some LRU caches to try to make things more
+        // efficient. (I haven't done any testing to see how much the caching
+        // helps, though ...)
 
-        let mut hit_buf = vec![false; matchers.len()];
-        let mut matches = vec![Vec::new(); matchers.len()];
-
-        // Do the walk!
-
+        let mut commit_data = lru::LruCache::new(512);
         let mut trees = lru::LruCache::new(3);
+
         let mut dopts = git2::DiffOptions::new();
         dopts.include_typechange(true);
 
-        for maybe_oid in walk {
-            // Get the two relevant trees and compute their diff. We have to
-            // jump through some hoops to support the root commit (with no
-            // parents) but it's not really that bad. We also have to pop() the
-            // trees out of the LRU because get() holds a mutable reference to
-            // the cache, which prevents us from looking at two trees
-            // simultaneously.
+        // note that we don't "know" that proj_idx = project.ident
+        for proj_idx in 0..projects.len() {
+            let mut walk = self.repo.revwalk()?;
+            walk.push_head()?;
 
-            let oid = maybe_oid?;
-            let commit = self.repo.find_commit(oid)?;
-            let ctid = commit.tree_id();
-            let cur_tree = match trees.pop(&ctid) {
-                Some(t) => t,
-                None => self.repo.find_tree(ctid)?,
-            };
-
-            let (maybe_ptid, maybe_parent_tree) = if commit.parent_count() == 0 {
-                (None, None) // this is the first commit in the history!
-            } else {
-                let parent = commit.parent(0)?;
-                let ptid = parent.tree_id();
-                let parent_tree = match trees.pop(&ptid) {
-                    Some(t) => t,
-                    None => self.repo.find_tree(ptid)?,
-                };
-                (Some(ptid), Some(parent_tree))
-            };
-
-            let diff = self.repo.diff_tree_to_tree(
-                maybe_parent_tree.as_ref(),
-                Some(&cur_tree),
-                Some(&mut dopts),
-            )?;
-
-            trees.put(ctid, cur_tree);
-            if let (Some(ptid), Some(pt)) = (maybe_ptid, maybe_parent_tree) {
-                trees.put(ptid, pt);
+            if let Some(release_commit_id) = histories[proj_idx].release_commit {
+                walk.hide(release_commit_id.0)?;
             }
 
-            // Examine the diff and see what file paths, and therefore which
-            // projects, are affected.
+            // Walk through the history, finding relevant commits. The full
+            // codepath loads up trees for each commit and its parents, computes
+            // the diff, and compares that against the path-matchers for each
+            // project to decide if a given commit affects a given project. The
+            // intention is that the LRU caches will make it so that little
+            // redundant work is performed.
 
-            for flag in &mut hit_buf {
-                *flag = false;
-            }
+            for maybe_oid in walk {
+                let oid = maybe_oid?;
 
-            for delta in diff.deltas() {
-                // there's presumably a cleaner way to do this?
-                if let Some(old_path_bytes) = delta.old_file().path_bytes() {
-                    let old_path = RepoPath::new(old_path_bytes);
-                    for (idx, matcher) in matchers.iter().enumerate() {
-                        if matcher.repo_path_matches(old_path) {
-                            hit_buf[idx] = true;
+                // Hopefully this commit is already in the cache, but if not ...
+                if !commit_data.contains(&oid) {
+                    // Get the two relevant trees and compute their diff. We have to
+                    // jump through some hoops to support the root commit (with no
+                    // parents) but it's not really that bad. We also have to pop() the
+                    // trees out of the LRU because get() holds a mutable reference to
+                    // the cache, which prevents us from looking at two trees
+                    // simultaneously.
+
+                    let commit = self.repo.find_commit(oid)?;
+                    let ctid = commit.tree_id();
+                    let cur_tree = match trees.pop(&ctid) {
+                        Some(t) => t,
+                        None => self.repo.find_tree(ctid)?,
+                    };
+
+                    let (maybe_ptid, maybe_parent_tree) = if commit.parent_count() == 0 {
+                        (None, None) // this is the first commit in the history!
+                    } else {
+                        let parent = commit.parent(0)?;
+                        let ptid = parent.tree_id();
+                        let parent_tree = match trees.pop(&ptid) {
+                            Some(t) => t,
+                            None => self.repo.find_tree(ptid)?,
+                        };
+                        (Some(ptid), Some(parent_tree))
+                    };
+
+                    let diff = self.repo.diff_tree_to_tree(
+                        maybe_parent_tree.as_ref(),
+                        Some(&cur_tree),
+                        Some(&mut dopts),
+                    )?;
+
+                    trees.put(ctid, cur_tree);
+                    if let (Some(ptid), Some(pt)) = (maybe_ptid, maybe_parent_tree) {
+                        trees.put(ptid, pt);
+                    }
+
+                    // Examine the diff and see what file paths, and therefore which
+                    // projects, are affected. Vec<bool> is a bit of a silly way to
+                    // store the info, but hopefully good enough.
+
+                    let mut hit_buf = vec![false; projects.len()];
+
+                    for delta in diff.deltas() {
+                        for file in &[delta.old_file(), delta.new_file()] {
+                            if let Some(path_bytes) = file.path_bytes() {
+                                let path = RepoPath::new(path_bytes);
+                                for (idx, proj) in projects.iter().enumerate() {
+                                    if proj.repo_paths.repo_path_matches(path) {
+                                        hit_buf[idx] = true;
+                                    }
+                                }
+                            }
                         }
                     }
+
+                    // Save the information for posterity
+                    commit_data.put(oid.clone(), hit_buf);
                 }
 
-                if let Some(new_path_bytes) = delta.new_file().path_bytes() {
-                    let new_path = RepoPath::new(new_path_bytes);
-                    for (idx, matcher) in matchers.iter().enumerate() {
-                        if matcher.repo_path_matches(new_path) {
-                            hit_buf[idx] = true;
-                        }
-                    }
-                }
-            }
+                // OK, now the commit data is definitely in the cache.
+                let hits = commit_data.get(&oid).unwrap();
 
-            for (idx, commit_list) in matches.iter_mut().enumerate() {
-                if hit_buf[idx] {
-                    commit_list.push(CommitId(oid.clone()));
+                if hits[proj_idx] {
+                    histories[proj_idx].commits.push(CommitId(oid));
                 }
             }
         }
 
-        Ok(matches)
+        Ok(histories)
     }
 
     /// Get the brief message associated with a commit.
@@ -528,6 +597,7 @@ impl Repository {
         changes: &mut ChangeList,
     ) -> Result<Option<RcProjectInfo>> {
         let mut saw_changelog = false;
+        let changelog_matcher = proj.changelog.create_path_matcher(proj)?;
 
         let mut opts = git2::StatusOptions::new();
         opts.include_untracked(true);
@@ -541,10 +611,14 @@ impl Repository {
 
             let status = entry.status();
 
-            if proj.changelog.is_changelog_path_for(proj, path) {
+            if changelog_matcher.repo_path_matches(path) {
                 if status.is_conflicted() {
                     return Err(Error::DirtyRepository(path.escaped()));
-                } else if status.is_index_new() || status.is_index_modified() {
+                } else if status.is_index_new()
+                    || status.is_index_modified()
+                    || status.is_wt_new()
+                    || status.is_wt_modified()
+                {
                     changes.add_path(path);
                     saw_changelog = true;
                 } // TODO: handle/complain about some other statuses
@@ -675,6 +749,30 @@ impl Repository {
             commit: Some(CommitId(head_commit.id())),
             projects: srci.projects,
         })
+    }
+
+    /// Update the specified files in the working tree to reset them to what
+    /// HEAD says they should be.
+    pub fn hard_reset_changes(&self, changes: &ChangeList) -> Result<()> {
+        // If no changes, do nothing. If we don't special-case this, the
+        // checkout_head() will affect *all* files, i.e. perform a hard reset to
+        // HEAD.
+        if changes.paths.len() == 0 {
+            return Ok(());
+        }
+
+        let mut cb = git2::build::CheckoutBuilder::new();
+        cb.force();
+
+        // The key is that by specifying paths here, the checkout operation will
+        // only affect those paths and not anything else.
+        for path in &changes.paths[..] {
+            let p: &RepoPath = path.as_ref();
+            cb.path(p);
+        }
+
+        self.repo.checkout_head(Some(&mut cb))?;
+        Ok(())
     }
 
     /// Get a tag name for a release of this project.
@@ -829,6 +927,45 @@ impl ChangeList {
     /// Mark the file at this path as having been updated.
     pub fn add_path(&mut self, p: &RepoPath) {
         self.paths.push(p.to_owned());
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RepoHistory {
+    commits: Vec<CommitId>,
+    release_commit: Option<CommitId>,
+}
+
+impl RepoHistory {
+    /// Get the Cranko release commit that this chunk of history
+    /// extends to. If None, there is no such commit, and the
+    /// history extends all the way to the start of the project
+    /// history.
+    pub fn release_commit(&self) -> Option<CommitId> {
+        self.release_commit
+    }
+
+    /// Get the release information corresponding to this item's release commit.
+    /// If this history item was computed for certain project, this info is
+    /// guaranteed to contain an age=0 release for that project (if it is not
+    /// None).
+    pub fn release_info(&self, repo: &Repository) -> Result<Option<ReleaseCommitInfo>> {
+        if let Some(cid) = self.release_commit() {
+            let commit = repo.repo.find_commit(cid.0)?;
+            Ok(Some(repo.parse_release_info_from_commit(&commit)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Get the number of commits in this chunk of history.
+    pub fn n_commits(&self) -> usize {
+        self.commits.len()
+    }
+
+    /// Get the commit IDs in this chunk of history.
+    pub fn commits(&self) -> impl IntoIterator<Item = &CommitId> {
+        &self.commits[..]
     }
 }
 
