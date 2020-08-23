@@ -120,38 +120,55 @@ fn main() -> Result<()> {
 // confirm
 
 #[derive(Debug, PartialEq, StructOpt)]
-struct ConfirmCommand {
-    #[structopt(
-        short = "f",
-        long = "force",
-        help = "Force operation even in unexpected conditions"
-    )]
-    force: bool,
-}
+struct ConfirmCommand {}
 
 impl Command for ConfirmCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
-        if let Err(e) = sess.ensure_changelog_clean() {
-            warn!(
-                "not recommended to confirm with a modified working tree ({})",
-                e
-            );
-            if !self.force {
-                return Err(anyhow!("refusing to proceed (use `--force` to override)"));
-            }
-        }
+        // Note that scan_rc_info() below will always error out if there are
+        // local modifications, so we can't easily support a `--force` mode
+        // right now.
+        sess.ensure_changelog_clean()
+            .context("refusing to `confirm` with a modified working tree")?;
+
+        // Scan the repository histories for everybody -- we'll use these to
+        // report whether there are projects that ought to be released but
+        // aren't.
+        let histories = sess.analyze_histories()?;
 
         let mut changes = repository::ChangeList::default();
         let mut rc_info = Vec::new();
 
         for proj in sess.graph().toposort()? {
+            let history = histories.lookup(proj.ident());
+
             if let Some(info) = sess.repo.scan_rc_info(proj, &mut changes)? {
-                // TODO: apply bump and print out expected new version and other helpful info
-                info!("{}: {}", proj.user_facing_name, info.bump_spec);
+                let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
+                let maybe_last_release = history.release_info(&sess.repo)?;
+
+                let (old_version, new_version) = if let Some(last_release) = maybe_last_release {
+                    // By definition, this project is will be present in the table:
+                    let last_release = last_release.lookup_project(proj).unwrap();
+                    let new_version = scheme.apply(&proj.version, Some(last_release))?;
+                    (last_release.version.clone(), new_version.to_string())
+                } else {
+                    let new_version = scheme.apply(&proj.version, None)?;
+                    ("[no previous releases]".to_owned(), new_version.to_string())
+                };
+
+                info!(
+                    "{}: {} (expected: {} => {})",
+                    proj.user_facing_name, info.bump_spec, old_version, new_version
+                );
                 rc_info.push(info);
+            } else if history.n_commits() > 0 {
+                warn!(
+                    "project `{}` has been changed since its last release, \
+                    but is not part of the rc submission",
+                    proj.user_facing_name
+                );
             }
         }
 
