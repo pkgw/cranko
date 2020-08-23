@@ -1,5 +1,10 @@
 # rc: micro bump
 
+- Add `github install-credential-helper` and hidden support command `github
+  _credential-helper`; this release will help check whether they actually work!
+
+# cranko 0.0.4 (2020-08-23)
+
 - Fix up the analysis of release histories to work properly when projects are not
   all released in lockstep. (I hope. Not yet tested.)
 - Fix up checking for repository dirtiness in the stage/confirm workflow: modified

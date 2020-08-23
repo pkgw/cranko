@@ -221,6 +221,34 @@ impl Command for CreateReleaseCommand {
     }
 }
 
+/// hidden Git credential helper command
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct CredentialHelperCommand {}
+
+impl Command for CredentialHelperCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        let token = require_var("GITHUB_TOKEN")?;
+        println!("username=token");
+        println!("password={}", token);
+        Ok(0)
+    }
+}
+
+/// Install as a Git credential helper
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct InstallCredentialHelperCommand {}
+
+impl Command for InstallCredentialHelperCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        let global_path = git2::Config::find_global()?;
+        let mut cfg =
+            git2::Config::open(&global_path).context("cannot open global Git config file")?;
+        cfg.set_str("credential.helper", "cranko github _credential-helper")
+            .context("cannot update Git configuration setting `credential.helper`")?;
+        Ok(0)
+    }
+}
+
 /// Upload one or more artifact files to a GitHub release.
 #[derive(Debug, PartialEq, StructOpt)]
 pub struct UploadArtifactsCommand {
@@ -354,6 +382,14 @@ pub enum GithubCommands {
     /// Create one or more new GitHub releases
     CreateRelease(CreateReleaseCommand),
 
+    #[structopt(name = "_credential-helper", setting = structopt::clap::AppSettings::Hidden)]
+    /// (hidden) github credential helper
+    CredentialHelper(CredentialHelperCommand),
+
+    #[structopt(name = "install-credential-helper")]
+    /// Install Cranko as a Git "credential helper", using $GITHUB_TOKEN to log in
+    InstallCredentialHelper(InstallCredentialHelperCommand),
+
     #[structopt(name = "upload-artifacts")]
     /// Upload one or more files as GitHub release artifacts
     UploadArtifacts(UploadArtifactsCommand),
@@ -369,6 +405,8 @@ impl Command for GithubCommand {
     fn execute(self) -> anyhow::Result<i32> {
         match self.command {
             GithubCommands::CreateRelease(o) => o.execute(),
+            GithubCommands::CredentialHelper(o) => o.execute(),
+            GithubCommands::InstallCredentialHelper(o) => o.execute(),
             GithubCommands::UploadArtifacts(o) => o.execute(),
         }
     }
