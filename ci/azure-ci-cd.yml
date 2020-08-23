@@ -10,16 +10,22 @@ trigger:
 stages:
 - stage: BuildAndTest
   jobs:
+
+  # Main Linux build(s) that create release artifacts
   - job: Linux
     pool:
       vmImage: ubuntu-16.04
     steps:
       - template: azure-test-all.yml
+        parameters:
+          primaryRcBuild: ${{ eq(variables['Build.SourceBranchName'], 'rc') }}
     variables:
       TOOLCHAIN: stable
       OTHER_TARGET: i686-unknown-linux-gnu
 
   # As far as I can tell, there is no way to matrix over a template *parameter*?
+  # So we need a separate group for the "canary" jobs that test build success but
+  # shouldn't create release artifacts.
   - job: Linux_canary
     pool:
       vmImage: ubuntu-16.04
@@ -36,6 +42,7 @@ stages:
     variables:
       OTHER_TARGET: i686-unknown-linux-gnu
 
+  # Mac builds
   - job: macOS
     pool:
       vmImage: macos-10.15
@@ -45,6 +52,7 @@ stages:
       TOOLCHAIN: stable
       OTHER_TARGET: x86_64-apple-ios
 
+  # Windows builds
   - job: Windows
     pool:
       vmImage: windows-2019
@@ -59,6 +67,7 @@ stages:
           TOOLCHAIN: nightly-x86_64-pc-windows-gnu
           OTHER_TARGET: i686-pc-windows-gnu
 
+  # rustfmt check
   - job: rustfmt
     pool:
       vmImage: ubuntu-16.04
@@ -71,6 +80,10 @@ stages:
     variables:
       TOOLCHAIN: stable
 
+
+# If all of those succeed and we're not in a pull request, run the deployment
+# pipeline. If we're specifically on the `rc` branch, this will finalize any
+# releases.
 - stage: Deploy
   condition: and(succeeded('BuildAndTest'), not(eq(variables['build.reason'], 'PullRequest')))
   jobs:
@@ -87,44 +100,6 @@ stages:
       runOnce:
         deploy:
           steps:
-          # NB: make sure to properly handle both `master` and `rc` cases!
-          - checkout: self
-
-          - bash: |
-              cd $(Pipeline.Workspace)
-              mkdir collection
-              cp binary-*/* collection/
-            displayName: Collect release artifacts
-
-          - publish: $(Pipeline.Workspace)/collection
-            displayName: Publish release artifacts
-            artifact: artifacts
-
-          # if we're on the `rc` branch, the release has been fully vetted and
-          # the artifacts have been published -- time switch back to the `release`
-          # branch and lock things in.
-
-          - bash: |
-              git switch -c release
-              git pull --ff-only $(Pipeline.Workspace)/git/release.bundle
-              git status
-              git show
-              tar xzf $(Pipeline.Workspace)/binary-x86_64-unknown-linux-gnu/cranko-*.tar.gz
-              ./cranko release-workflow tag
-            displayName: Prepare release commit and tags
-            condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'rc'))
-
-          - bash: |
-              git -c "credential.helper=!f() { echo username=token; echo password=$GITHUB_TOKEN; };f" push --tags origin release:release
-            displayName: Update release branch
-            condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'rc'))
-            env:
-              GITHUB_TOKEN: $(GITHUB_TOKEN)
-
-          - bash: |
-              ./cranko github create-release cranko
-              ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/collection/*
-            displayName: Create GitHub release
-            condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'rc'))
-            env:
-              GITHUB_TOKEN: $(GITHUB_TOKEN)
+            - template: azure-deployment.yml
+              parameters:
+                rcBuild: ${{ eq(variables['Build.SourceBranchName'], 'rc') }}

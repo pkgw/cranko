@@ -18,6 +18,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     errors::{Error, Result},
     project::{Project, ProjectBuilder, ProjectId},
+    repository::{RepoHistory, Repository},
 };
 
 type OurNodeIndex = NodeIndex<DefaultIx>;
@@ -332,6 +333,26 @@ impl ProjectGraph {
 
             Ok(idents)
         }
+    }
+
+    pub fn analyze_histories(&self, repo: &Repository) -> Result<RepoHistories> {
+        Ok(RepoHistories {
+            histories: repo.analyze_histories(&self.projects[..])?,
+        })
+    }
+}
+
+/// This type is how we "launder" the knowledge that the vector that
+/// comes out of repo.analyze_histories can be mapped into ProjectId values.
+#[derive(Clone, Debug)]
+pub struct RepoHistories {
+    histories: Vec<RepoHistory>,
+}
+
+impl RepoHistories {
+    /// Given a project ID, look up its history
+    pub fn lookup(&self, projid: ProjectId) -> &RepoHistory {
+        &self.histories[projid]
     }
 }
 

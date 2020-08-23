@@ -127,14 +127,48 @@ impl Command for ConfirmCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
+        // Note that scan_rc_info() below will always error out if there are
+        // local modifications, so we can't easily support a `--force` mode
+        // right now.
+        sess.ensure_changelog_clean()
+            .context("refusing to `confirm` with a modified working tree")?;
+
+        // Scan the repository histories for everybody -- we'll use these to
+        // report whether there are projects that ought to be released but
+        // aren't.
+        let histories = sess.analyze_histories()?;
+
         let mut changes = repository::ChangeList::default();
         let mut rc_info = Vec::new();
 
         for proj in sess.graph().toposort()? {
+            let history = histories.lookup(proj.ident());
+
             if let Some(info) = sess.repo.scan_rc_info(proj, &mut changes)? {
-                // TODO: apply bump and print out expected new version and other helpful info
-                info!("{}: {}", proj.user_facing_name, info.bump_spec);
+                let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
+                let maybe_last_release = history.release_info(&sess.repo)?;
+
+                let (old_version, new_version) = if let Some(last_release) = maybe_last_release {
+                    // By definition, this project is will be present in the table:
+                    let last_release = last_release.lookup_project(proj).unwrap();
+                    let new_version = scheme.apply(&proj.version, Some(last_release))?;
+                    (last_release.version.clone(), new_version.to_string())
+                } else {
+                    let new_version = scheme.apply(&proj.version, None)?;
+                    ("[no previous releases]".to_owned(), new_version.to_string())
+                };
+
+                info!(
+                    "{}: {} (expected: {} => {})",
+                    proj.user_facing_name, info.bump_spec, old_version, new_version
+                );
                 rc_info.push(info);
+            } else if history.n_commits() > 0 {
+                warn!(
+                    "project `{}` has been changed since its last release, \
+                    but is not part of the rc submission",
+                    proj.user_facing_name
+                );
             }
         }
 
@@ -148,6 +182,8 @@ impl Command for ConfirmCommand {
             "staged rc commit to `{}` branch",
             sess.repo.upstream_rc_name()
         );
+
+        sess.repo.hard_reset_changes(&changes)?;
         Ok(0)
     }
 }
@@ -244,7 +280,7 @@ impl Command for ReleaseWorkflowApplyVersionsCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
-        sess.repo.check_dirty()?;
+        sess.ensure_fully_clean()?;
 
         let mut rci = None;
         let mut dev_mode = true;
@@ -460,11 +496,13 @@ impl Command for StageCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
-        if let Err(e) = sess.repo.check_dirty() {
-            if self.force {
-                warn!("staging despite dirty repo due to --force");
-            } else {
-                return Err(e).context("refusing to stage (override with `--force`)");
+        if let Err(e) = sess.ensure_changelog_clean() {
+            warn!(
+                "not recommended to stage with a modified working tree ({})",
+                e
+            );
+            if !self.force {
+                return Err(anyhow!("refusing to proceed (use `--force` to override)"));
             }
         }
 
@@ -490,28 +528,29 @@ impl Command for StageCommand {
             return Ok(0);
         }
 
-        // Pull up the relevant repository history for all of those projects.
-        let history = {
-            let graph = sess.graph();
-            let mut matchers = Vec::new();
-
-            for projid in &idents {
-                let proj = graph.lookup(*projid);
-                matchers.push(&proj.repo_paths);
-            }
-
-            sess.repo.analyze_history_to_release(&matchers[..])?
-        };
+        // Scan the repository histories for everybody.
+        let histories = sess.analyze_histories()?;
 
         // Update the changelogs
         let mut n_staged = 0;
         let rel_info = sess.repo.get_latest_release_info()?;
+        let mut changes = repository::ChangeList::default();
 
         for i in 0..idents.len() {
             let proj = sess.graph().lookup(idents[i]);
-            let changes = &history[i][..];
+            let history = histories.lookup(idents[i]);
 
-            if changes.len() == 0 {
+            if let Some(_) = sess.repo.scan_rc_info(proj, &mut changes)? {
+                if !empty_query {
+                    warn!(
+                        "skipping {}: it appears to have already been staged",
+                        proj.user_facing_name
+                    );
+                }
+                continue;
+            }
+
+            if history.n_commits() == 0 {
                 if !empty_query {
                     warn!("no changes detected for project {}", proj.user_facing_name);
                 }
@@ -519,15 +558,22 @@ impl Command for StageCommand {
                 println!(
                     "{}: {} relevant commits",
                     proj.user_facing_name,
-                    changes.len()
+                    history.n_commits()
                 );
+
+                // Because Changelog is a boxed trait object, it can't accept
+                // generic types :-(
+                let commits: Vec<repository::CommitId> =
+                    history.commits().into_iter().map(|c| *c).collect();
                 proj.changelog
-                    .draft_release_update(proj, &sess, changes, rel_info.commit)?;
+                    .draft_release_update(proj, &sess, &commits[..], rel_info.commit)?;
                 n_staged += 1;
             }
         }
 
-        if empty_query && n_staged != 1 {
+        if empty_query && n_staged == 0 {
+            info!("nothing further to stage at this time");
+        } else if empty_query && n_staged != 1 {
             info!("{} of {} projects staged", n_staged, idents.len());
         } else if n_staged != idents.len() {
             info!("{} of {} selected projects staged", n_staged, idents.len());
@@ -557,17 +603,20 @@ impl Command for StatusCommand {
             .query_or_all(q)
             .context("cannot get requested statuses")?;
 
-        let rci = sess.repo.get_latest_release_info()?;
-        let oids = sess.analyze_history_to_release()?;
+        let histories = sess.analyze_histories()?;
 
         for ident in idents {
-            let n = oids[ident].len();
             let proj = sess.graph().lookup(ident);
+            let history = histories.lookup(ident);
+            let n = history.n_commits();
 
-            if let Some(latest) = rci.lookup_project(proj) {
+            if let Some(rel_info) = history.release_info(&sess.repo)? {
+                // By definition, rel_info must contain a record for this project.
+                let this_info = rel_info.lookup_project(proj).unwrap();
+
                 println!(
                     "{}: {} relevant commit(s) since {}",
-                    proj.user_facing_name, n, latest.version
+                    proj.user_facing_name, n, this_info.version
                 );
             } else {
                 println!(

@@ -10,7 +10,7 @@
 //! as implemented in the `graph` module.
 
 use crate::{
-    changelog::ChangelogFormat,
+    changelog::{self, Changelog},
     graph::ProjectGraph,
     repository::{PathMatcher, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
@@ -71,7 +71,7 @@ pub struct Project {
     pub repo_paths: PathMatcher,
 
     /// How this project's changelog is formatted and updated.
-    pub changelog: ChangelogFormat,
+    pub changelog: Box<dyn Changelog>,
 }
 
 impl Project {
@@ -163,7 +163,7 @@ impl<'a> ProjectBuilder<'a> {
             rewriters: Vec::new(),
             prefix: prefix.clone(),
             repo_paths: PathMatcher::new_include(prefix),
-            changelog: ChangelogFormat::default(),
+            changelog: changelog::default(),
         })
     }
 }

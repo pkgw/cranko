@@ -1,5 +1,15 @@
 # rc: micro bump
 
+- Fix up the analysis of release histories to work properly when projects are not
+  all released in lockstep. (I hope. Not yet tested.)
+- Fix up checking for repository dirtiness in the stage/confirm workflow: modified
+  changelogs should be ignore.
+- Lots of general polish to the stage/confirm UX
+- Infrastructure: try to simplify/clarify CI pipeline logic with conditionals on
+  template parameters
+
+# cranko 0.0.3 (2020-08-22)
+
 - Split `apply` into two separate steps, subcommands of a new `release-workflow`
   command along with `tag`.
 
