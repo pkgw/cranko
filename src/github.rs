@@ -240,9 +240,7 @@ pub struct InstallCredentialHelperCommand {}
 
 impl Command for InstallCredentialHelperCommand {
     fn execute(self) -> anyhow::Result<i32> {
-        let global_path = git2::Config::find_global()?;
-        let mut cfg =
-            git2::Config::open(&global_path).context("cannot open global Git config file")?;
+        let mut cfg = git2::Config::open_default().context("cannot open Git configuration")?;
         cfg.set_str("credential.helper", "cranko github _credential-helper")
             .context("cannot update Git configuration setting `credential.helper`")?;
         Ok(0)
