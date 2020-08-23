@@ -21,7 +21,7 @@ use crate::{
     app::AppSession,
     errors::{Error, Result},
     project::Project,
-    repository::{ChangeList, CommitId, RcProjectInfo, RepoPath, RepoPathBuf, Repository},
+    repository::{ChangeList, CommitId, PathMatcher, RcProjectInfo, RepoPathBuf, Repository},
 };
 
 /// A type that defines how the changelog for a given project is managed.
@@ -37,11 +37,11 @@ pub trait Changelog: std::fmt::Debug {
         prev_release_commit: Option<CommitId>,
     ) -> Result<()>;
 
-    /// Test whether a path in the working directory, relative to the working
-    /// directory root, corresponds to a changelog file. Used in "cranko
-    /// confirm" to detect staged projects and make sure that there are no
-    /// functional changes.
-    fn is_changelog_path_for(&self, proj: &Project, path: &RepoPath) -> bool;
+    /// Create a matcher that matches one or more paths in the project's
+    /// directory corresponding to its changelog(s). Operations like `cranko
+    /// stage` and `cranko confirm` care about working directory dirtiness, but
+    /// in our model modified changelogs are OK.
+    fn create_path_matcher(&self, proj: &Project) -> Result<PathMatcher>;
 
     /// Scan the changelog(s) in the project's working directory to extract
     /// metadata about a proposed release of the project. The idea is that we
@@ -179,18 +179,8 @@ impl Changelog for MarkdownChangelog {
         }
     }
 
-    fn is_changelog_path_for(&self, proj: &Project, path: &RepoPath) -> bool {
-        let pfx = proj.prefix();
-
-        if !path.starts_with(pfx) {
-            return false;
-        }
-
-        if path.len() != pfx.len() + self.basename.len() {
-            return false;
-        }
-
-        return path.ends_with(self.basename.as_bytes());
+    fn create_path_matcher(&self, proj: &Project) -> Result<PathMatcher> {
+        Ok(PathMatcher::new_include(self.changelog_repopath(proj)))
     }
 
     fn scan_rc_info(&self, proj: &Project, repo: &Repository) -> Result<RcProjectInfo> {

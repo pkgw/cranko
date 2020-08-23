@@ -582,6 +582,7 @@ impl Repository {
         changes: &mut ChangeList,
     ) -> Result<Option<RcProjectInfo>> {
         let mut saw_changelog = false;
+        let changelog_matcher = proj.changelog.create_path_matcher(proj)?;
 
         let mut opts = git2::StatusOptions::new();
         opts.include_untracked(true);
@@ -595,7 +596,7 @@ impl Repository {
 
             let status = entry.status();
 
-            if proj.changelog.is_changelog_path_for(proj, path) {
+            if changelog_matcher.repo_path_matches(path) {
                 if status.is_conflicted() {
                     return Err(Error::DirtyRepository(path.escaped()));
                 } else if status.is_index_new() || status.is_index_modified() {
