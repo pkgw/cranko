@@ -223,10 +223,20 @@ impl Command for CreateReleaseCommand {
 
 /// hidden Git credential helper command
 #[derive(Debug, PartialEq, StructOpt)]
-pub struct CredentialHelperCommand {}
+pub struct CredentialHelperCommand {
+    #[structopt(help = "The operation")]
+    operation: String,
+}
 
 impl Command for CredentialHelperCommand {
     fn execute(self) -> anyhow::Result<i32> {
+        if self.operation != "get" {
+            return Err(anyhow!(
+                "unexpected credential operation `{}`",
+                self.operation
+            ));
+        }
+
         let token = require_var("GITHUB_TOKEN")?;
         println!("username=token");
         println!("password={}", token);
