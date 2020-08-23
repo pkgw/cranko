@@ -251,7 +251,7 @@ impl Command for InstallCredentialHelperCommand {
         let mut cfg = git2::Config::open_default().context("cannot open Git configuration")?;
         cfg.set_str(
             "credential.helper",
-            format!("{} github _credential-helper", this_exe),
+            &format!("{} github _credential-helper", this_exe),
         )
         .context("cannot update Git configuration setting `credential.helper`")?;
         Ok(0)
