@@ -240,9 +240,20 @@ pub struct InstallCredentialHelperCommand {}
 
 impl Command for InstallCredentialHelperCommand {
     fn execute(self) -> anyhow::Result<i32> {
+        // The path given to Git must be an absolute path.
+        let this_exe = std::env::current_exe()?;
+        let this_exe = this_exe.to_str().ok_or_else(|| {
+            anyhow!(
+                "cannot install cranko as a Git \
+                 credential helper because its executable path is not Unicode"
+            )
+        })?;
         let mut cfg = git2::Config::open_default().context("cannot open Git configuration")?;
-        cfg.set_str("credential.helper", "cranko github _credential-helper")
-            .context("cannot update Git configuration setting `credential.helper`")?;
+        cfg.set_str(
+            "credential.helper",
+            format!("{} github _credential-helper", this_exe),
+        )
+        .context("cannot update Git configuration setting `credential.helper`")?;
         Ok(0)
     }
 }

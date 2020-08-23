@@ -34,8 +34,7 @@ steps:
     displayName: Prepare release commit and tags
 
   - bash: |
-      export PATH="$(pwd):$PATH"
-      cranko github install-credential-helper
+      ./cranko github install-credential-helper
       git push --tags origin release:release
     displayName: Update release branch
     env:
