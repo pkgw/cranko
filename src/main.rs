@@ -490,18 +490,8 @@ impl Command for StageCommand {
             return Ok(0);
         }
 
-        // Pull up the relevant repository history for all of those projects.
-        let history = {
-            let graph = sess.graph();
-            let mut matchers = Vec::new();
-
-            for projid in &idents {
-                let proj = graph.lookup(*projid);
-                matchers.push(&proj.repo_paths);
-            }
-
-            sess.repo.analyze_history_to_release(&matchers[..])?
-        };
+        // Scan the repository histories for everybody.
+        let histories = sess.analyze_histories()?;
 
         // Update the changelogs
         let mut n_staged = 0;
@@ -509,9 +499,9 @@ impl Command for StageCommand {
 
         for i in 0..idents.len() {
             let proj = sess.graph().lookup(idents[i]);
-            let changes = &history[i][..];
+            let history = histories.lookup(idents[i]);
 
-            if changes.len() == 0 {
+            if history.n_commits() == 0 {
                 if !empty_query {
                     warn!("no changes detected for project {}", proj.user_facing_name);
                 }
@@ -519,10 +509,15 @@ impl Command for StageCommand {
                 println!(
                     "{}: {} relevant commits",
                     proj.user_facing_name,
-                    changes.len()
+                    history.n_commits()
                 );
-                proj.changelog
-                    .draft_release_update(proj, &sess, changes, rel_info.commit)?;
+
+                proj.changelog.draft_release_update(
+                    proj,
+                    &sess,
+                    history.commits(),
+                    rel_info.commit,
+                )?;
                 n_staged += 1;
             }
         }
@@ -557,17 +552,20 @@ impl Command for StatusCommand {
             .query_or_all(q)
             .context("cannot get requested statuses")?;
 
-        let rci = sess.repo.get_latest_release_info()?;
-        let oids = sess.analyze_history_to_release()?;
+        let histories = sess.analyze_histories()?;
 
         for ident in idents {
-            let n = oids[ident].len();
             let proj = sess.graph().lookup(ident);
+            let history = histories.lookup(ident);
+            let n = history.n_commits();
 
-            if let Some(latest) = rci.lookup_project(proj) {
+            if let Some(rel_info) = history.release_info(&sess.repo)? {
+                // By definition, rel_info must contain a record for this project.
+                let this_info = rel_info.lookup_project(proj).unwrap();
+
                 println!(
                     "{}: {} relevant commit(s) since {}",
-                    proj.user_facing_name, n, latest.version
+                    proj.user_facing_name, n, this_info.version
                 );
             } else {
                 println!(

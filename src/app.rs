@@ -7,10 +7,8 @@ use log::warn;
 
 use crate::{
     errors::Result,
-    graph::ProjectGraph,
-    repository::{
-        ChangeList, CommitId, RcCommitInfo, RcProjectInfo, ReleaseCommitInfo, Repository,
-    },
+    graph::{ProjectGraph, RepoHistories},
+    repository::{ChangeList, RcCommitInfo, RcProjectInfo, ReleaseCommitInfo, Repository},
 };
 
 /// The main Cranko CLI application state structure.
@@ -173,14 +171,8 @@ impl AppSession {
         Ok(())
     }
 
-    pub fn analyze_history_to_release(&self) -> Result<Vec<Vec<CommitId>>> {
-        let mut matchers = Vec::with_capacity(self.graph.len());
-
-        for pid in 0..self.graph.len() {
-            matchers.push(&self.graph.lookup(pid).repo_paths);
-        }
-
-        self.repo.analyze_history_to_release(&matchers)
+    pub fn analyze_histories(&self) -> Result<RepoHistories> {
+        self.graph.analyze_histories(&self.repo)
     }
 
     pub fn default_dev_rc_info(&self) -> RcCommitInfo {

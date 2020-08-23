@@ -40,11 +40,11 @@ impl Default for ChangelogFormat {
 impl ChangelogFormat {
     /// Rewrite the changelog file with stub contents derived from the
     /// repository history.
-    pub fn draft_release_update(
+    pub fn draft_release_update<'a, T: IntoIterator<Item = &'a CommitId>>(
         &self,
         proj: &Project,
         sess: &AppSession,
-        changes: &[CommitId],
+        changes: T,
         prev_release_commit: Option<CommitId>,
     ) -> Result<()> {
         match self {
@@ -132,11 +132,11 @@ impl MarkdownFormat {
         repo.resolve_workdir(&self.changelog_repopath(proj))
     }
 
-    fn draft_release_update(
+    fn draft_release_update<'a, T: IntoIterator<Item = &'a CommitId>>(
         &self,
         proj: &Project,
         sess: &AppSession,
-        changes: &[CommitId],
+        changes: T,
         prev_release_commit: Option<CommitId>,
     ) -> Result<()> {
         // Populate the previous changelog from the most recent `release`
