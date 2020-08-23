@@ -221,6 +221,53 @@ impl Command for CreateReleaseCommand {
     }
 }
 
+/// hidden Git credential helper command
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct CredentialHelperCommand {
+    #[structopt(help = "The operation")]
+    operation: String,
+}
+
+impl Command for CredentialHelperCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        if self.operation != "get" {
+            return Err(anyhow!(
+                "unexpected credential operation `{}`",
+                self.operation
+            ));
+        }
+
+        let token = require_var("GITHUB_TOKEN")?;
+        println!("username=token");
+        println!("password={}", token);
+        Ok(0)
+    }
+}
+
+/// Install as a Git credential helper
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct InstallCredentialHelperCommand {}
+
+impl Command for InstallCredentialHelperCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        // The path given to Git must be an absolute path.
+        let this_exe = std::env::current_exe()?;
+        let this_exe = this_exe.to_str().ok_or_else(|| {
+            anyhow!(
+                "cannot install cranko as a Git \
+                 credential helper because its executable path is not Unicode"
+            )
+        })?;
+        let mut cfg = git2::Config::open_default().context("cannot open Git configuration")?;
+        cfg.set_str(
+            "credential.helper",
+            &format!("{} github _credential-helper", this_exe),
+        )
+        .context("cannot update Git configuration setting `credential.helper`")?;
+        Ok(0)
+    }
+}
+
 /// Upload one or more artifact files to a GitHub release.
 #[derive(Debug, PartialEq, StructOpt)]
 pub struct UploadArtifactsCommand {
@@ -354,6 +401,14 @@ pub enum GithubCommands {
     /// Create one or more new GitHub releases
     CreateRelease(CreateReleaseCommand),
 
+    #[structopt(name = "_credential-helper", setting = structopt::clap::AppSettings::Hidden)]
+    /// (hidden) github credential helper
+    CredentialHelper(CredentialHelperCommand),
+
+    #[structopt(name = "install-credential-helper")]
+    /// Install Cranko as a Git "credential helper", using $GITHUB_TOKEN to log in
+    InstallCredentialHelper(InstallCredentialHelperCommand),
+
     #[structopt(name = "upload-artifacts")]
     /// Upload one or more files as GitHub release artifacts
     UploadArtifacts(UploadArtifactsCommand),
@@ -369,6 +424,8 @@ impl Command for GithubCommand {
     fn execute(self) -> anyhow::Result<i32> {
         match self.command {
             GithubCommands::CreateRelease(o) => o.execute(),
+            GithubCommands::CredentialHelper(o) => o.execute(),
+            GithubCommands::InstallCredentialHelper(o) => o.execute(),
             GithubCommands::UploadArtifacts(o) => o.execute(),
         }
     }

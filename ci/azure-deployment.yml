@@ -34,7 +34,8 @@ steps:
     displayName: Prepare release commit and tags
 
   - bash: |
-      git -c "credential.helper=!f() { echo username=token; echo password=$GITHUB_TOKEN; };f" push --tags origin release:release
+      ./cranko github install-credential-helper
+      git push --tags origin release:release
     displayName: Update release branch
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
