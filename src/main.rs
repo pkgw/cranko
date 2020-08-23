@@ -182,6 +182,8 @@ impl Command for ConfirmCommand {
             "staged rc commit to `{}` branch",
             sess.repo.upstream_rc_name()
         );
+
+        sess.repo.hard_reset_changes(&changes)?;
         Ok(0)
     }
 }

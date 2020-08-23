@@ -751,6 +751,30 @@ impl Repository {
         })
     }
 
+    /// Update the specified files in the working tree to reset them to what
+    /// HEAD says they should be.
+    pub fn hard_reset_changes(&self, changes: &ChangeList) -> Result<()> {
+        // If no changes, do nothing. If we don't special-case this, the
+        // checkout_head() will affect *all* files, i.e. perform a hard reset to
+        // HEAD.
+        if changes.paths.len() == 0 {
+            return Ok(());
+        }
+
+        let mut cb = git2::build::CheckoutBuilder::new();
+        cb.force();
+
+        // The key is that by specifying paths here, the checkout operation will
+        // only affect those paths and not anything else.
+        for path in &changes.paths[..] {
+            let p: &RepoPath = path.as_ref();
+            cb.path(p);
+        }
+
+        self.repo.checkout_head(Some(&mut cb))?;
+        Ok(())
+    }
+
     /// Get a tag name for a release of this project.
     pub fn get_tag_name(&self, proj: &Project, rel: &ReleasedProjectInfo) -> Result<String> {
         let mut tagname_args = HashMap::new();
