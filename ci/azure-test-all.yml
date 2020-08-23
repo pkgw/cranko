@@ -22,7 +22,9 @@ steps:
 - bash: cargo build --all
   displayName: "cargo build (bootstrap)"
 
-- bash: cargo run -- release-workflow apply-versions
+- bash: |
+    git status  # temp: Windows builds intermittently report changed files here??
+    cargo run -- release-workflow apply-versions
   displayName: "cranko release-workflow apply-versions (using bootstrapped build)"
 
 # Now that we've applied versions, mainline test workflow
