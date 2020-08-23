@@ -614,7 +614,11 @@ impl Repository {
             if changelog_matcher.repo_path_matches(path) {
                 if status.is_conflicted() {
                     return Err(Error::DirtyRepository(path.escaped()));
-                } else if status.is_index_new() || status.is_index_modified() {
+                } else if status.is_index_new()
+                    || status.is_index_modified()
+                    || status.is_wt_new()
+                    || status.is_wt_modified()
+                {
                     changes.add_path(path);
                     saw_changelog = true;
                 } // TODO: handle/complain about some other statuses
