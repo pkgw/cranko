@@ -2,6 +2,9 @@ parameters:
 - name: canaryBuild
   type: boolean
   default: false
+- name: primaryRcBuild
+  type: boolean
+  default: false
 
 steps:
 - checkout: self
@@ -80,22 +83,21 @@ steps:
       targetPath: '$(Build.ArtifactStagingDirectory)/binary-$(rustTarget)'
       artifactName: binary-$(rustTarget)
 
-  # If, further, we're the primary Linux build on the `rc` branch, generate and export
+  # If, further, we're the primary build on the `rc` branch, generate and export
   # the final release commit.
 
-  - bash: |
-      git add .
-      cargo run -- release-workflow commit
-      git show HEAD
-      artifact_dir="$(Build.ArtifactStagingDirectory)/git"
-      mkdir -p "$artifact_dir"
-      git bundle create "$artifact_dir/release.bundle" origin/master..HEAD
-    displayName: "Generate and Bundle release commit"
-    condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'), eq(variables['Build.SourceBranchName'], 'rc'))
+  - ${{ if eq(parameters.primaryRcBuild, true) }}:
+    - bash: |
+        git add .
+        cargo run -- release-workflow commit
+        git show HEAD
+        artifact_dir="$(Build.ArtifactStagingDirectory)/git"
+        mkdir -p "$artifact_dir"
+        git bundle create "$artifact_dir/release.bundle" origin/master..HEAD
+      displayName: "Generate and Bundle release commit"
 
-  - task: PublishPipelineArtifact@1
-    displayName: Publish git bundle artifact
-    condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'), eq(variables['Build.SourceBranchName'], 'rc'))
-    inputs:
-      targetPath: '$(Build.ArtifactStagingDirectory)/git'
-      artifactName: git
+    - task: PublishPipelineArtifact@1
+      displayName: Publish git bundle artifact
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/git'
+        artifactName: git
