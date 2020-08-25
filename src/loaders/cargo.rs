@@ -7,6 +7,7 @@
 //! information about all of the crates and their interdependencies.
 
 use cargo_metadata::MetadataCommand;
+use log::warn;
 use std::collections::HashMap;
 
 use crate::{
@@ -107,13 +108,41 @@ impl CargoLoader {
 
         // Now establish the interdependencies.
 
-        let graph = app.graph_mut();
+        let mut cargoid_to_index = HashMap::new();
+
+        for (index, pkg) in cargo_meta.packages[..].iter().enumerate() {
+            cargoid_to_index.insert(pkg.id.clone(), index);
+        }
 
         for node in &cargo_meta.resolve.unwrap().nodes {
+            let pkg = &cargo_meta.packages[cargoid_to_index[&node.id]];
+
             if let Some(depender_id) = cargo_to_graph.get(&node.id) {
+                let maybe_versions = pkg.metadata.get("internal_dep_versions");
+                let manifest_repopath = app.repo.convert_path(&pkg.manifest_path)?;
+
                 for dep in &node.deps {
                     if let Some(dependee_id) = cargo_to_graph.get(&dep.pkg) {
-                        graph.add_dependency(*depender_id, *dependee_id);
+                        let min_version = maybe_versions
+                            .and_then(|table| table.get(&dep.name))
+                            .and_then(|nameval| nameval.as_str())
+                            .map(|text| app.repo.parse_commit_ref(text))
+                            .transpose()?
+                            .map(|cref| app.repo.resolve_commit_ref(&cref, &manifest_repopath))
+                            .transpose()?;
+
+                        if min_version.is_none() {
+                            warn!(
+                                "missing or invalid key `internal_dep_versions.{}` in `{}`",
+                                &dep.name,
+                                pkg.manifest_path.display()
+                            );
+                            warn!("... this is needed to specify the oldest version of `{}` compatible with `{}`", 
+                                &dep.name, &pkg.name);
+                        }
+
+                        app.graph_mut()
+                            .add_dependency(*depender_id, *dependee_id, min_version);
                     }
                 }
             }

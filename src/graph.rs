@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     errors::{Error, Result},
     project::{Project, ProjectBuilder, ProjectId},
-    repository::{RepoHistory, Repository},
+    repository::{CommitId, RepoHistory, Repository},
 };
 
 type OurNodeIndex = NodeIndex<DefaultIx>;
@@ -34,7 +34,7 @@ pub struct ProjectGraph {
     node_ixs: Vec<OurNodeIndex>,
 
     /// The `petgraph` state expressing the project graph.
-    graph: DiGraph<ProjectId, ()>,
+    graph: DiGraph<ProjectId, Option<CommitId>>,
 
     /// Mapping from user-facing project name to project ID. This is calculated
     /// in the complete_loading() method.
@@ -86,10 +86,15 @@ impl ProjectGraph {
     }
 
     /// Add a dependency between two projects in the graph.
-    pub fn add_dependency(&mut self, depender_id: ProjectId, dependee_id: ProjectId) {
+    pub fn add_dependency(
+        &mut self,
+        depender_id: ProjectId,
+        dependee_id: ProjectId,
+        min_version: Option<CommitId>,
+    ) {
         let depender_nix = self.node_ixs[depender_id];
         let dependee_nix = self.node_ixs[dependee_id];
-        self.graph.add_edge(dependee_nix, depender_nix, ());
+        self.graph.add_edge(dependee_nix, depender_nix, min_version);
     }
 
     /// Complete construction of the graph.

@@ -39,7 +39,7 @@ pub enum Error {
     #[error("{0}")]
     Environment(String),
 
-    #[error("{0}")]
+    #[error("error with the backing repository")]
     Git(#[from] git2::Error),
 
     #[error("{0}")]
@@ -50,6 +50,9 @@ pub enum Error {
 
     #[error("invalid commit message format")]
     InvalidCommitMessageFormat,
+
+    #[error("invalid commit reference `{0}`")]
+    InvalidCommitReference(String),
 
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),

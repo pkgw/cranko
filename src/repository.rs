@@ -8,6 +8,8 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    fs::File,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
 
@@ -139,6 +141,81 @@ impl Repository {
                 ))
             })?
             .to_owned())
+    }
+
+    /// Parse a textual reference to a commit within the repository.
+    pub fn parse_commit_ref<T: AsRef<str>>(&self, text: T) -> Result<CommitRef> {
+        let text = text.as_ref();
+
+        if let Ok(id) = text.parse() {
+            Ok(CommitRef::Id(CommitId(id)))
+        } else if text.starts_with("thiscommit:") {
+            Ok(CommitRef::ThisCommit {
+                salt: text[11..].to_owned(),
+            })
+        } else {
+            Err(Error::InvalidCommitReference(text.to_owned()))
+        }
+    }
+
+    /// Resolve a commit reference to a specific commit ID
+    pub fn resolve_commit_ref(
+        &self,
+        cref: &CommitRef,
+        ref_source_path: &RepoPath,
+    ) -> Result<CommitId> {
+        let cid = match cref {
+            CommitRef::Id(id) => id.clone(),
+            CommitRef::ThisCommit { ref salt } => lookup_this(self, salt, ref_source_path)?,
+        };
+
+        // Double-check that the ID actually resolves to a commit.
+        self.repo.find_commit(cid.0)?;
+        return Ok(cid);
+
+        fn lookup_this(
+            repo: &Repository,
+            salt: &str,
+            ref_source_path: &RepoPath,
+        ) -> Result<CommitId> {
+            let file = File::open(repo.resolve_workdir(ref_source_path))?;
+            let reader = BufReader::new(file);
+            let mut line_no = 1; // blames start at line 1.
+            let mut found_it = false;
+
+            for maybe_line in reader.lines() {
+                let line = maybe_line?;
+                if line.contains(salt) {
+                    found_it = true;
+                    break;
+                }
+
+                line_no += 1;
+            }
+
+            if !found_it {
+                return Err(Error::Environment(format!(
+                    "commit-ref key `{}` not found in contents of file {}",
+                    salt,
+                    ref_source_path.escaped(),
+                )));
+            }
+
+            let blame = repo.repo.blame_file(ref_source_path.as_path(), None)?;
+            let hunk = blame.get_line(line_no).ok_or_else(|| {
+                // TODO: this happens if the line in question hasn't yet been
+                // committed. Need to figure out how to handle that
+                // circumstance.
+                Error::Environment(format!(
+                    "commit-ref key `{}` found in non-existent line {} of file {}??",
+                    salt,
+                    line_no,
+                    ref_source_path.escaped()
+                ))
+            })?;
+
+            Ok(CommitId(hunk.final_commit_id()))
+        }
     }
 
     /// Resolve a `RepoPath` repository path to a filesystem path in the working
@@ -1044,6 +1121,19 @@ enum PathMatcherTerm {
 
     /// Exclude paths prefixed by the value.
     Exclude(RepoPathBuf),
+}
+
+/// A reference to a commit in the repository. We have some special machinery to
+/// allow people to create commits that reference themselves.
+pub enum CommitRef {
+    /// A reference to a specific commit ID
+    Id(CommitId),
+
+    /// A reference to the commit that introduced this reference into the
+    /// repository contents. `salt` is a random string allowing different
+    /// this-commit references to be distinguished and to ease identification of
+    /// the relevant commit through "blame" tracing of the repository history.
+    ThisCommit { salt: String },
 }
 
 // Below we have helpers for trying to deal with git's paths properly, on the
