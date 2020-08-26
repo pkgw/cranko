@@ -1,5 +1,10 @@
 # rc: micro bump
 
+- Try to get internal dependencies working. The most very basic tests don't
+  crash. The code feels quite messy.
+
+# cranko 0.0.5 (2020-08-23)
+
 - Add `github install-credential-helper` and hidden support command `github
   _credential-helper`; this release will help check whether they actually work!
 
