@@ -3,14 +3,18 @@
 
 //! State for the Cranko CLI application.
 
-use log::warn;
+use log::{info, warn};
+use std::collections::HashMap;
 
 use crate::{
     errors::{Error, Result},
     graph::{ProjectGraph, RepoHistories},
+    project::{ProjectId, ResolvedRequirement},
     repository::{
-        ChangeList, PathMatcher, RcCommitInfo, RcProjectInfo, ReleaseCommitInfo, Repository,
+        ChangeList, CommitAvailability, PathMatcher, RcCommitInfo, RcProjectInfo,
+        ReleaseCommitInfo, Repository,
     },
+    version::Version,
 };
 
 /// The main Cranko CLI application state structure.
@@ -149,18 +153,57 @@ impl AppSession {
         Ok(())
     }
 
-    /// Apply version numbers given the current repository state and bump specifications.
-    pub fn apply_versions(&mut self, rcinfo: &RcCommitInfo) -> Result<()> {
+    /// Apply version numbers given the current repository state and bump
+    /// specifications.
+    ///
+    /// This also involves solving the version requirements for internal
+    /// dependencies.
+    pub fn apply_versions(&mut self, rc_info: &RcCommitInfo) -> Result<()> {
+        let mut new_versions: HashMap<ProjectId, Version> = HashMap::new();
         let latest_info = self.repo.get_latest_release_info()?;
 
-        for proj in self.graph.toposort_mut()? {
+        for ident in self.graph.toposort_idents()? {
+            // First, make sure that we can satisfy this project's internal
+            // dependencies. By definition of the toposort, any of its
+            // dependencies will have already been visited.
+            let deps = self.graph.resolve_direct_dependencies(&self.repo, ident)?;
+            let proj = self.graph.lookup_mut(ident);
+
+            for dep in &deps[..] {
+                let min_version = match dep.availability {
+                    CommitAvailability::NotAvailable => {
+                        return Err(Error::UnsatisfiedInternalRequirement(
+                            proj.user_facing_name.to_string(),
+                        ))
+                    }
+
+                    CommitAvailability::ExistingRelease(ref v) => v.clone(),
+
+                    CommitAvailability::NewRelease => {
+                        if let Some(v) = new_versions.get(&dep.ident) {
+                            v.clone()
+                        } else {
+                            return Err(Error::UnsatisfiedInternalRequirement(
+                                proj.user_facing_name.to_string(),
+                            ));
+                        }
+                    }
+                };
+
+                proj.internal_reqs.push(ResolvedRequirement {
+                    ident: dep.ident,
+                    min_version,
+                });
+            }
+
             let cur_version = proj.version.clone();
             let latest_release = latest_info.lookup_project(proj);
 
-            if let Some(rc) = rcinfo.lookup_project(proj) {
+            if let Some(rc) = rc_info.lookup_project(proj) {
                 let scheme = proj.version.parse_bump_scheme(&rc.bump_spec)?;
                 proj.version = scheme.apply(&cur_version, latest_release)?;
-                println!(
+                new_versions.insert(proj.ident(), proj.version.clone());
+                info!(
                     "{}: {} => {}",
                     proj.user_facing_name, cur_version, proj.version
                 );
@@ -180,7 +223,9 @@ impl AppSession {
     pub fn rewrite(&self) -> Result<ChangeList> {
         let mut changes = ChangeList::default();
 
-        for proj in self.graph.toposort()? {
+        for ident in self.graph.toposort_idents()? {
+            let proj = self.graph.lookup(ident);
+
             for rw in &proj.rewriters {
                 rw.rewrite(self, &mut changes)?;
             }

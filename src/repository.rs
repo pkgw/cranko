@@ -8,6 +8,8 @@ use log::info;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    fs::File,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
 
@@ -15,6 +17,7 @@ use crate::{
     errors::{Error, Result},
     graph::ProjectGraph,
     project::Project,
+    version::Version,
 };
 
 /// Opaque type representing a commit in the repository.
@@ -139,6 +142,81 @@ impl Repository {
                 ))
             })?
             .to_owned())
+    }
+
+    /// Parse a textual reference to a commit within the repository.
+    pub fn parse_commit_ref<T: AsRef<str>>(&self, text: T) -> Result<CommitRef> {
+        let text = text.as_ref();
+
+        if let Ok(id) = text.parse() {
+            Ok(CommitRef::Id(CommitId(id)))
+        } else if text.starts_with("thiscommit:") {
+            Ok(CommitRef::ThisCommit {
+                salt: text[11..].to_owned(),
+            })
+        } else {
+            Err(Error::InvalidCommitReference(text.to_owned()))
+        }
+    }
+
+    /// Resolve a commit reference to a specific commit ID
+    pub fn resolve_commit_ref(
+        &self,
+        cref: &CommitRef,
+        ref_source_path: &RepoPath,
+    ) -> Result<CommitId> {
+        let cid = match cref {
+            CommitRef::Id(id) => id.clone(),
+            CommitRef::ThisCommit { ref salt } => lookup_this(self, salt, ref_source_path)?,
+        };
+
+        // Double-check that the ID actually resolves to a commit.
+        self.repo.find_commit(cid.0)?;
+        return Ok(cid);
+
+        fn lookup_this(
+            repo: &Repository,
+            salt: &str,
+            ref_source_path: &RepoPath,
+        ) -> Result<CommitId> {
+            let file = File::open(repo.resolve_workdir(ref_source_path))?;
+            let reader = BufReader::new(file);
+            let mut line_no = 1; // blames start at line 1.
+            let mut found_it = false;
+
+            for maybe_line in reader.lines() {
+                let line = maybe_line?;
+                if line.contains(salt) {
+                    found_it = true;
+                    break;
+                }
+
+                line_no += 1;
+            }
+
+            if !found_it {
+                return Err(Error::Environment(format!(
+                    "commit-ref key `{}` not found in contents of file {}",
+                    salt,
+                    ref_source_path.escaped(),
+                )));
+            }
+
+            let blame = repo.repo.blame_file(ref_source_path.as_path(), None)?;
+            let hunk = blame.get_line(line_no).ok_or_else(|| {
+                // TODO: this happens if the line in question hasn't yet been
+                // committed. Need to figure out how to handle that
+                // circumstance.
+                Error::Environment(format!(
+                    "commit-ref key `{}` found in non-existent line {} of file {}??",
+                    salt,
+                    line_no,
+                    ref_source_path.escaped()
+                ))
+            })?;
+
+            Ok(CommitId(hunk.final_commit_id()))
+        }
     }
 
     /// Resolve a `RepoPath` repository path to a filesystem path in the working
@@ -803,13 +881,94 @@ impl Repository {
 
         Ok(())
     }
+
+    /// Find the earliest release of the specified project that contains
+    /// the specified commit. If that commit has not yet been released,
+    /// None is returned.
+    pub fn find_earliest_release_containing(
+        &self,
+        proj: &Project,
+        cid: &CommitId,
+    ) -> Result<CommitAvailability> {
+        let maybe_rpi = self.find_published_release_containing(proj, cid)?;
+
+        if let Some(rpi) = maybe_rpi {
+            let v = Version::parse_like(&proj.version, rpi.version)?;
+            return Ok(CommitAvailability::ExistingRelease(v));
+        }
+
+        let head_ref = self.repo.head()?;
+        let head_commit = head_ref.peel_to_commit()?;
+
+        if self.repo.graph_descendant_of(head_commit.id(), cid.0)? {
+            Ok(CommitAvailability::NewRelease)
+        } else {
+            Ok(CommitAvailability::NotAvailable)
+        }
+    }
+
+    /// Find the earliest release of the specified project that contains
+    /// the specified commit. If that commit has not yet been released,
+    /// None is returned.
+    fn find_published_release_containing(
+        &self,
+        proj: &Project,
+        cid: &CommitId,
+    ) -> Result<Option<ReleasedProjectInfo>> {
+        let mut best_info = None;
+
+        let mut commit = if let Some(c) = self.try_get_release_commit()? {
+            c
+        } else {
+            // If no `release` branch, nothing's been released, so:
+            return Ok(None);
+        };
+
+        loop {
+            if !self.repo.graph_descendant_of(commit.id(), cid.0)? {
+                // If this release commit is not a descendant of the desired
+                // commit, we've gone too far back in the history -- quit.
+                break;
+            }
+
+            let release = self.parse_release_info_from_commit(&commit)?;
+
+            // Is the release of the project described in this commit older than
+            // any other release that we've encountered? Probably! But we don't
+            // want to make overly restrictive assumptions about commit
+            // ordering.
+
+            if let Some(cur_release) = release.lookup_if_released(proj) {
+                let cur_version = proj.version.parse_like(&cur_release.version)?;
+
+                if let Some((_, ref best_version)) = best_info {
+                    if cur_version < *best_version {
+                        best_info = Some((cur_release.clone(), cur_version));
+                    }
+                } else {
+                    best_info = Some((cur_release.clone(), cur_version));
+                }
+            }
+
+            if commit.parent_count() == 1 {
+                // If a `release` commit has one parent, it is the first
+                // Cranko release commit in the project history, so there's
+                // nothing more to check.
+                break;
+            }
+
+            commit = commit.parent(0)?;
+        }
+
+        Ok(best_info.map(|pair| pair.0))
+    }
 }
 
 /// Information about the state of the projects in the repository corresponding
 /// to a "release" commit where all of the projects have been assigned version
 /// numbers, and the commit should have made it out into the wild only if all of
 /// the CI tests passed.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ReleaseCommitInfo {
     /// The Git commit-ish that this object describes. May be None when there is
     /// no upstream `release` branch, in which case this struct will contain no
@@ -848,13 +1007,13 @@ impl ReleaseCommitInfo {
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct SerializedReleaseCommitInfo {
     pub projects: Vec<ReleasedProjectInfo>,
 }
 
 /// Serializable state information about a single project in a release commit.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ReleasedProjectInfo {
     /// The qualified names of this project, equivalent to the same-named
     /// property of the Project struct.
@@ -872,7 +1031,7 @@ pub struct ReleasedProjectInfo {
 /// Information about the projects in the repository corresponding to an "rc"
 /// commit where the user has requested that one or more of the projects be
 /// released.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RcCommitInfo {
     /// The Git commit-ish that this object describes.
     pub commit: Option<CommitId>,
@@ -899,14 +1058,14 @@ impl RcCommitInfo {
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct SerializedRcCommitInfo {
     pub projects: Vec<RcProjectInfo>,
 }
 
 /// Serializable state information about a single project with a proposed
 /// release in an `rc` commit.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RcProjectInfo {
     /// The qualified names of this project, equivalent to the same-named
     /// property of the Project struct.
@@ -914,6 +1073,25 @@ pub struct RcProjectInfo {
 
     /// The kind of version bump requested by the user.
     pub bump_spec: String,
+}
+
+/// Describes the release availability of a particular commit in a project's
+/// history. Note that for the same commit, this information might vary
+/// depending on which project we're talking about.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CommitAvailability {
+    /// The commit has already been released, and the earliest release
+    /// containing it has the given version.
+    ExistingRelease(Version),
+
+    /// The commit has not been released but is an ancestor of HEAD, so it would
+    /// be available if a new release of the target project were to be created.
+    /// We need to pay attention to this case to allow people to stage and
+    /// release multiple projects in one batch.
+    NewRelease,
+
+    /// None of the above.
+    NotAvailable,
 }
 
 /// A data structure recording changes made when rewriting files
@@ -1044,6 +1222,19 @@ enum PathMatcherTerm {
 
     /// Exclude paths prefixed by the value.
     Exclude(RepoPathBuf),
+}
+
+/// A reference to a commit in the repository. We have some special machinery to
+/// allow people to create commits that reference themselves.
+pub enum CommitRef {
+    /// A reference to a specific commit ID
+    Id(CommitId),
+
+    /// A reference to the commit that introduced this reference into the
+    /// repository contents. `salt` is a random string allowing different
+    /// this-commit references to be distinguished and to ease identification of
+    /// the relevant commit through "blame" tracing of the repository history.
+    ThisCommit { salt: String },
 }
 
 // Below we have helpers for trying to deal with git's paths properly, on the

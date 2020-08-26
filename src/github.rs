@@ -231,15 +231,13 @@ pub struct CredentialHelperCommand {
 impl Command for CredentialHelperCommand {
     fn execute(self) -> anyhow::Result<i32> {
         if self.operation != "get" {
-            return Err(anyhow!(
-                "unexpected credential operation `{}`",
-                self.operation
-            ));
+            info!("ignoring Git credential operation `{}`", self.operation);
+        } else {
+            let token = require_var("GITHUB_TOKEN")?;
+            println!("username=token");
+            println!("password={}", token);
         }
 
-        let token = require_var("GITHUB_TOKEN")?;
-        println!("username=token");
-        println!("password={}", token);
         Ok(0)
     }
 }

@@ -72,6 +72,11 @@ pub struct Project {
 
     /// How this project's changelog is formatted and updated.
     pub changelog: Box<dyn Changelog>,
+
+    /// The version requirements of this project's dependencies on other
+    /// projects within the repo. This is empty until
+    /// `AppSession.apply_versions()` is called.
+    pub internal_reqs: Vec<ResolvedRequirement>,
 }
 
 impl Project {
@@ -164,6 +169,13 @@ impl<'a> ProjectBuilder<'a> {
             prefix: prefix.clone(),
             repo_paths: PathMatcher::new_include(prefix),
             changelog: changelog::default(),
+            internal_reqs: Vec::new(),
         })
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedRequirement {
+    pub ident: ProjectId,
+    pub min_version: Version,
 }

@@ -12,13 +12,14 @@
 use petgraph::{
     algo::toposort,
     graph::{DefaultIx, DiGraph, NodeIndex},
+    visit::EdgeRef,
 };
 use std::collections::{HashMap, HashSet};
 
 use crate::{
     errors::{Error, Result},
     project::{Project, ProjectBuilder, ProjectId},
-    repository::{RepoHistory, Repository},
+    repository::{CommitAvailability, CommitId, RepoHistory, Repository},
 };
 
 type OurNodeIndex = NodeIndex<DefaultIx>;
@@ -34,7 +35,7 @@ pub struct ProjectGraph {
     node_ixs: Vec<OurNodeIndex>,
 
     /// The `petgraph` state expressing the project graph.
-    graph: DiGraph<ProjectId, ()>,
+    graph: DiGraph<ProjectId, Option<CommitId>>,
 
     /// Mapping from user-facing project name to project ID. This is calculated
     /// in the complete_loading() method.
@@ -86,10 +87,15 @@ impl ProjectGraph {
     }
 
     /// Add a dependency between two projects in the graph.
-    pub fn add_dependency(&mut self, depender_id: ProjectId, dependee_id: ProjectId) {
+    pub fn add_dependency(
+        &mut self,
+        depender_id: ProjectId,
+        dependee_id: ProjectId,
+        min_version: Option<CommitId>,
+    ) {
         let depender_nix = self.node_ixs[depender_id];
         let dependee_nix = self.node_ixs[dependee_id];
-        self.graph.add_edge(dependee_nix, depender_nix, ());
+        self.graph.add_edge(dependee_nix, depender_nix, min_version);
     }
 
     /// Complete construction of the graph.
@@ -113,10 +119,10 @@ impl ProjectGraph {
         // should be unique. Here n1 is the "narrowest" name and probably
         // corresponds to what the user naively thinks of as the project names.
         // Farther-out names help us disambiguate, e.g. in a monorepo containing
-        // a Python project and an NPM project with the same name. Our disambiguation
-        // strings together n_broad items from the broad end of the list and n_narrow
-        // items from the narrow end of the list. If qnames is [foo, bar, bax, quux],
-        // n_narrow is 2, and n_broad is 1, the rendered name is "quux:bar:foo".
+        // a Python project and an NPM project with the same name. Our
+        // disambiguation simply strings together n_narrow items from the narrow
+        // end of the list. If qnames is [foo, bar, bax, quux] and n_narrow is
+        // 2, the rendered name is "bar:foo".
         #[derive(Copy, Clone, Debug, Eq, PartialEq)]
         struct NamingState {
             pub n_narrow: usize,
@@ -262,8 +268,31 @@ impl ProjectGraph {
         }
     }
 
+    /// Get an iterator to visit the project identifiers in the graph in
+    /// topologically sorted order.
+    ///
+    /// That is, if project A in the repository depends on project B, project B
+    /// will be visited before project A. This operation is fallible if the
+    /// dependency graph contains cycles — i.e., if project B depends on project
+    /// A and project A depends on project B. This shouldn't happen but isn't
+    /// strictly impossible.
+    pub fn toposort_idents(&self) -> Result<impl IntoIterator<Item = ProjectId>> {
+        let idents = toposort(&self.graph, None)
+            .map_err(|cycle| {
+                let ident = self.graph[cycle.node_id()];
+                Error::Cycle(self.projects[ident].user_facing_name.to_owned())
+            })?
+            .iter()
+            .map(|ix| self.graph[*ix])
+            .collect::<Vec<_>>();
+        Ok(idents)
+    }
+
     /// Get an iterator to visit the projects in the graph in topologically
     /// sorted order.
+    ///
+    /// TODO: this should be superseded by toposort_idents(), it just gets
+    /// annoying to hold the ref to the graph.
     ///
     /// That is, if project A in the repository depends on project B, project B
     /// will be visited before project A. This operation is fallible if the
@@ -340,6 +369,37 @@ impl ProjectGraph {
             histories: repo.analyze_histories(&self.projects[..])?,
         })
     }
+
+    pub fn resolve_direct_dependencies(
+        &self,
+        repo: &Repository,
+        ident: ProjectId,
+    ) -> Result<Vec<ResolvedDependency>> {
+        let mut deps = Vec::new();
+
+        for edge in self
+            .graph
+            .edges_directed(self.node_ixs[ident], petgraph::Direction::Incoming)
+        {
+            let dependee_id = self.graph[edge.source()];
+            let dependee_proj = &self.projects[dependee_id];
+            let maybe_cid = edge.weight();
+
+            let availability = if let Some(cid) = maybe_cid {
+                repo.find_earliest_release_containing(dependee_proj, cid)?
+            } else {
+                CommitAvailability::NotAvailable
+            };
+
+            deps.push(ResolvedDependency {
+                ident: dependee_id,
+                min_commit: maybe_cid.clone(),
+                availability,
+            });
+        }
+
+        Ok(deps)
+    }
 }
 
 /// This type is how we "launder" the knowledge that the vector that
@@ -354,6 +414,16 @@ impl RepoHistories {
     pub fn lookup(&self, projid: ProjectId) -> &RepoHistory {
         &self.histories[projid]
     }
+}
+
+/// Information about the version requirements of one project's dependency upon
+/// another project within the repo. If no version has yet been published
+/// satisying the dependency, min_version is None.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResolvedDependency {
+    pub ident: ProjectId,
+    pub min_commit: Option<CommitId>,
+    pub availability: CommitAvailability,
 }
 
 /// Builder structure for querying projects in the graph.
