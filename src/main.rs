@@ -138,13 +138,65 @@ impl Command for ConfirmCommand {
         // aren't.
         let histories = sess.analyze_histories()?;
 
+        let mut new_versions = HashMap::new();
         let mut changes = repository::ChangeList::default();
         let mut rc_info = Vec::new();
 
-        for proj in sess.graph().toposort()? {
-            let history = histories.lookup(proj.ident());
+        for ident in sess.graph().toposort_idents()? {
+            let history = histories.lookup(ident);
 
-            if let Some(info) = sess.repo.scan_rc_info(proj, &mut changes)? {
+            if let Some(info) = sess
+                .repo
+                .scan_rc_info(sess.graph().lookup(ident), &mut changes)?
+            {
+                if history.n_commits() == 0 {
+                    let proj = sess.graph().lookup(ident);
+                    warn!(
+                        "project `{}` is being staged for release, but does not \
+                        seem to have been modified since its last release",
+                        proj.user_facing_name
+                    );
+                }
+
+                // Check whether all of this project's internal dependencies are in
+                // order.
+
+                let deps = sess
+                    .graph()
+                    .resolve_direct_dependencies(&sess.repo, ident)?;
+
+                use repository::CommitAvailability;
+
+                for dep in &deps[..] {
+                    let available = match dep.availability {
+                        CommitAvailability::NotAvailable => false,
+                        CommitAvailability::ExistingRelease(_) => true,
+                        CommitAvailability::NewRelease => new_versions.contains_key(&dep.ident),
+                    };
+
+                    if !available {
+                        error!(
+                            "cannot release `{}`",
+                            sess.graph().lookup(ident).user_facing_name
+                        );
+                        error!(
+                            "... no sufficiently new release of its internal dependency `{}` \
+                                is available or staged",
+                            sess.graph().lookup(dep.ident).user_facing_name
+                        );
+
+                        if let Some(cid) = dep.min_commit {
+                            error!("... the required commit is {}", cid);
+                        } else {
+                            error!("... the required commit was unknown or unspecified");
+                        }
+
+                        return Err(anyhow!("cannot confirm release submission"));
+                    }
+                }
+
+                // OK. Analyze the version bump.
+                let proj = sess.graph().lookup(ident);
                 let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
                 let maybe_last_release = history.release_info(&sess.repo)?;
 
@@ -163,7 +215,20 @@ impl Command for ConfirmCommand {
                     proj.user_facing_name, info.bump_spec, old_version, new_version
                 );
                 rc_info.push(info);
+                new_versions.insert(proj.ident(), new_version);
+
+                for dep in &deps[..] {
+                    let v = match dep.availability {
+                        CommitAvailability::NotAvailable => unreachable!(),
+                        CommitAvailability::ExistingRelease(ref v) => v.to_string(),
+                        CommitAvailability::NewRelease => new_versions[&dep.ident].clone(),
+                    };
+
+                    let dproj = sess.graph().lookup(dep.ident);
+                    info!("    internal dep: {} >= {}", dproj.user_facing_name, v);
+                }
             } else if history.n_commits() > 0 {
+                let proj = sess.graph().lookup(ident);
                 warn!(
                     "project `{}` has been changed since its last release, \
                     but is not part of the rc submission",
