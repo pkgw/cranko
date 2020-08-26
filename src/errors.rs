@@ -97,6 +97,9 @@ pub enum Error {
     #[error("TOML format error: {0}")]
     TomlEdit(#[from] toml_edit::TomlError),
 
+    #[error("unsatisfied internal requirement in {0}")]
+    UnsatisfiedInternalRequirement(String),
+
     #[error("unsupported version-bump scheme \"{0}\" for version template {1:?}")]
     UnsupportedBumpScheme(String, Version),
 }

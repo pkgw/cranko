@@ -11,7 +11,7 @@
 use anyhow::{anyhow, Context, Result};
 use log::{error, info, warn};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeSet, HashMap},
     env, fs,
     path::{Path, PathBuf},
 };

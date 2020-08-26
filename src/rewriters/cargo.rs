@@ -4,6 +4,7 @@
 //! Project metadata stored in a `Cargo.toml` file.
 
 use std::{
+    collections::HashMap,
     fs::File,
     io::{Read, Write},
 };
@@ -16,6 +17,7 @@ use crate::{
     errors::{Error, Result},
     project::ProjectId,
     repository::{ChangeList, RepoPathBuf},
+    version::Version,
 };
 
 #[derive(Debug)]

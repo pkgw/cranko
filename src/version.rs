@@ -14,7 +14,7 @@ use crate::{
 ///
 /// This is an enumeration because different kinds of projects may subscribe to
 /// different kinds of versioning schemes.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub enum Version {
     /// A version compatible with the semantic versioning specification.
     Semver(semver::Version),
@@ -29,6 +29,13 @@ impl std::fmt::Display for Version {
 }
 
 impl Version {
+    /// Given a template version, parse another version
+    pub fn parse_like<T: AsRef<str>>(&self, text: T) -> Result<Version> {
+        Ok(match self {
+            Version::Semver(_) => Version::Semver(semver::Version::parse(text.as_ref())?),
+        })
+    }
+
     /// Given a template version, parse a "bump scheme" from a textual
     /// description.
     ///
