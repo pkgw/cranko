@@ -1,3 +1,10 @@
+# cranko 0.0.7 (2020-08-27)
+
+- Add `cranko git-util reboot-branch`
+- Start working on stubbing out a GitHub Pages site to host instant-install
+  commands for use in CI pipelines. If I've done this right, this release should
+  demonstrate the basic workflow.
+
 # cranko 0.0.6 (2020-08-26)
 
 - Try to get internal dependencies working. The most very basic tests don't

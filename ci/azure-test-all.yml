@@ -91,7 +91,7 @@ steps:
         git add .
         cargo run -- release-workflow commit
         git show HEAD
-        artifact_dir="$(Build.ArtifactStagingDirectory)/git"
+        artifact_dir="$(Build.ArtifactStagingDirectory)/git-release"
         mkdir -p "$artifact_dir"
         git bundle create "$artifact_dir/release.bundle" origin/master..HEAD
       displayName: "Generate and Bundle release commit"
@@ -99,5 +99,5 @@ steps:
     - task: PublishPipelineArtifact@1
       displayName: Publish git bundle artifact
       inputs:
-        targetPath: '$(Build.ArtifactStagingDirectory)/git'
-        artifactName: git
+        targetPath: '$(Build.ArtifactStagingDirectory)/git-release'
+        artifactName: git-release

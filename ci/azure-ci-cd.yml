@@ -80,7 +80,32 @@ stages:
     variables:
       TOOLCHAIN: stable
 
-
+  # website build
+  - job: website
+    pool:
+      vmImage: ubuntu-16.04
+    steps:
+    - template: azure-install-rust.yml
+    - bash: cargo build --bin cranko
+      displayName: "cargo build (bootstrap)"
+    - bash: cargo run -- release-workflow apply-versions
+      displayName: "cranko release-workflow apply-versions (using bootstrapped build)"
+    - bash: cargo build --bin cranko
+      displayName: "cargo build (versioned)"
+    - bash: PATH="$(pwd)/target/debug:$PATH" www/build.sh
+      displayName: "Build website content"
+    - bash: |
+        cargo run -- git-util reboot-branch gh-pages www/content
+        artifact_dir="$(Build.ArtifactStagingDirectory)/git-gh-pages"
+        mkdir -p "$artifact_dir"
+        git bundle create "$artifact_dir/gh-pages.bundle" gh-pages
+      displayName: "Prep new gh-pages branch"
+    - task: PublishPipelineArtifact@1
+      displayName: Publish git bundle artifact
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/git-gh-pages'
+        artifactName: git-gh-pages
+  
 # If all of those succeed and we're not in a pull request, run the deployment
 # pipeline. If we're specifically on the `rc` branch, this will finalize any
 # releases.
