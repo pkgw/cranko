@@ -149,14 +149,14 @@ impl GitHubInformation {
     }
 }
 
-/// Create a new release on GitHub.
+/// Create new release(s) on GitHub.
 #[derive(Debug, PartialEq, StructOpt)]
-pub struct CreateReleaseCommand {
+pub struct CreateReleasesCommand {
     #[structopt(help = "Name(s) of the project(s) to release on GitHub")]
     proj_names: Vec<String>,
 }
 
-impl Command for CreateReleaseCommand {
+impl Command for CreateReleasesCommand {
     fn execute(self) -> anyhow::Result<i32> {
         let mut sess = AppSession::initialize()?;
         let info = GitHubInformation::new(&sess)?;
@@ -395,9 +395,9 @@ impl Command for UploadArtifactsCommand {
 
 #[derive(Debug, PartialEq, StructOpt)]
 pub enum GithubCommands {
-    #[structopt(name = "create-release")]
+    #[structopt(name = "create-releases")]
     /// Create one or more new GitHub releases
-    CreateRelease(CreateReleaseCommand),
+    CreateReleases(CreateReleasesCommand),
 
     #[structopt(name = "_credential-helper", setting = structopt::clap::AppSettings::Hidden)]
     /// (hidden) github credential helper
@@ -421,7 +421,7 @@ pub struct GithubCommand {
 impl Command for GithubCommand {
     fn execute(self) -> anyhow::Result<i32> {
         match self.command {
-            GithubCommands::CreateRelease(o) => o.execute(),
+            GithubCommands::CreateReleases(o) => o.execute(),
             GithubCommands::CredentialHelper(o) => o.execute(),
             GithubCommands::InstallCredentialHelper(o) => o.execute(),
             GithubCommands::UploadArtifacts(o) => o.execute(),
