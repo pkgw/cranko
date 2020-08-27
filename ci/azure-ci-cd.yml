@@ -96,15 +96,15 @@ stages:
       displayName: "Build website content"
     - bash: |
         cargo run -- git-util reboot-branch gh-pages www/content
-        artifact_dir="$(Build.ArtifactStagingDirectory)/git"
+        artifact_dir="$(Build.ArtifactStagingDirectory)/git-gh-pages"
         mkdir -p "$artifact_dir"
         git bundle create "$artifact_dir/gh-pages.bundle" gh-pages
       displayName: "Prep new gh-pages branch"
     - task: PublishPipelineArtifact@1
       displayName: Publish git bundle artifact
       inputs:
-        targetPath: '$(Build.ArtifactStagingDirectory)/git'
-        artifactName: git
+        targetPath: '$(Build.ArtifactStagingDirectory)/git-gh-pages'
+        artifactName: git-gh-pages
   
 # If all of those succeed and we're not in a pull request, run the deployment
 # pipeline. If we're specifically on the `rc` branch, this will finalize any

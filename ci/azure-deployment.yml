@@ -26,7 +26,7 @@ steps:
 
   - bash: |
       git switch -c release
-      git pull --ff-only $(Pipeline.Workspace)/git/release.bundle
+      git pull --ff-only $(Pipeline.Workspace)/git-release/release.bundle
       git status
       git show
       tar xzf $(Pipeline.Workspace)/binary-x86_64-unknown-linux-gnu/cranko-*.tar.gz
@@ -44,5 +44,13 @@ steps:
       ./cranko github create-release cranko
       ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/collection/*
     displayName: Create GitHub release
+    env:
+      GITHUB_TOKEN: $(GITHUB_TOKEN)
+
+  - bash: |
+      git fetch $(Pipeline.Workspace)/git-gh-pages/gh-pages.bundle gh-pages
+      git branch -f gh-pages FETCH_HEAD
+      git push --force origin gh-pages:gh-pages
+    displayName: Update GitHub pages website
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
