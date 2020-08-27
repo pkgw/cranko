@@ -2,8 +2,8 @@
 
 - Add `cranko git-util reboot-branch`
 - Start working on stubbing out a GitHub Pages site to host instant-install
-  commands for use in CI pipelines. This release tests what happens when we have
-  multiple jobs creating artifacts with the same directory name.
+  commands for use in CI pipelines. If I've done this right, this release should
+  demonstrate the basic workflow.
 
 # cranko 0.0.6 (2020-08-26)
 
