@@ -1,5 +1,12 @@
 # rc: micro bump
 
+- Add `cranko git-util reboot-branch`
+- Start working on stubbing out a GitHub Pages site to host instant-install
+  commands for use in CI pipelines. This release tests what happens when we have
+  multiple jobs creating artifacts with the same directory name.
+
+# cranko 0.0.6 (2020-08-26)
+
 - Try to get internal dependencies working. The most very basic tests don't
   crash. The code feels quite messy.
 
