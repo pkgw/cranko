@@ -42,6 +42,10 @@ impl Version {
     /// Not all bump schemes are compatible with all versioning styles, which is
     /// why this operation depends on the version template and is fallible.
     pub fn parse_bump_scheme(&self, text: &str) -> Result<VersionBumpScheme> {
+        if text.starts_with("force ") {
+            return Ok(VersionBumpScheme::Force(text[6..].to_owned()));
+        }
+
         match text {
             "micro bump" => Ok(VersionBumpScheme::MicroBump),
             "minor bump" => Ok(VersionBumpScheme::MinorBump),
@@ -53,7 +57,7 @@ impl Version {
 }
 
 /// A scheme for assigning a new version number to a project.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum VersionBumpScheme {
     /// Assigns a development-mode version (likely 0.0.0) with a YYYYMMDD date code included.
     DevDatecode,
@@ -69,6 +73,9 @@ pub enum VersionBumpScheme {
     /// Increment the most-significant version number, resetting any
     /// less-significant entries.
     MajorBump,
+
+    /// Force the version to the specified value.
+    Force(String),
 }
 
 impl VersionBumpScheme {
@@ -87,6 +94,7 @@ impl VersionBumpScheme {
             VersionBumpScheme::MicroBump => apply_micro_bump(template, latest_release),
             VersionBumpScheme::MinorBump => apply_minor_bump(template, latest_release),
             VersionBumpScheme::MajorBump => apply_major_bump(template, latest_release),
+            VersionBumpScheme::Force(ref t) => apply_force(template, t),
         };
 
         fn apply_dev_datecode(
@@ -174,6 +182,10 @@ impl VersionBumpScheme {
                     Ok(Version::Semver(v))
                 }
             }
+        }
+
+        fn apply_force(template: &Version, text: &str) -> Result<Version> {
+            template.parse_like(text)
         }
     }
 }
