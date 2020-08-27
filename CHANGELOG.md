@@ -1,3 +1,10 @@
+# cranko 0.0.9 (2020-08-27)
+
+- Rename `create-release` to `create-releases`. Still getting into the mindset
+  of vectorizing over projects.
+- Have `create-releases` be picky about its execution environment. It should
+  only be run on a checkout of `release` triggered by an update to `rc`.
+
 # cranko 0.0.8 (2020-08-27)
 
 - Add the "force X.Y.Z" version-bump scheme

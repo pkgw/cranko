@@ -11,7 +11,7 @@ use structopt::StructOpt;
 
 use super::Command;
 use crate::{
-    app::AppSession,
+    app::{AppSession, ExecutionEnvironment},
     errors::{Error, Result},
     graph,
     project::Project,
@@ -149,19 +149,47 @@ impl GitHubInformation {
     }
 }
 
-/// Create a new release on GitHub.
+/// Create new release(s) on GitHub.
 #[derive(Debug, PartialEq, StructOpt)]
-pub struct CreateReleaseCommand {
+pub struct CreateReleasesCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force operation even in unexpected conditions"
+    )]
+    force: bool,
+
     #[structopt(help = "Name(s) of the project(s) to release on GitHub")]
     proj_names: Vec<String>,
 }
 
-impl Command for CreateReleaseCommand {
+impl Command for CreateReleasesCommand {
     fn execute(self) -> anyhow::Result<i32> {
         let mut sess = AppSession::initialize()?;
         let info = GitHubInformation::new(&sess)?;
 
         sess.populated_graph()?;
+
+        // Note here that the active checkout should have been switched to the
+        // `release` branch by `release-workflow commit` or an equivalent; but
+        // the CI run should still have been *triggered* for the `rc` branch.
+        match sess.execution_environment() {
+            ExecutionEnvironment::NotCi => {
+                warn!("no CI environment detected; this is unexpected for this command");
+                if !self.force {
+                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+                }
+            }
+
+            ExecutionEnvironment::CiDevelopmentBranch | ExecutionEnvironment::CiPullRequest => {
+                warn!("CI environment detected but not on `rc` branch; this is unexpected for this command");
+                if !self.force {
+                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+                }
+            }
+
+            ExecutionEnvironment::CiRcBranch => {}
+        }
 
         let rel_info = sess
             .repo
@@ -395,9 +423,9 @@ impl Command for UploadArtifactsCommand {
 
 #[derive(Debug, PartialEq, StructOpt)]
 pub enum GithubCommands {
-    #[structopt(name = "create-release")]
+    #[structopt(name = "create-releases")]
     /// Create one or more new GitHub releases
-    CreateRelease(CreateReleaseCommand),
+    CreateReleases(CreateReleasesCommand),
 
     #[structopt(name = "_credential-helper", setting = structopt::clap::AppSettings::Hidden)]
     /// (hidden) github credential helper
@@ -421,7 +449,7 @@ pub struct GithubCommand {
 impl Command for GithubCommand {
     fn execute(self) -> anyhow::Result<i32> {
         match self.command {
-            GithubCommands::CreateRelease(o) => o.execute(),
+            GithubCommands::CreateReleases(o) => o.execute(),
             GithubCommands::CredentialHelper(o) => o.execute(),
             GithubCommands::InstallCredentialHelper(o) => o.execute(),
             GithubCommands::UploadArtifacts(o) => o.execute(),
