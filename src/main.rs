@@ -374,15 +374,6 @@ impl Command for ReleaseWorkflowApplyVersionsCommand {
                 rci = Some(sess.repo.parse_rc_info_from_head()?);
                 dev_mode = false;
             }
-
-            app::ExecutionEnvironment::CiReleaseBranch => {
-                warn!(
-                    "detected CI environment on `release` branch; this is unexpected for this command"
-                );
-                if !self.force {
-                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
-                }
-            }
         }
 
         let rci = rci.unwrap_or_else(|| sess.default_dev_rc_info());
@@ -424,8 +415,7 @@ impl Command for ReleaseWorkflowCommitCommand {
             }
 
             app::ExecutionEnvironment::CiDevelopmentBranch
-            | app::ExecutionEnvironment::CiPullRequest
-            | app::ExecutionEnvironment::CiReleaseBranch => {
+            | app::ExecutionEnvironment::CiPullRequest => {
                 warn!("CI environment detected but not on `rc` branch; this is unexpected for this command");
                 if !self.force {
                     return Err(anyhow!("refusing to proceed (use `--force` to override)"));
@@ -474,8 +464,7 @@ impl Command for ReleaseWorkflowTagCommand {
             }
 
             app::ExecutionEnvironment::CiDevelopmentBranch
-            | app::ExecutionEnvironment::CiPullRequest
-            | app::ExecutionEnvironment::CiReleaseBranch => {
+            | app::ExecutionEnvironment::CiPullRequest => {
                 warn!("CI environment detected but not on `rc` branch; this is unexpected for this command");
                 if !self.force {
                     return Err(anyhow!("refusing to proceed (use `--force` to override)"));

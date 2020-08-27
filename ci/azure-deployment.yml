@@ -41,9 +41,9 @@ steps:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
 
   - bash: |
-      ./cranko github create-release cranko
+      ./cranko github create-releases
       ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/collection/*
-    displayName: Create GitHub release
+    displayName: Create GitHub releases
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
 
