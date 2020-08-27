@@ -1,3 +1,7 @@
+# cranko 0.0.8 (2020-08-27)
+
+- Add the "force X.Y.Z" version-bump scheme
+
 # cranko 0.0.7 (2020-08-27)
 
 - Add `cranko git-util reboot-branch`
