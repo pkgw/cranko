@@ -77,10 +77,6 @@ impl AppSession {
                 return ExecutionEnvironment::CiRcBranch;
             }
 
-            if maybe_branch == Some(release_name) {
-                return ExecutionEnvironment::CiReleaseBranch;
-            }
-
             ExecutionEnvironment::CiDevelopmentBranch
         }
     }
@@ -295,7 +291,14 @@ impl AppSession {
     }
 }
 
-/// Different categorizations of the environment in which the program is running.
+/// Different categorizations of the environment in which the program is
+/// running.
+///
+/// Note that CI should not be run in response to updates to the `release`
+/// branch. There are certain commands that should be run with the release
+/// branch *checked out*, but the CI environment variables will still say that
+/// the run is for the `rc` branch. (We could/should set up to distinguish
+/// between these cases intead of having the one CiRcBranch.)
 pub enum ExecutionEnvironment {
     /// This program is running in a CI environment, in response to an
     /// externally submitted pull request.
@@ -309,13 +312,6 @@ pub enum ExecutionEnvironment {
     /// to the `rc`-type branch. The HEAD commit should include Cranko release
     /// request information.
     CiRcBranch,
-
-    /// The program is running in a CI environment, on the `release`-type
-    /// branch. The HEAD commit should include Cranko release information. In
-    /// the Cranko model, CI should not be invoked upon updates to the release
-    /// branch, but during `rc` processing `cranko apply` will switch the active
-    /// branch from `rc` to `release`.
-    CiReleaseBranch,
 
     /// The program does not appear to be running in a CI environment. We infer
     /// that we're running in an individual development environment.
