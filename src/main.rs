@@ -526,8 +526,7 @@ impl Command for ShowVersionCommand {
         let idents = sess.graph().query_ids(q)?;
 
         if idents.len() != 1 {
-            println!("error: must specify exactly one project to show");
-            return Ok(1);
+            return Err(anyhow!("must specify exactly one project to show"));
         }
 
         let proj = sess.graph().lookup(idents[0]);
