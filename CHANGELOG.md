@@ -1,5 +1,9 @@
 # rc: micro bump
 
+- Add a draft Windows Powershell install script for CI.
+
+# cranko 0.0.9 (2020-08-27)
+
 - Rename `create-release` to `create-releases`. Still getting into the mindset
   of vectorizing over projects.
 - Have `create-releases` be picky about its execution environment. It should
