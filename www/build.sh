@@ -12,3 +12,6 @@ cd "$(dirname $0)"
 version="$(cranko show version cranko)"
 sed -e "s/@VERSION@/${version}/g" fetch-tgz.tmpl.sh >content/fetch-latest.sh
 sed -e "s/@VERSION@/${version}/g" fetch-zip.tmpl.ps1 >content/fetch-latest.ps1
+
+mkdir -p content/book/latest/
+mdbook build -d $(pwd)/content/book/latest ../book
