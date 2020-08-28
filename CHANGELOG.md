@@ -1,3 +1,7 @@
+# cranko 0.0.10 (2020-08-28)
+
+- Add a draft Windows Powershell install script for CI.
+
 # cranko 0.0.9 (2020-08-27)
 
 - Rename `create-release` to `create-releases`. Still getting into the mindset
