@@ -2,5 +2,6 @@
 
 [Overview](index.md)
 
-- [Introduction](introduction/index.md)
+- [Installation](installation/index.md)
+- [Getting Started](getting-started/index.md)
 - [Just-in-Time Versioning](jit-versioning/index.md)
