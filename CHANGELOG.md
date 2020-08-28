@@ -1,7 +1,6 @@
 # rc: micro bump
 
-- New release because the macOS binary in 0.0.10 was almost all zeros for some
-  reason. Azure Pipelines artifact processing issue?
+- Start working on the book, and wire it up to the GitHub pages site.
 
 # cranko 0.0.10 (2020-08-28)
 
