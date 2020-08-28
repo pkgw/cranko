@@ -5,3 +5,4 @@
 - [Installation](installation/index.md)
 - [Getting Started](getting-started/index.md)
 - [Just-in-Time Versioning](jit-versioning/index.md)
+- [Cranko Concepts](concepts/index.md)
