@@ -1,3 +1,8 @@
+# cranko 0.0.11 (2020-08-28)
+
+- New release because the macOS binary in 0.0.10 was almost all zeros for some
+  reason. Azure Pipelines artifact processing issue?
+
 # cranko 0.0.10 (2020-08-28)
 
 - Add a draft Windows Powershell install script for CI.
