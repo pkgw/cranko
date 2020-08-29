@@ -32,6 +32,8 @@ publishes artifacts with every push to the main branch, you shouldn’t need to
 change it. A key thing to keep in mind is that pushes to the main branch, unlike
 pushes to `rc`, do not include `cranko confirm` metadata, and so there are no
 changelogs and no specific list of projects for which releases are requested.
+Intead, *all* projects have their versions bumped — but with development
+placeholders, not realistic-looking values.
 
 
 ## `rc` builds

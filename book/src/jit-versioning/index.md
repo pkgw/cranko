@@ -53,7 +53,7 @@ most!) of those proposals are accepted, and result in releases. How do we
 synchronize with the `main` branch and keep everything coherent, especially in
 light of **issue #2**?
 
-Just-in-time versioning says: just don’t! On the `main` branch, assign
+Just-in-time versioning says: don’t! On the `main` branch, assign
 everything a version number of 0.0.0, and never change it. When your CI system
 runs on the `rc` branch, before you do anything else, edit your metadata files
 to assign the actual version numbers. If the build succeeds, commit those
@@ -69,17 +69,17 @@ a branch called `release`, merging `rc` into `release` but discarding the
 `release` file tree in favor of `rc`:
 
 ```
-  main:     rc:      release:
-                      
-   M8           /-------R2 (v0.3.0)
-   |           /        |
-   M7 /------C3         |
-   | /       |          |
-   M6 /------C2         |
-   | /       |          | 
-   M5        |          R1 (v0.2.0)
-   |         |         /
-   M4 /------C1-------/
+  main:     rc:          release:
+
+   M8           /---------R2 (v0.3.0)
+   |           /          |
+   M7 /------C3           |
+   | /       |            |
+   M6 /------C2 (failed)  |
+   | /       |            |
+   M5        |            R1 (v0.2.0)
+   |         |           /
+   M4 /------C1---------/
    | /       |
    M3        |
    |         |
@@ -89,9 +89,8 @@ a branch called `release`, merging `rc` into `release` but discarding the
 ```
 
 This tactic isn’t strictly necessary for just-in-time versioning concept,
-because in principle we can preserve the release commits just through the Git
-tag(s) associated with each release commit. But it becomes very useful for
-navigating the release history.
+because in principle we can preserve the release commits through Git tags alone.
+But it becomes very useful for navigating the release history.
 
 
 ## The workflow in practice
@@ -104,18 +103,24 @@ workflow, the developer’s workflow for proposing releases is trivial:
 
 In the very simplest implementation, this step could as straightforward as
 running `git push origin $COMMIT:rc`. For reasons described below, Cranko
-implements it with two commands: `cranko stage` and `cranko confirm`.
+implements it with two commands: [`cranko stage`](../commands/dev/stage.md) and
+[`cranko confirm`](../commands/dev/confirm.md).
 
 In the CI/CD pipeline, things are hardly more complicated:
 
 1. The first step in any such pipeline is to apply version numbers and create a
-   release commit. In Cranko, this is performed with `cranko release-workflow
-   apply-versions` and `cranko release-workflow commit`.
-2. If the CI passes, the release is “locked in” by pushing to `release`. If not,
-   the release commit is discarded.
+   release commit. In Cranko, this is performed with [`cranko release-workflow
+   apply-versions`](../commands/cicd/release-workflow-apply-versions.md) and
+   [`cranko release-workflow
+   commit`](../commands/cicd/release-workflow-commit.md).
+2. If the CI passes, the release is “locked in” by pushing to `release`.
+   If not, the release commit is discarded.
 
 Cranko provides a lot of other infrastructure to make your life easier, but the
-core of the just-in-time versioning workflow is this simple.
+core of the just-in-time versioning workflow is this simple. Importantly: you
+don’t need to completely rebuild your development and CI/CD pipelines in order
+to adopt Cranko. There are only a small number of new steps, and existing setups
+can largely be preserved.
 
 
 ## The monorepo wrinkle

@@ -54,8 +54,8 @@ project since the last release. In this example, this looks like:
 $ head tcprint/CHANGELOG.md 
 # rc: micro bump
 
-- Add stub changelogs on the master branch
-- Edit Cargo.tomls to allow another release attempt
+- Add an amazing new feature
+- Fix a dastardly bug
 
 # tcprint 0.1.1 (2020-08-27)
 
@@ -64,7 +64,8 @@ $ head tcprint/CHANGELOG.md
 The placeholder header line `# rc: micro bump` specifies the version bump that
 is being requested. At the moment, this just unilaterally defaults to a bump in
 the “micro” (AKA “patch”) version number. When the release is finalized, this
-placeholder will be replaced with a actual information as seen in the next line.
+placeholder will be replaced with actual release information as seen in the next
+stanza.
 
 You can edit the bump type and the actual changelog contents. We view it as
 important that the changelog and/or release notes can be reviewed and curated by
