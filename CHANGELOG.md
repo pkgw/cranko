@@ -1,5 +1,12 @@
 # rc: micro bump
 
+- Add a bunch of content to the book. (I should start releasing this as project
+  separate from the `cranko` crate, but the infrastructure isn’t quite there yet
+  …)
+- ci: move Windows/GNU to stable instead of nightly
+
+# cranko 0.0.12 (2020-08-28)
+
 - Start working on the book, and wire it up to the GitHub pages site.
 
 # cranko 0.0.10 (2020-08-28)
