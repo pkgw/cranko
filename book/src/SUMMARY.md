@@ -5,3 +5,4 @@
 - [Just-in-Time Versioning](jit-versioning/index.md)
 - [Cranko Concepts](concepts/index.md)
 - [Developer Workflows](workflows-dev/index.md)
+- [CI/CD Workflows](workflows-cicd/index.md)
