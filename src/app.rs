@@ -257,7 +257,7 @@ impl AppSession {
     fn populate_graph(&mut self) -> Result<()> {
         // Start by auto-detecting everything in the repo index.
 
-        let mut cargo = crate::loaders::cargo::CargoLoader::default();
+        let mut cargo = crate::cargo::CargoLoader::default();
 
         self.repo.scan_paths(|p| {
             let (dirname, basename) = p.split_basename();

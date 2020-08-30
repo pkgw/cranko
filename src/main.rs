@@ -18,12 +18,12 @@ use std::{
 use structopt::StructOpt;
 
 mod app;
+mod cargo;
 mod changelog;
 mod errors;
 mod github;
 mod gitutil;
 mod graph;
-mod loaders;
 mod logger;
 mod project;
 mod repository;
