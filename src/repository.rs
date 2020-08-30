@@ -144,6 +144,27 @@ impl Repository {
             .to_owned())
     }
 
+    /// Get the name of the currently active branch, if there is one.
+    ///
+    /// There might not be such a branch if the repository is in a "detached
+    /// HEAD" state, for instance.
+    pub fn current_branch_name(&self) -> Result<Option<String>> {
+        let head_ref = self.repo.head()?;
+
+        Ok(if !head_ref.is_branch() {
+            None
+        } else {
+            Some(
+                head_ref
+                    .shorthand()
+                    .ok_or_else(|| {
+                        Error::Environment("current branch name not Unicode".to_owned())
+                    })?
+                    .to_owned(),
+            )
+        })
+    }
+
     /// Parse a textual reference to a commit within the repository.
     pub fn parse_commit_ref<T: AsRef<str>>(&self, text: T) -> Result<CommitRef> {
         let text = text.as_ref();
