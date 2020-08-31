@@ -216,18 +216,22 @@ impl Command for ConfirmCommand {
                 }
 
                 // OK. Analyze the version bump.
-                let proj = sess.graph().lookup(ident);
-                let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
                 let maybe_last_release = history.release_info(&sess.repo)?;
+                let proj = sess.graph_mut().lookup_mut(ident);
+                let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
 
                 let (old_version, new_version) = if let Some(last_release) = maybe_last_release {
                     // By definition, this project is will be present in the table:
                     let last_release = last_release.lookup_project(proj).unwrap();
-                    let new_version = scheme.apply(&proj.version, Some(last_release))?;
-                    (last_release.version.clone(), new_version.to_string())
+                    proj.version = proj.version.parse_like(&last_release.version)?;
+                    scheme.apply(&mut proj.version)?;
+                    (last_release.version.clone(), proj.version.to_string())
                 } else {
-                    let new_version = scheme.apply(&proj.version, None)?;
-                    ("[no previous releases]".to_owned(), new_version.to_string())
+                    scheme.apply(&mut proj.version)?;
+                    (
+                        "[no previous releases]".to_owned(),
+                        proj.version.to_string(),
+                    )
                 };
 
                 info!(

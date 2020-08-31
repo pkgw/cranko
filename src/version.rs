@@ -5,10 +5,7 @@
 
 use chrono::{offset::Local, Datelike};
 
-use crate::{
-    errors::{Error, Result},
-    repository::ReleasedProjectInfo,
-};
+use crate::errors::{Error, Result};
 
 /// A version number associated with a project.
 ///
@@ -34,6 +31,13 @@ impl Version {
         Ok(match self {
             Version::Semver(_) => Version::Semver(semver::Version::parse(text.as_ref())?),
         })
+    }
+
+    /// Given a template version, compute its "zero"
+    pub fn zero_like(&self) -> Version {
+        match self {
+            Version::Semver(_) => Version::Semver(semver::Version::new(0, 0, 0)),
+        }
     }
 
     /// Given a template version, parse a "bump scheme" from a textual
@@ -79,113 +83,73 @@ pub enum VersionBumpScheme {
 }
 
 impl VersionBumpScheme {
-    /// Generate a new version by applying a versioning scheme to a template
-    /// version, in a specified release mode, potentially building off of
-    /// information about the most recent prior release.
-    pub fn apply(
-        &self,
-        template: &Version,
-        latest_release: Option<&ReleasedProjectInfo>,
-    ) -> Result<Version> {
+    /// Apply this bump to a version.
+    pub fn apply(&self, version: &mut Version) -> Result<()> {
         // This function inherently has to matrix over versioning schemes and
         // versioning systems, so it gets a little hairy.
         return match self {
-            VersionBumpScheme::DevDatecode => apply_dev_datecode(template, latest_release),
-            VersionBumpScheme::MicroBump => apply_micro_bump(template, latest_release),
-            VersionBumpScheme::MinorBump => apply_minor_bump(template, latest_release),
-            VersionBumpScheme::MajorBump => apply_major_bump(template, latest_release),
-            VersionBumpScheme::Force(ref t) => apply_force(template, t),
+            VersionBumpScheme::DevDatecode => apply_dev_datecode(version),
+            VersionBumpScheme::MicroBump => apply_micro_bump(version),
+            VersionBumpScheme::MinorBump => apply_minor_bump(version),
+            VersionBumpScheme::MajorBump => apply_major_bump(version),
+            VersionBumpScheme::Force(ref t) => apply_force(version, t),
         };
 
-        fn apply_dev_datecode(
-            template: &Version,
-            latest_release: Option<&ReleasedProjectInfo>,
-        ) -> Result<Version> {
+        fn apply_dev_datecode(version: &mut Version) -> Result<()> {
             let local = Local::now();
             let code = format!("{:04}{:02}{:02}", local.year(), local.month(), local.day());
 
-            match template {
-                Version::Semver(_) => {
-                    let mut v = if let Some(rpi) = latest_release {
-                        semver::Version::parse(&rpi.version)?
-                    } else {
-                        semver::Version::new(0, 0, 0)
-                    };
-
+            match version {
+                Version::Semver(v) => {
                     v.build.push(semver::Identifier::AlphaNumeric(code));
-                    Ok(Version::Semver(v))
                 }
             }
+
+            Ok(())
         }
 
-        fn apply_micro_bump(
-            template: &Version,
-            latest_release: Option<&ReleasedProjectInfo>,
-        ) -> Result<Version> {
-            match template {
-                Version::Semver(_) => {
-                    let mut v = if let Some(rpi) = latest_release {
-                        semver::Version::parse(&rpi.version)?
-                    } else {
-                        semver::Version::new(0, 0, 0)
-                    };
-
+        fn apply_micro_bump(version: &mut Version) -> Result<()> {
+            match version {
+                Version::Semver(v) => {
                     v.pre.clear();
                     v.build.clear();
                     v.patch += 1;
-
-                    Ok(Version::Semver(v))
                 }
             }
+
+            Ok(())
         }
 
-        fn apply_minor_bump(
-            template: &Version,
-            latest_release: Option<&ReleasedProjectInfo>,
-        ) -> Result<Version> {
-            match template {
-                Version::Semver(_) => {
-                    let mut v = if let Some(rpi) = latest_release {
-                        semver::Version::parse(&rpi.version)?
-                    } else {
-                        semver::Version::new(0, 0, 0)
-                    };
-
+        fn apply_minor_bump(version: &mut Version) -> Result<()> {
+            match version {
+                Version::Semver(v) => {
                     v.pre.clear();
                     v.build.clear();
                     v.patch = 0;
                     v.minor += 1;
-
-                    Ok(Version::Semver(v))
                 }
             }
+
+            Ok(())
         }
 
-        fn apply_major_bump(
-            template: &Version,
-            latest_release: Option<&ReleasedProjectInfo>,
-        ) -> Result<Version> {
-            match template {
-                Version::Semver(_) => {
-                    let mut v = if let Some(rpi) = latest_release {
-                        semver::Version::parse(&rpi.version)?
-                    } else {
-                        semver::Version::new(0, 0, 0)
-                    };
-
+        fn apply_major_bump(version: &mut Version) -> Result<()> {
+            match version {
+                Version::Semver(v) => {
                     v.pre.clear();
                     v.build.clear();
                     v.patch = 0;
                     v.minor = 0;
                     v.major += 1;
-
-                    Ok(Version::Semver(v))
                 }
             }
+
+            Ok(())
         }
 
-        fn apply_force(template: &Version, text: &str) -> Result<Version> {
-            template.parse_like(text)
+        fn apply_force(version: &mut Version, text: &str) -> Result<()> {
+            *version = version.parse_like(text)?;
+            Ok(())
         }
     }
 }
