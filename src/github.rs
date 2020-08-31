@@ -172,10 +172,10 @@ impl Command for CreateReleasesCommand {
         // Get the list of projects that we're interested in.
         let mut q = graph::GraphQueryBuilder::default();
         q.names(self.proj_names);
-        let empty_query = q.is_empty();
+        let no_names = q.no_names();
         let idents = sess
             .graph()
-            .query_or_all(q)
+            .query(q)
             .context("could not select projects for GitHub release")?;
 
         if idents.len() == 0 {
@@ -192,7 +192,7 @@ impl Command for CreateReleasesCommand {
             if let Some(rel) = rel_info.lookup_if_released(proj) {
                 info.create_release(&sess, proj, &rel, rel_commit, &mut client)?;
                 n_released += 1;
-            } else if !empty_query {
+            } else if !no_names {
                 warn!(
                     "project {} was specified but does not have a new release",
                     proj.user_facing_name
@@ -200,7 +200,7 @@ impl Command for CreateReleasesCommand {
             }
         }
 
-        if empty_query && n_released != 1 {
+        if no_names && n_released != 1 {
             info!(
                 "created GitHub releases for {} of {} projects",
                 n_released,

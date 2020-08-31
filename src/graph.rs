@@ -19,7 +19,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     errors::{Error, Result},
     project::{Project, ProjectBuilder, ProjectId},
-    repository::{CommitAvailability, CommitId, RepoHistory, Repository},
+    repository::{CommitAvailability, CommitId, ReleaseCommitInfo, RepoHistory, Repository},
 };
 
 type OurNodeIndex = NodeIndex<DefaultIx>;
@@ -328,40 +328,65 @@ impl ProjectGraph {
     }
 
     /// Process the query and return a vector of matched project IDs
-    pub fn query_ids(&self, query: GraphQueryBuilder) -> Result<Vec<ProjectId>> {
+    pub fn query(&self, query: GraphQueryBuilder) -> Result<Vec<ProjectId>> {
         // Note: while it generally feels "right" to not allow repeated visits
         // to the same project, this is especially important if a query is used
         // to construct a mutable iterator, since it breaks soundness to have
         // such an iterator visit the same project more than once.
-        let mut idents = Vec::new();
+        let mut matched_idents = Vec::new();
         let mut seen_ids = HashSet::new();
 
-        for name in query.names {
-            if let Some(id) = self.name_to_id.get(&name) {
-                if seen_ids.insert(*id) {
-                    idents.push(*id);
-                } // todo? error/warning/etc on duplicated project
-            } else {
-                return Err(Error::NoSuchProject(name));
-            }
-        }
+        // Build up the list of input projids
 
-        Ok(idents)
-    }
-
-    /// Process a query, returning all projects if the query is empty
-    pub fn query_or_all(&self, query: GraphQueryBuilder) -> Result<Vec<ProjectId>> {
-        if !query.is_empty() {
-            self.query_ids(query)
+        let root_idents = if query.no_names() {
+            (0..self.projects.len()).collect()
         } else {
-            let mut idents = Vec::with_capacity(self.projects.len());
+            let mut root_idents = Vec::new();
 
-            for proj in self.toposort()? {
-                idents.push(proj.ident());
+            for name in query.names {
+                if let Some(id) = self.name_to_id.get(&name) {
+                    root_idents.push(*id);
+                } else {
+                    return Err(Error::NoSuchProject(name));
+                }
             }
 
-            Ok(idents)
+            root_idents
+        };
+
+        // Apply filters and deduplicate if needed
+
+        for id in root_idents {
+            let proj = &self.projects[id];
+
+            // only_new_releases() filter
+            if let Some(ref rel_info) = query.release_info {
+                if rel_info.lookup_if_released(proj).is_none() {
+                    continue;
+                }
+            }
+
+            // only_project_type() filter
+            if let Some(ref ptype) = query.project_type {
+                let qnames = proj.qualified_names();
+                let n = qnames.len();
+
+                if n < 2 {
+                    continue;
+                }
+
+                if &qnames[n - 1] != ptype {
+                    continue;
+                }
+            }
+
+            // not rejected -- keep this one
+            if seen_ids.insert(id) {
+                matched_idents.push(id);
+            }
         }
+
+        Ok(matched_idents)
     }
 
     pub fn analyze_histories(&self, repo: &Repository) -> Result<RepoHistories> {
@@ -434,11 +459,17 @@ pub struct ResolvedDependency {
 #[derive(Debug)]
 pub struct GraphQueryBuilder {
     names: Vec<String>,
+    release_info: Option<ReleaseCommitInfo>,
+    project_type: Option<String>,
 }
 
 impl Default for GraphQueryBuilder {
     fn default() -> Self {
-        GraphQueryBuilder { names: Vec::new() }
+        GraphQueryBuilder {
+            names: Vec::new(),
+            release_info: None,
+            project_type: None,
+        }
     }
 }
 
@@ -451,8 +482,21 @@ impl GraphQueryBuilder {
         self
     }
 
-    /// Return true if the query is empty.
-    pub fn is_empty(&self) -> bool {
+    /// Specify that only projects released in the associated info should be
+    /// matched.
+    pub fn only_new_releases(&mut self, rel_info: ReleaseCommitInfo) -> &mut Self {
+        self.release_info = Some(rel_info);
+        self
+    }
+
+    /// Specify that only projects with the associated type should be matched.
+    pub fn only_project_type<T: std::fmt::Display>(&mut self, ptype: T) -> &mut Self {
+        self.project_type = Some(ptype.to_string());
+        self
+    }
+
+    /// Return true if no input names were specified.
+    pub fn no_names(&self) -> bool {
         self.names.len() == 0
     }
 }

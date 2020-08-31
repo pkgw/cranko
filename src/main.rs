@@ -449,12 +449,12 @@ impl Command for ShowCommand {
     }
 }
 
+// TODO: add something like `--ifdev=latest` to print "latest"
+// instead of 0.0.0-dev.0 if we're not on a release commit for
+// this project.
 #[derive(Debug, PartialEq, StructOpt)]
 struct ShowVersionCommand {
-    // TODO: add something like `--ifdev=latest` to print "latest"
-    // instead of 0.0.0-dev.0 if we're not on a release commit for
-    // this project.
-    #[structopt(help = "Name(s) of the project(s) to query")]
+    #[structopt(help = "Name of the project to query")]
     proj_names: Vec<String>,
 }
 
@@ -463,13 +463,9 @@ impl Command for ShowVersionCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
-        // Get the list of projects that we're interested in.
-        //
-        // TODO: better validation and more flexible querying; if no names are
-        // provided, default to staging any changed projects.
         let mut q = graph::GraphQueryBuilder::default();
         q.names(self.proj_names);
-        let idents = sess.graph().query_ids(q)?;
+        let idents = sess.graph().query(q)?;
 
         if idents.len() != 1 {
             return Err(anyhow!("must specify exactly one project to show"));
@@ -516,10 +512,10 @@ impl Command for StageCommand {
         // Get the list of projects that we're interested in.
         let mut q = graph::GraphQueryBuilder::default();
         q.names(self.proj_names);
-        let empty_query = q.is_empty();
+        let no_names = q.no_names();
         let idents = sess
             .graph()
-            .query_or_all(q)
+            .query(q)
             .context("could not select projects for staging")?;
 
         if idents.len() == 0 {
@@ -541,7 +537,7 @@ impl Command for StageCommand {
             let dirty_allowed = self.force;
 
             if let Some(_) = sess.repo.scan_rc_info(proj, &mut changes, dirty_allowed)? {
-                if !empty_query {
+                if !no_names {
                     warn!(
                         "skipping {}: it appears to have already been staged",
                         proj.user_facing_name
@@ -551,7 +547,7 @@ impl Command for StageCommand {
             }
 
             if history.n_commits() == 0 {
-                if !empty_query {
+                if !no_names {
                     warn!("no changes detected for project {}", proj.user_facing_name);
                 }
             } else {
@@ -571,9 +567,9 @@ impl Command for StageCommand {
             }
         }
 
-        if empty_query && n_staged == 0 {
+        if no_names && n_staged == 0 {
             info!("nothing further to stage at this time");
-        } else if empty_query && n_staged != 1 {
+        } else if no_names && n_staged != 1 {
             info!("{} of {} projects staged", n_staged, idents.len());
         } else if n_staged != idents.len() {
             info!("{} of {} selected projects staged", n_staged, idents.len());
@@ -600,7 +596,7 @@ impl Command for StatusCommand {
         q.names(self.proj_names);
         let idents = sess
             .graph()
-            .query_or_all(q)
+            .query(q)
             .context("cannot get requested statuses")?;
 
         let histories = sess.analyze_histories()?;
