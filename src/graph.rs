@@ -339,7 +339,14 @@ impl ProjectGraph {
         // Build up the list of input projids
 
         let root_idents = if query.no_names() {
-            (0..self.projects.len()).collect()
+            toposort(&self.graph, None)
+                .map_err(|cycle| {
+                    let ident = self.graph[cycle.node_id()];
+                    Error::Cycle(self.projects[ident].user_facing_name.to_owned())
+                })?
+                .iter()
+                .map(|ix| self.graph[*ix])
+                .collect::<Vec<_>>()
         } else {
             let mut root_idents = Vec::new();
 
