@@ -5,7 +5,7 @@ Create a new `rc` commit to request the release of one or more projects.
 #### Usage
 
 ```
-cranko confirm
+cranko confirm [--force]
 ```
 
 This command gathers release request information prepared from one or more calls

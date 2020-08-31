@@ -1,3 +1,10 @@
+# cranko 0.0.14 (2020-08-31)
+
+- Make `--force` actually work for `cranko stage` and `cranko confirm`
+- book: a first pass of edits and tidying
+- Tidy up some internals that "shouldn't" affect the release pipeline, but I
+  want to push a release through to verify that.
+
 # cranko 0.0.13 (2020-08-29)
 
 - Add a bunch of content to the book. (I should start releasing this as project
