@@ -6,7 +6,7 @@ build.
 #### Usage
 
 ```
-cranko release-workflow tag [--force]
+cranko release-workflow tag
 ```
 
 This command should be run in CI processing of an update to the `rc` branch,

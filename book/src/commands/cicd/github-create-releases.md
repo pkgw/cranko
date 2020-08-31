@@ -8,7 +8,7 @@ had releases.
 #### Usage
 
 ```
-cranko github create-releases [--force] [PROJECT-NAMES...]
+cranko github create-releases [PROJECT-NAMES...]
 ```
 
 This command should be run in CI processing of an update to the `rc` branch,

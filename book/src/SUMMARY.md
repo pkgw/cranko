@@ -20,7 +20,7 @@
   - [cranko release-workflow apply-versions](commands/cicd/release-workflow-apply-versions.md)
   - [cranko release-workflow commit](commands/cicd/release-workflow-commit.md)
   - [cranko release-workflow tag](commands/cicd/release-workflow-tag.md)
-- [Utility commands]()
+- [Utility Commands]()
   - [cranko git-util reboot-branch](commands/util/git-util-reboot-branch.md)
   - [cranko help](commands/util/help.md)
   - [cranko list-commands](commands/util/list-commands.md)

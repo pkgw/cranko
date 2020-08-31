@@ -28,13 +28,14 @@ There are several installation options:
 [Rust]: https://www.rust-lang.org/tools/install
 [the source code]: https://github.com/pkgw/cranko/
 
-Note that, to fully implement the just-in-time versioning workflow, the `cranko`
-command will need to be available both on your development machine and on the
-machines implementing your CI/CD pipeline. The `curl` and PowerShell commands
-given above should make installation easy on just about any CI/CD system. The
-code for these installers is almost directly ripped off from [Rustup] and
-[Chocolatey], respectively (thanks!), and will honor some of the environment
-variables used by those installers.
+Note that, to fully implement the [just-in-time
+versioning](../jit-versioning/index.md) workflow, the `cranko` command will need
+to be available both on your development machine and on the nodes powering your
+CI/CD pipeline. The `curl` and PowerShell commands given above should make
+installation easy on just about any CI/CD system. The code for these installers
+is almost directly ripped off from [Rustup] and [Chocolatey], respectively
+(thanks!), and will honor some of the environment variables used by those
+installers.
 
 [Rustup]: https://github.com/rust-lang/rustup/blob/master/rustup-init.sh
 [Chocolatey]: https://github.com/chocolatey/chocolatey.org/blob/master/chocolatey/Website/Install.ps1

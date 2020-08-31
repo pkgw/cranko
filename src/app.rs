@@ -3,7 +3,7 @@
 
 //! State for the Cranko CLI application.
 
-use log::{info, warn};
+use log::{error, info, warn};
 use std::collections::HashMap;
 
 use crate::{
@@ -48,36 +48,157 @@ impl AppSession {
 
     /// Characterize the repository environment in which this process is
     /// running.
-    pub fn execution_environment(&self) -> ExecutionEnvironment {
+    pub fn execution_environment(&self) -> Result<ExecutionEnvironment> {
         if !self.ci_info.ci {
-            ExecutionEnvironment::NotCi
+            Ok(ExecutionEnvironment::NotCi)
         } else {
             let maybe_pr = self.ci_info.pr;
-            let maybe_branch = self.ci_info.branch_name.as_ref().map(|s| s.as_ref());
+            let maybe_ci_branch = self.ci_info.branch_name.as_ref().map(|s| s.as_ref());
             let rc_name = self.repo.upstream_rc_name();
             let release_name = self.repo.upstream_release_name();
 
-            if maybe_branch.is_none() {
-                warn!("cannot determine the current branch name in this CI environment");
+            if maybe_ci_branch.is_none() {
+                warn!("cannot determine the triggering branch name in this CI environment");
+                warn!("... this will affect many workflow safety checks")
             }
 
             if let Some(true) = maybe_pr {
-                if maybe_branch == Some(rc_name) {
-                    warn!("cranko seems to be running in a pull request to the `rc` branch; this is not recommended");
+                if maybe_ci_branch == Some(rc_name) {
+                    warn!("cranko seems to be running in a pull request to the `{}` branch; this is not recommended", rc_name);
+                    warn!("... treating as a non-CI environment for safety");
+                    return Ok(ExecutionEnvironment::NotCi);
                 }
 
-                if maybe_branch == Some(release_name) {
-                    warn!("cranko seems to be running in a pull request to the `release` branch; this is not recommended");
+                if maybe_ci_branch == Some(release_name) {
+                    warn!("cranko seems to be running in a pull request to the `{}` branch; this is not recommended", release_name);
+                    warn!("... treating as a non-CI environment for safety");
+                    return Ok(ExecutionEnvironment::NotCi);
                 }
 
-                return ExecutionEnvironment::CiPullRequest;
+                return Ok(ExecutionEnvironment::CiPullRequest);
             }
 
-            if maybe_branch == Some(rc_name) {
-                return ExecutionEnvironment::CiRcBranch;
+            if maybe_ci_branch == Some(release_name) {
+                warn!("cranko seems to be running in an update to the `{}` branch; this is not recommended", release_name);
+                warn!("... treating as a non-CI environment for safety");
+                return Ok(ExecutionEnvironment::NotCi);
             }
 
-            ExecutionEnvironment::CiDevelopmentBranch
+            if maybe_ci_branch != Some(rc_name) {
+                return Ok(ExecutionEnvironment::CiDevelopmentBranch);
+            }
+
+            // OK, we're in CI triggered by a push to the `rc` branch. We allow
+            // two further possibilities: that we are still on the `rc` branch,
+            // so that the HEAD commit should contain release request
+            // information; or that the releases have been approved and we have
+            // subsequently switched to the `release` branch, so that the HEAD
+            // commit should contain approved-release information.
+
+            if let Some(current_branch) = self.repo.current_branch_name()? {
+                if current_branch == rc_name {
+                    Ok(ExecutionEnvironment::CiRcMode(
+                        self.repo.parse_rc_info_from_head()?,
+                    ))
+                } else if current_branch == release_name {
+                    Ok(ExecutionEnvironment::CiReleaseMode(
+                        self.repo.parse_release_info_from_head()?,
+                    ))
+                } else {
+                    Err(Error::Environment(format!(
+                        "unexpected checked-out branch name `{}` in a CI update to the `{}` branch",
+                        current_branch, rc_name
+                    )))
+                }
+            } else {
+                Err(Error::Environment(format!(
+                    "cannot determine checked-out branch in a CI update to the `{}` branch",
+                    rc_name
+                )))
+            }
+        }
+    }
+
+    /// Check that the current process is running *outside* of a CI environment.
+    pub fn ensure_not_ci(&self, force: bool) -> Result<()> {
+        match self.execution_environment()? {
+            ExecutionEnvironment::NotCi => Ok(()),
+
+            _ => {
+                warn!("CI environment detected; this is unexpected for this command");
+                if force {
+                    Ok(())
+                } else {
+                    Err(Error::Environment(
+                        "refusing to proceed (use \"force\" mode to override)".to_owned(),
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Check that the current process is running in the "release mode" CI
+    /// environment, returning the latest release information. Any other
+    /// circumstance results in an error.
+    pub fn ensure_ci_release_mode(&self) -> Result<ReleaseCommitInfo> {
+        match self.execution_environment()? {
+            ExecutionEnvironment::NotCi => {
+                error!("no CI environment detected; this is unexpected for this command");
+                Err(Error::Environment(
+                    "don't know how to obtain release information -- cannot proceed".to_owned(),
+                ))
+            }
+
+            ExecutionEnvironment::CiReleaseMode(ri) => Ok(ri),
+
+            _ => {
+                error!("unexpected CI environment detected");
+                error!("... this command should only be run on updates to the `rc`-type branch");
+                error!("... after switching to a local `release`-type branch");
+                Err(Error::Environment(
+                    "don't know how to obtain release information -- cannot proceed".to_owned(),
+                ))
+            }
+        }
+    }
+
+    /// Check that the current process is running and "RC"-like CI mode: either
+    /// an update to the `rc` branch, before release deployment processes have
+    /// activated; or in a pull request or push to some other branch, assumed to
+    /// be a standard development branch.
+    ///
+    /// The returned boolean is true if in a "development"-like mode, false if
+    /// in the intended `rc` mode.
+    pub fn ensure_ci_rc_like_mode(&self, force: bool) -> Result<(bool, RcCommitInfo)> {
+        match self.execution_environment()? {
+            ExecutionEnvironment::CiRcMode(rci) => Ok((false, rci)),
+
+            ExecutionEnvironment::CiPullRequest | ExecutionEnvironment::CiDevelopmentBranch => {
+                Ok((true, self.default_dev_rc_info()))
+            }
+
+            ExecutionEnvironment::CiReleaseMode(_) => {
+                warn!("unexpected CI environment detected");
+                warn!("... this command should only be run on updates to the `rc`-type branch");
+                if force {
+                    Ok((true, self.default_dev_rc_info()))
+                } else {
+                    Err(Error::Environment(
+                        "refusing to proceed (use \"force\" mode to override)".to_owned(),
+                    ))
+                }
+            }
+
+            ExecutionEnvironment::NotCi => {
+                warn!("no CI environment detected; this is unexpected for this command");
+                if force {
+                    Ok((true, self.default_dev_rc_info()))
+                } else {
+                    Err(Error::Environment(
+                        "refusing to proceed (use \"force\" mode to override)".to_owned(),
+                    ))
+                }
+            }
         }
     }
 
@@ -136,7 +257,7 @@ impl AppSession {
     fn populate_graph(&mut self) -> Result<()> {
         // Start by auto-detecting everything in the repo index.
 
-        let mut cargo = crate::loaders::cargo::CargoLoader::default();
+        let mut cargo = crate::cargo::CargoLoader::default();
 
         self.repo.scan_paths(|p| {
             let (dirname, basename) = p.split_basename();
@@ -293,25 +414,26 @@ impl AppSession {
 
 /// Different categorizations of the environment in which the program is
 /// running.
-///
-/// Note that CI should not be run in response to updates to the `release`
-/// branch. There are certain commands that should be run with the release
-/// branch *checked out*, but the CI environment variables will still say that
-/// the run is for the `rc` branch. (We could/should set up to distinguish
-/// between these cases intead of having the one CiRcBranch.)
 pub enum ExecutionEnvironment {
     /// This program is running in a CI environment, in response to an
     /// externally submitted pull request.
     CiPullRequest,
 
     /// The program is running in a CI environment, in response to an update to
-    /// the main development branch (e.g. ,`master`).
+    /// the main development branch (e.g., `master`).
     CiDevelopmentBranch,
 
-    /// The program is running in a CI environment, in response to an update
-    /// to the `rc`-type branch. The HEAD commit should include Cranko release
-    /// request information.
-    CiRcBranch,
+    /// The program is running in a CI environment, in response to an update to
+    /// the `rc`-type branch, and the current branch is still `rc`. Therefore,
+    /// the HEAD commit should be associated with release request information.
+    CiRcMode(RcCommitInfo),
+
+    /// The program is running in a CI environment, in response to an update to
+    /// the `rc`-type branch, and the current branch has been changed to
+    /// `release`. This means that the CI tests passed, and the release
+    /// deployment process is now underway. Therefore, the HEAD commit should be
+    /// associated with full release information.
+    CiReleaseMode(ReleaseCommitInfo),
 
     /// The program does not appear to be running in a CI environment. We infer
     /// that we're running in an individual development environment.

@@ -1,5 +1,12 @@
 # rc: micro bump
 
+- Make `--force` actually work for `cranko stage` and `cranko confirm`
+- book: a first pass of edits and tidying
+- Tidy up some internals that "shouldn't" affect the release pipeline, but I
+  want to push a release through to verify that.
+
+# cranko 0.0.13 (2020-08-29)
+
 - Add a bunch of content to the book. (I should start releasing this as project
   separate from the `cranko` crate, but the infrastructure isn’t quite there yet
   …)

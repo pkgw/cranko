@@ -11,7 +11,7 @@ use structopt::StructOpt;
 
 use super::Command;
 use crate::{
-    app::{AppSession, ExecutionEnvironment},
+    app::AppSession,
     errors::{Error, Result},
     graph,
     project::Project,
@@ -152,13 +152,6 @@ impl GitHubInformation {
 /// Create new release(s) on GitHub.
 #[derive(Debug, PartialEq, StructOpt)]
 pub struct CreateReleasesCommand {
-    #[structopt(
-        short = "f",
-        long = "force",
-        help = "Force operation even in unexpected conditions"
-    )]
-    force: bool,
-
     #[structopt(help = "Name(s) of the project(s) to release on GitHub")]
     proj_names: Vec<String>,
 }
@@ -170,31 +163,7 @@ impl Command for CreateReleasesCommand {
 
         sess.populated_graph()?;
 
-        // Note here that the active checkout should have been switched to the
-        // `release` branch by `release-workflow commit` or an equivalent; but
-        // the CI run should still have been *triggered* for the `rc` branch.
-        match sess.execution_environment() {
-            ExecutionEnvironment::NotCi => {
-                warn!("no CI environment detected; this is unexpected for this command");
-                if !self.force {
-                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
-                }
-            }
-
-            ExecutionEnvironment::CiDevelopmentBranch | ExecutionEnvironment::CiPullRequest => {
-                warn!("CI environment detected but not on `rc` branch; this is unexpected for this command");
-                if !self.force {
-                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
-                }
-            }
-
-            ExecutionEnvironment::CiRcBranch => {}
-        }
-
-        let rel_info = sess
-            .repo
-            .parse_release_info_from_head()
-            .context("expected Cranko release metadata in the HEAD commit but could not load it")?;
+        let rel_info = sess.ensure_ci_release_mode()?;
         let rel_commit = rel_info
             .commit
             .as_ref()

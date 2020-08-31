@@ -18,12 +18,12 @@ use std::{
 use structopt::StructOpt;
 
 mod app;
+mod cargo;
 mod changelog;
 mod errors;
 mod github;
 mod gitutil;
 mod graph;
-mod loaders;
 mod logger;
 mod project;
 mod repository;
@@ -126,18 +126,31 @@ fn main() -> Result<()> {
 // confirm
 
 #[derive(Debug, PartialEq, StructOpt)]
-struct ConfirmCommand {}
+struct ConfirmCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force operation even in unexpected conditions"
+    )]
+    force: bool,
+}
 
 impl Command for ConfirmCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
-        // Note that scan_rc_info() below will always error out if there are
-        // local modifications, so we can't easily support a `--force` mode
-        // right now.
-        sess.ensure_changelog_clean()
-            .context("refusing to `confirm` with a modified working tree")?;
+        sess.ensure_not_ci(self.force)?;
+
+        if let Err(e) = sess.ensure_changelog_clean() {
+            warn!(
+                "not recommended to confirm with a modified working tree ({})",
+                e
+            );
+            if !self.force {
+                return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+            }
+        }
 
         // Scan the repository histories for everybody -- we'll use these to
         // report whether there are projects that ought to be released but
@@ -150,10 +163,11 @@ impl Command for ConfirmCommand {
 
         for ident in sess.graph().toposort_idents()? {
             let history = histories.lookup(ident);
+            let dirty_allowed = self.force;
 
-            if let Some(info) = sess
-                .repo
-                .scan_rc_info(sess.graph().lookup(ident), &mut changes)?
+            if let Some(info) =
+                sess.repo
+                    .scan_rc_info(sess.graph().lookup(ident), &mut changes, dirty_allowed)?
             {
                 if history.n_commits() == 0 {
                     let proj = sess.graph().lookup(ident);
@@ -353,30 +367,12 @@ impl Command for ReleaseWorkflowApplyVersionsCommand {
 
         sess.ensure_fully_clean()?;
 
-        let mut rci = None;
-        let mut dev_mode = true;
-
-        match sess.execution_environment() {
-            app::ExecutionEnvironment::NotCi => {
-                warn!("no CI environment detected; this is unexpected for this command");
-                if !self.force {
-                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
-                }
-            }
-
-            app::ExecutionEnvironment::CiDevelopmentBranch
-            | app::ExecutionEnvironment::CiPullRequest => {
-                info!("detected development-mode CI environment");
-            }
-
-            app::ExecutionEnvironment::CiRcBranch => {
-                info!("computing new versions based on `rc` commit request data");
-                rci = Some(sess.repo.parse_rc_info_from_head()?);
-                dev_mode = false;
-            }
+        let (dev_mode, rci) = sess.ensure_ci_rc_like_mode(self.force)?;
+        if dev_mode {
+            info!("computing new versions for \"development\" mode");
+        } else {
+            info!("computing new versions based on `rc` commit request data");
         }
-
-        let rci = rci.unwrap_or_else(|| sess.default_dev_rc_info());
 
         sess.apply_versions(&rci)?;
         let mut changes = sess.rewrite()?;
@@ -406,31 +402,11 @@ impl Command for ReleaseWorkflowCommitCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
-        match sess.execution_environment() {
-            app::ExecutionEnvironment::NotCi => {
-                warn!("no CI environment detected; this is unexpected for this command");
-                if !self.force {
-                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
-                }
-            }
-
-            app::ExecutionEnvironment::CiDevelopmentBranch
-            | app::ExecutionEnvironment::CiPullRequest => {
-                warn!("CI environment detected but not on `rc` branch; this is unexpected for this command");
-                if !self.force {
-                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
-                }
-            }
-
-            app::ExecutionEnvironment::CiRcBranch => {}
-        }
-
-        // We don't actually need the information, but this step helps us verify
-        // that everything is as expected.
-        sess.repo
-            .parse_rc_info_from_head()
-            .context("expected HEAD to contain `rc` information")?;
-
+        // We won't complain if people want to make a release commit on updates
+        // to `master` or whatever: they might want to monitor that that part of
+        // the workflow seems to be in good working order. Just so long as they
+        // don't *push* that commit at the wrong time, it's OK.
+        let (_dev, _rci) = sess.ensure_ci_rc_like_mode(self.force)?;
         sess.make_release_commit()?;
         Ok(0)
     }
@@ -439,43 +415,13 @@ impl Command for ReleaseWorkflowCommitCommand {
 // release-workflow tag
 
 #[derive(Debug, PartialEq, StructOpt)]
-struct ReleaseWorkflowTagCommand {
-    #[structopt(
-        short = "f",
-        long = "force",
-        help = "Force operation even in unexpected conditions"
-    )]
-    force: bool,
-}
+struct ReleaseWorkflowTagCommand {}
 
 impl Command for ReleaseWorkflowTagCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-
-        // Note here that the active checkout should have been switched to the
-        // `release` branch by `release-workflow commit` or an equivalent; but
-        // the CI run should still have been *triggered* for the `rc` branch.
-        match sess.execution_environment() {
-            app::ExecutionEnvironment::NotCi => {
-                warn!("no CI environment detected; this is unexpected for this command");
-                if !self.force {
-                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
-                }
-            }
-
-            app::ExecutionEnvironment::CiDevelopmentBranch
-            | app::ExecutionEnvironment::CiPullRequest => {
-                warn!("CI environment detected but not on `rc` branch; this is unexpected for this command");
-                if !self.force {
-                    return Err(anyhow!("refusing to proceed (use `--force` to override)"));
-                }
-            }
-
-            app::ExecutionEnvironment::CiRcBranch => {}
-        }
-
-        let rci = sess.repo.parse_release_info_from_head()?;
-        sess.create_tags(&rci)?;
+        let rel_info = sess.ensure_ci_release_mode()?;
+        sess.create_tags(&rel_info)?;
         Ok(0)
     }
 }
@@ -565,13 +511,7 @@ impl Command for StageCommand {
             }
         }
 
-        match sess.execution_environment() {
-            app::ExecutionEnvironment::NotCi => {}
-
-            _ => {
-                warn!("`cranko stage` seems to be running in a CI environment; this is not recommended");
-            }
-        }
+        sess.ensure_not_ci(self.force)?;
 
         // Get the list of projects that we're interested in.
         let mut q = graph::GraphQueryBuilder::default();
@@ -598,8 +538,9 @@ impl Command for StageCommand {
         for i in 0..idents.len() {
             let proj = sess.graph().lookup(idents[i]);
             let history = histories.lookup(idents[i]);
+            let dirty_allowed = self.force;
 
-            if let Some(_) = sess.repo.scan_rc_info(proj, &mut changes)? {
+            if let Some(_) = sess.repo.scan_rc_info(proj, &mut changes, dirty_allowed)? {
                 if !empty_query {
                     warn!(
                         "skipping {}: it appears to have already been staged",
