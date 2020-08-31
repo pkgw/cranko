@@ -43,6 +43,10 @@ trait Command {
 
 #[derive(Debug, PartialEq, StructOpt)]
 enum Commands {
+    #[structopt(name = "cargo")]
+    /// Commands specific to the Rust/Cargo packaging system.
+    Cargo(cargo::CargoCommand),
+
     #[structopt(name = "confirm")]
     /// Commit staged release requests to the `rc` branch
     Confirm(ConfirmCommand),
@@ -86,6 +90,7 @@ enum Commands {
 impl Command for Commands {
     fn execute(self) -> Result<i32> {
         match self {
+            Commands::Cargo(o) => o.execute(),
             Commands::Confirm(o) => o.execute(),
             Commands::Github(o) => o.execute(),
             Commands::GitUtil(o) => o.execute(),
@@ -693,6 +698,7 @@ fn list_commands() -> BTreeSet<String> {
         }
     }
 
+    commands.insert("cargo".to_owned());
     commands.insert("confirm".to_owned());
     commands.insert("git-util".to_owned());
     commands.insert("github".to_owned());

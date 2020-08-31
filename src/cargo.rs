@@ -6,24 +6,31 @@
 //! If we detect a Cargo.toml in the repo root, we use `cargo metadata` to slurp
 //! information about all of the crates and their interdependencies.
 
+use anyhow::{anyhow, Context};
 use cargo_metadata::MetadataCommand;
 use log::warn;
 use std::{
     collections::HashMap,
+    ffi::OsString,
     fs::File,
     io::{Read, Write},
 };
+use structopt::StructOpt;
 use toml_edit::Document;
+
+use super::Command;
 
 use crate::{
     app::AppSession,
     errors::{Error, Result},
+    graph::GraphQueryBuilder,
     project::ProjectId,
     repository::{ChangeList, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::Version,
 };
 
+/// Framework for auto-loading Cargo projects from the repository contents.
 #[derive(Debug)]
 pub struct CargoLoader {
     shortest_toml_dirname: Option<RepoPathBuf>,
@@ -143,7 +150,7 @@ impl CargoLoader {
                                 &dep.name,
                                 pkg.manifest_path.display()
                             );
-                            warn!("... this is needed to specify the oldest version of `{}` compatible with `{}`", 
+                            warn!("... this is needed to specify the oldest version of `{}` compatible with `{}`",
                                 &dep.name, &pkg.name);
                         }
 
@@ -158,6 +165,7 @@ impl CargoLoader {
     }
 }
 
+/// Rewrite Cargo.toml to include real version numbers.
 #[derive(Debug)]
 pub struct CargoRewriter {
     proj_id: ProjectId,
@@ -277,5 +285,85 @@ impl Rewriter for CargoRewriter {
         }
 
         Ok(())
+    }
+}
+
+/// Cargo-specific CLI utilities.
+#[derive(Debug, PartialEq, StructOpt)]
+pub enum CargoCommands {
+    #[structopt(name = "foreach-released")]
+    /// Run a "cargo" command for each released Cargo project.
+    ForeachReleased(ForeachReleasedCommand),
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct CargoCommand {
+    #[structopt(subcommand)]
+    command: CargoCommands,
+}
+
+impl Command for CargoCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        match self.command {
+            CargoCommands::ForeachReleased(o) => o.execute(),
+        }
+    }
+}
+
+/// `cranko cargo foreach-released`
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct ForeachReleasedCommand {
+    #[structopt(help = "Arguments to the `cargo` command", required = true)]
+    cargo_args: Vec<OsString>,
+}
+
+impl Command for ForeachReleasedCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        let mut sess = AppSession::initialize()?;
+        sess.populated_graph()?;
+
+        let rel_info = sess.ensure_ci_release_mode()?;
+
+        let mut q = GraphQueryBuilder::default();
+        q.only_new_releases(rel_info);
+        q.only_project_type("cargo");
+        let idents = sess
+            .graph()
+            .query(q)
+            .context("could not select projects for cargo foreach-released")?;
+
+        let mut cmd = std::process::Command::new("cargo");
+        cmd.args(&self.cargo_args[..]);
+
+        let print_which = idents.len() > 1;
+        let mut first = true;
+
+        for ident in &idents {
+            let proj = sess.graph().lookup(*ident);
+            let dir = sess.repo.resolve_workdir(&proj.prefix());
+            cmd.current_dir(&dir);
+
+            if print_which {
+                if first {
+                    first = false;
+                } else {
+                    println!();
+                }
+                println!("### in `{}`:", dir.display());
+            }
+
+            let status = cmd.status().context(format!(
+                "could not run the cargo command for project `{}`",
+                proj.user_facing_name
+            ))?;
+            if !status.success() {
+                return Err(anyhow!(
+                    "the command cargo failed for project `{}`",
+                    proj.user_facing_name
+                ));
+            }
+        }
+
+        Ok(0)
     }
 }
