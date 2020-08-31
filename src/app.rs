@@ -110,9 +110,16 @@ impl AppSession {
                         current_branch, rc_name
                     )))
                 }
+            } else if let Ok(rci) = self.repo.parse_rc_info_from_head() {
+                // On Azure Pipelines, the initial checkout is in detached-HEAD
+                // state, so on pushes to the `rc` branch we can't determine
+                // `current_branch`. It would be kind of tedious to force all
+                // Azure users to manually check out the RC branch, so if we can
+                // parse out the RC info, let's assume that's what's going on.
+                Ok(ExecutionEnvironment::CiRcMode(rci))
             } else {
                 Err(Error::Environment(format!(
-                    "cannot determine checked-out branch in a CI update to the `{}` branch",
+                    "cannot determine or guess checked-out branch in a CI update to the `{}` branch",
                     rc_name
                 )))
             }
