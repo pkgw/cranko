@@ -142,11 +142,15 @@ impl Command for ConfirmCommand {
 
         sess.ensure_not_ci(self.force)?;
 
-        // Note that scan_rc_info() below will always error out if there are
-        // local modifications, so we can't easily support a `--force` mode
-        // right now.
-        sess.ensure_changelog_clean()
-            .context("refusing to `confirm` with a modified working tree")?;
+        if let Err(e) = sess.ensure_changelog_clean() {
+            warn!(
+                "not recommended to confirm with a modified working tree ({})",
+                e
+            );
+            if !self.force {
+                return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+            }
+        }
 
         // Scan the repository histories for everybody -- we'll use these to
         // report whether there are projects that ought to be released but
@@ -159,10 +163,11 @@ impl Command for ConfirmCommand {
 
         for ident in sess.graph().toposort_idents()? {
             let history = histories.lookup(ident);
+            let dirty_allowed = self.force;
 
-            if let Some(info) = sess
-                .repo
-                .scan_rc_info(sess.graph().lookup(ident), &mut changes)?
+            if let Some(info) =
+                sess.repo
+                    .scan_rc_info(sess.graph().lookup(ident), &mut changes, dirty_allowed)?
             {
                 if history.n_commits() == 0 {
                     let proj = sess.graph().lookup(ident);
@@ -533,8 +538,9 @@ impl Command for StageCommand {
         for i in 0..idents.len() {
             let proj = sess.graph().lookup(idents[i]);
             let history = histories.lookup(idents[i]);
+            let dirty_allowed = self.force;
 
-            if let Some(_) = sess.repo.scan_rc_info(proj, &mut changes)? {
+            if let Some(_) = sess.repo.scan_rc_info(proj, &mut changes, dirty_allowed)? {
                 if !empty_query {
                     warn!(
                         "skipping {}: it appears to have already been staged",

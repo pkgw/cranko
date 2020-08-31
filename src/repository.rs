@@ -694,6 +694,7 @@ impl Repository {
         &self,
         proj: &Project,
         changes: &mut ChangeList,
+        dirty_allowed: bool,
     ) -> Result<Option<RcProjectInfo>> {
         let mut saw_changelog = false;
         let changelog_matcher = proj.changelog.create_path_matcher(proj)?;
@@ -723,7 +724,7 @@ impl Repository {
                 } // TODO: handle/complain about some other statuses
             } else {
                 if status.is_ignored() || status.is_wt_new() || status == git2::Status::CURRENT {
-                } else {
+                } else if !dirty_allowed {
                     return Err(Error::DirtyRepository(path.escaped()));
                 }
             }
