@@ -24,14 +24,15 @@ steps:
   displayName: Set up Rust
 
 # Bootstrap a binary for the buildhost arch with the unmodified checkout at
-# 0.0.0 versions.
+# 0.0.0 versions. We're going to have to build everything in release mode
+# eventually, so it saves a bit of time to do that from the start.
 
-- bash: cargo build --all
+- bash: cargo build --all --release
   displayName: "cargo build (bootstrap)"
 
 - bash: |
     git status  # temp: Windows builds intermittently report changed files here??
-    cargo run -- release-workflow apply-versions
+    cargo run --release -- release-workflow apply-versions
   displayName: "cranko release-workflow apply-versions (using bootstrapped build)"
 
 # Now that we've applied versions, mainline test workflow
@@ -47,14 +48,14 @@ steps:
 - ${{ if eq(parameters.canaryBuild, false) }}:
   - bash: |
       git add .
-      cargo run -- release-workflow commit
+      cargo run --release -- release-workflow commit
       git show HEAD
     displayName: "Make release commit"
 
   - bash: |
       artifact_dir="$(Build.ArtifactStagingDirectory)/binary-$TARGET"
       mkdir -p "$artifact_dir"
-      cargo run -- cargo package-released-binaries -t $TARGET $artifact_dir -- build --release
+      cargo run --release -- cargo package-released-binaries -t $TARGET $artifact_dir -- build --release
     displayName: "Package binaries"
 
   - task: PublishPipelineArtifact@1
