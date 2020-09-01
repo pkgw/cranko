@@ -383,7 +383,7 @@ impl Repository {
     pub fn make_release_commit(&mut self, graph: &ProjectGraph) -> Result<()> {
         // Gather useful info.
 
-        let maybe_release_commit = self.try_get_release_commit()?;
+        let rel_info = self.get_latest_release_info()?;
         let head_ref = self.repo.head()?;
         let head_commit = head_ref.peel_to_commit()?;
         let sig = self.get_signature()?;
@@ -399,10 +399,20 @@ impl Repository {
         let mut info = SerializedReleaseCommitInfo::default();
 
         for proj in graph.toposort()? {
+            let age = if let Some(ri) = rel_info.lookup_project(proj) {
+                if proj.version.to_string() == ri.version {
+                    ri.age + 1
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+
             info.projects.push(ReleasedProjectInfo {
                 qnames: proj.qualified_names().clone(),
                 version: proj.version.to_string(),
-                age: proj.version_age,
+                age,
             });
         }
 
@@ -441,8 +451,9 @@ impl Repository {
             )?)
         };
 
-        let commit_id = if let Some(release_commit) = maybe_release_commit {
-            commit(&[&release_commit, &head_commit])?
+        let commit_id = if let Some(prev_cid) = rel_info.commit {
+            let prev_release_commit = self.repo.find_commit(prev_cid.0)?;
+            commit(&[&prev_release_commit, &head_commit])?
         } else {
             commit(&[&head_commit])?
         };

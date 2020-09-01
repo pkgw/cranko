@@ -348,12 +348,6 @@ impl AppSession {
                     proj.user_facing_name, baseline_version
                 );
             }
-
-            // Bookkeeping so that we can produce updated release info.
-            proj.version_age = match (latest_release, proj.version == baseline_version) {
-                (Some(info), true) => info.age + 1,
-                _ => 0,
-            };
         }
 
         Ok(())
