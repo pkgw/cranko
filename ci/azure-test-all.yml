@@ -10,7 +10,18 @@ steps:
 - checkout: self
   fetchDepth: 1
 
-- template: azure-install-rust.yml
+- bash: |
+    set -e
+    rustup set profile minimal
+    rustup component remove --toolchain=$TOOLCHAIN rust-docs || echo "already removed"
+    rustup update --no-self-update $TOOLCHAIN
+    rustup default $TOOLCHAIN
+    # Log versions
+    set -ex
+    rustup -V
+    rustc -Vv
+    cargo -V
+  displayName: Set up Rust
 
 # Bootstrap a binary for the buildhost arch with the unmodified checkout at
 # 0.0.0 versions.
