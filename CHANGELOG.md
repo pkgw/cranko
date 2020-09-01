@@ -1,3 +1,9 @@
+# cranko 0.0.17 (2020-09-01)
+
+- cargo: take the "v" out of the binary package name template -- fixes the
+  one-liner intallers
+- ci: minor tidying
+
 # cranko 0.0.16 (2020-09-01)
 
 - Add `cranko cargo package-released-binaries`

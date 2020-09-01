@@ -37,7 +37,7 @@ selectors as appropriate. The `--message-flags=json` argument will be
 automatically (and unconditionally) appended.
 
 The created archive files will be named according to the format
-`{cratename}-v{version}-{target}.{format}`. The archive format is `.tar.gz` on
+`{cratename}-{version}-{target}.{format}`. The archive format is `.tar.gz` on
 all platforms except Windows, for which it is `.zip`. This format is chosen by
 parsing the `-t`/`--target` argument, *not* by examining the host platform
 information.
