@@ -329,7 +329,10 @@ impl Command for ForeachReleasedCommand {
         let mut sess = AppSession::initialize()?;
         sess.populated_graph()?;
 
-        let rel_info = sess.ensure_ci_release_mode()?;
+        let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
+        if dev_mode {
+            warn!("proceeding even though in dev mode");
+        }
 
         let mut q = GraphQueryBuilder::default();
         q.only_new_releases(rel_info);
@@ -402,7 +405,8 @@ impl Command for PackageReleasedBinariesCommand {
         let mut sess = AppSession::initialize()?;
         sess.populated_graph()?;
 
-        let rel_info = sess.ensure_ci_release_mode()?;
+        // For this command, it is OK to run in dev mode
+        let (_dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
 
         let target: target_lexicon::Triple = self
             .target

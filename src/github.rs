@@ -163,11 +163,15 @@ impl Command for CreateReleasesCommand {
 
         sess.populated_graph()?;
 
-        let rel_info = sess.ensure_ci_release_mode()?;
+        let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
         let rel_commit = rel_info
             .commit
             .as_ref()
             .ok_or_else(|| anyhow!("no commit ID for HEAD (?)"))?;
+
+        if dev_mode {
+            return Err(anyhow!("refusing to proceed in dev mode"));
+        }
 
         // Get the list of projects that we're interested in.
         let mut q = graph::GraphQueryBuilder::default();
