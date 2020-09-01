@@ -507,7 +507,7 @@ impl BinaryArchiveMode {
     ) -> Result<PathBuf> {
         let mut path = dest_dir.to_path_buf();
         path.push(format!(
-            "{}-v{}-{}.zip",
+            "{}-{}-{}.zip",
             proj.qualified_names()[0],
             proj.version.to_string(),
             target
@@ -557,7 +557,7 @@ impl BinaryArchiveMode {
 
         let mut path = dest_dir.to_path_buf();
         path.push(format!(
-            "{}-v{}-{}.tar.gz",
+            "{}-{}-{}.tar.gz",
             proj.qualified_names()[0],
             proj.version.to_string(),
             target
