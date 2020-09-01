@@ -9,13 +9,13 @@ parameters:
 steps:
 - bash: |
     cd $(Pipeline.Workspace)
-    mkdir collection
-    cp binary-*/* collection/
+    mkdir artifact-collection
+    cp binary-*/* artifact-collection/
   displayName: Collect release artifacts
 
-- publish: $(Pipeline.Workspace)/collection
+- publish: $(Pipeline.Workspace)/artifact-collection
   displayName: Publish release artifacts
-  artifact: artifacts
+  artifact: artifact-collection
 
 # if we're on the `rc` branch, the release has been fully vetted and the
 # internal artifacts have been gathered -- time to lock in a new `release`
@@ -42,7 +42,7 @@ steps:
 
   - bash: |
       ./cranko github create-releases
-      ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/collection/*
+      ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/artifact-collection/*
     displayName: Create GitHub releases
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)

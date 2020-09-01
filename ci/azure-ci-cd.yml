@@ -19,7 +19,7 @@ stages:
     pool:
       vmImage: ubuntu-16.04
     steps:
-      - template: azure-test-all.yml
+      - template: azure-build-and-test.yml
         parameters:
           primaryRcBuild: ${{ eq(variables['Build.SourceBranchName'], 'rc') }}
     variables:
@@ -33,7 +33,7 @@ stages:
     pool:
       vmImage: ubuntu-16.04
     steps:
-      - template: azure-test-all.yml
+      - template: azure-build-and-test.yml
         parameters:
           canaryBuild: true
     strategy:
@@ -50,7 +50,7 @@ stages:
     pool:
       vmImage: macos-10.15
     steps:
-      - template: azure-test-all.yml
+      - template: azure-build-and-test.yml
     variables:
       TARGET: x86_64-apple-darwin
       TOOLCHAIN: stable
@@ -60,7 +60,7 @@ stages:
     pool:
       vmImage: windows-2019
     steps:
-      - template: azure-test-all.yml
+      - template: azure-build-and-test.yml
     strategy:
       matrix:
         x86_64-msvc:
