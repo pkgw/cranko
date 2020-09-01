@@ -1,5 +1,12 @@
 # rc: micro bump
 
+- Add `cranko cargo package-released-binaries`
+- Refactor CI infrastructure and use the above new command.
+- Yet more tuning of the execution-environment code, unbreaking it on pull
+  requests and in other contexts.
+
+# cranko 0.0.15 (2020-09-01)
+
 - Oops! Fix the release process when only a subset of packages are being
   released.
 - Add a `cargo foreach-released` subcommand

@@ -23,8 +23,8 @@ stages:
         parameters:
           primaryRcBuild: ${{ eq(variables['Build.SourceBranchName'], 'rc') }}
     variables:
+      TARGET: x86_64-unknown-linux-gnu
       TOOLCHAIN: stable
-      OTHER_TARGET: i686-unknown-linux-gnu
 
   # As far as I can tell, there is no way to matrix over a template *parameter*?
   # So we need a separate group for the "canary" jobs that test build success but
@@ -39,11 +39,11 @@ stages:
     strategy:
       matrix:
         beta:
+          TARGET: x86_64-unknown-linux-gnu
           TOOLCHAIN: beta
         nightly:
+          TARGET: x86_64-unknown-linux-gnu
           TOOLCHAIN: nightly
-    variables:
-      OTHER_TARGET: i686-unknown-linux-gnu
 
   # Mac builds
   - job: macOS
@@ -52,8 +52,8 @@ stages:
     steps:
       - template: azure-test-all.yml
     variables:
+      TARGET: x86_64-apple-darwin
       TOOLCHAIN: stable
-      OTHER_TARGET: x86_64-apple-ios
 
   # Windows builds
   - job: Windows
@@ -64,18 +64,17 @@ stages:
     strategy:
       matrix:
         x86_64-msvc:
+          TARGET: x86_64-pc-windows-msvc
           TOOLCHAIN: stable-x86_64-pc-windows-msvc
-          OTHER_TARGET: i686-pc-windows-msvc
         x86_64-gnu:
+          TARGET: x86_64-pc-windows-gnu
           TOOLCHAIN: stable-x86_64-pc-windows-gnu
-          OTHER_TARGET: i686-pc-windows-gnu
 
   # rustfmt check
   - job: rustfmt
     pool:
       vmImage: ubuntu-16.04
     steps:
-      - template: azure-install-rust.yml
       - bash: rustup component add rustfmt
         displayName: "Install rustfmt"
       - bash: cargo fmt --all -- --check
@@ -88,7 +87,6 @@ stages:
     pool:
       vmImage: ubuntu-16.04
     steps:
-    - template: azure-install-rust.yml
     - bash: |
         fn="mdbook-v$(MDBOOK_VERSION)-x86_64-unknown-linux-gnu.tar.gz"
         url="https://github.com/rust-lang/mdBook/releases/download/v$(MDBOOK_VERSION)/$fn"

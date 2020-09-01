@@ -74,8 +74,6 @@ impl AppSession {
                     warn!("... treating as a non-CI environment for safety");
                     return Ok(ExecutionEnvironment::NotCi);
                 }
-
-                return Ok(ExecutionEnvironment::CiPullRequest);
             }
 
             if maybe_ci_branch == Some(release_name) {
@@ -84,45 +82,44 @@ impl AppSession {
                 return Ok(ExecutionEnvironment::NotCi);
             }
 
-            if maybe_ci_branch != Some(rc_name) {
-                return Ok(ExecutionEnvironment::CiDevelopmentBranch);
+            // Gather some useful parameters ... Note: on Azure Pipelines, the
+            // initial checkout is in detached-HEAD state, so on pushes to the
+            // `rc` branch we can't determine `current_branch`. It would be kind
+            // of tedious to force all Azure users to manually check out the RC
+            // branch, so if we can parse out the RC info, let's assume that's
+            // what's going on.
+
+            let is_rc_update = maybe_ci_branch == Some(rc_name);
+            let current_is_release = self
+                .repo
+                .current_branch_name()?
+                .as_ref()
+                .map(|s| s.as_ref())
+                == Some(release_name);
+
+            // If the current branch is called `release`, we insist that we can
+            // parse release info from HEAD. We must be in dev mode (due to PR,
+            // or dev branch update) unless we have been triggered by an update to
+            // the `rc` branch.
+
+            if current_is_release {
+                let rel_info = self.repo.parse_release_info_from_head()?;
+                let dev_mode = !is_rc_update;
+                return Ok(ExecutionEnvironment::CiReleaseMode(dev_mode, rel_info));
             }
 
-            // OK, we're in CI triggered by a push to the `rc` branch. We allow
-            // two further possibilities: that we are still on the `rc` branch,
-            // so that the HEAD commit should contain release request
-            // information; or that the releases have been approved and we have
-            // subsequently switched to the `release` branch, so that the HEAD
-            // commit should contain approved-release information.
+            // Otherwise, we must be in RC mode. If we're an update to the `rc`
+            // branch, we are *not* in dev mode and we insist that we can parse
+            // actual RC info from HEAD. Otherwise, we are in dev mode and we
+            // fake an RC request for all projects.
 
-            if let Some(current_branch) = self.repo.current_branch_name()? {
-                if current_branch == rc_name {
-                    Ok(ExecutionEnvironment::CiRcMode(
-                        self.repo.parse_rc_info_from_head()?,
-                    ))
-                } else if current_branch == release_name {
-                    Ok(ExecutionEnvironment::CiReleaseMode(
-                        self.repo.parse_release_info_from_head()?,
-                    ))
-                } else {
-                    Err(Error::Environment(format!(
-                        "unexpected checked-out branch name `{}` in a CI update to the `{}` branch",
-                        current_branch, rc_name
-                    )))
-                }
-            } else if let Ok(rci) = self.repo.parse_rc_info_from_head() {
-                // On Azure Pipelines, the initial checkout is in detached-HEAD
-                // state, so on pushes to the `rc` branch we can't determine
-                // `current_branch`. It would be kind of tedious to force all
-                // Azure users to manually check out the RC branch, so if we can
-                // parse out the RC info, let's assume that's what's going on.
-                Ok(ExecutionEnvironment::CiRcMode(rci))
+            let (dev_mode, rc_info) = if is_rc_update {
+                (false, self.repo.parse_rc_info_from_head()?)
             } else {
-                Err(Error::Environment(format!(
-                    "cannot determine or guess checked-out branch in a CI update to the `{}` branch",
-                    rc_name
-                )))
-            }
+                (true, self.default_dev_rc_info())
+            };
+
+            Ok(ExecutionEnvironment::CiRcMode(dev_mode, rc_info))
         }
     }
 
@@ -147,7 +144,10 @@ impl AppSession {
     /// Check that the current process is running in the "release mode" CI
     /// environment, returning the latest release information. Any other
     /// circumstance results in an error.
-    pub fn ensure_ci_release_mode(&self) -> Result<ReleaseCommitInfo> {
+    ///
+    /// The returned boolean is true if in a "development"-like mode, false if
+    /// in the intended `rc` mode.
+    pub fn ensure_ci_release_mode(&self) -> Result<(bool, ReleaseCommitInfo)> {
         match self.execution_environment()? {
             ExecutionEnvironment::NotCi => {
                 error!("no CI environment detected; this is unexpected for this command");
@@ -156,12 +156,11 @@ impl AppSession {
                 ))
             }
 
-            ExecutionEnvironment::CiReleaseMode(ri) => Ok(ri),
+            ExecutionEnvironment::CiReleaseMode(dev, ri) => Ok((dev, ri)),
 
             _ => {
                 error!("unexpected CI environment detected");
-                error!("... this command should only be run on updates to the `rc`-type branch");
-                error!("... after switching to a local `release`-type branch");
+                error!("... this command should only be run after switching to a local `release`-type branch");
                 Err(Error::Environment(
                     "don't know how to obtain release information -- cannot proceed".to_owned(),
                 ))
@@ -169,24 +168,16 @@ impl AppSession {
         }
     }
 
-    /// Check that the current process is running and "RC"-like CI mode: either
-    /// an update to the `rc` branch, before release deployment processes have
-    /// activated; or in a pull request or push to some other branch, assumed to
-    /// be a standard development branch.
+    /// Check that the current process is running and "RC"-like CI mode.
     ///
     /// The returned boolean is true if in a "development"-like mode, false if
     /// in the intended `rc` mode.
-    pub fn ensure_ci_rc_like_mode(&self, force: bool) -> Result<(bool, RcCommitInfo)> {
+    pub fn ensure_ci_rc_mode(&self, force: bool) -> Result<(bool, RcCommitInfo)> {
         match self.execution_environment()? {
-            ExecutionEnvironment::CiRcMode(rci) => Ok((false, rci)),
+            ExecutionEnvironment::CiRcMode(dev, rci) => Ok((dev, rci)),
 
-            ExecutionEnvironment::CiPullRequest | ExecutionEnvironment::CiDevelopmentBranch => {
-                Ok((true, self.default_dev_rc_info()))
-            }
-
-            ExecutionEnvironment::CiReleaseMode(_) => {
-                warn!("unexpected CI environment detected");
-                warn!("... this command should only be run on updates to the `rc`-type branch");
+            ExecutionEnvironment::NotCi => {
+                warn!("no CI environment detected; this is unexpected for this command");
                 if force {
                     Ok((true, self.default_dev_rc_info()))
                 } else {
@@ -196,8 +187,9 @@ impl AppSession {
                 }
             }
 
-            ExecutionEnvironment::NotCi => {
-                warn!("no CI environment detected; this is unexpected for this command");
+            _ => {
+                warn!("unexpected CI environment detected");
+                warn!("... this command should only be run in `rc` contexts");
                 if force {
                     Ok((true, self.default_dev_rc_info()))
                 } else {
@@ -432,25 +424,19 @@ impl AppSession {
 /// Different categorizations of the environment in which the program is
 /// running.
 pub enum ExecutionEnvironment {
-    /// This program is running in a CI environment, in response to an
-    /// externally submitted pull request.
-    CiPullRequest,
+    /// The program is running in a CI environment, in "release request" mode
+    /// where we have not yet created a "release commit" with final version
+    /// number information. If the boolean is true, we are in a development mode
+    /// where version numbers are temporary and release artifacts will not be
+    /// deployed.
+    CiRcMode(bool, RcCommitInfo),
 
-    /// The program is running in a CI environment, in response to an update to
-    /// the main development branch (e.g., `master`).
-    CiDevelopmentBranch,
-
-    /// The program is running in a CI environment, in response to an update to
-    /// the `rc`-type branch, and the current branch is still `rc`. Therefore,
-    /// the HEAD commit should be associated with release request information.
-    CiRcMode(RcCommitInfo),
-
-    /// The program is running in a CI environment, in response to an update to
-    /// the `rc`-type branch, and the current branch has been changed to
-    /// `release`. This means that the CI tests passed, and the release
-    /// deployment process is now underway. Therefore, the HEAD commit should be
-    /// associated with full release information.
-    CiReleaseMode(ReleaseCommitInfo),
+    /// The program is running in a CI environment, in a "release deployment"
+    /// mode where HEAD is a Cranko release commit. If the boolean is true, we
+    /// are in a development mode where version numbers are temporary and
+    /// release artifacts will not be deployed (but this mode still can be
+    /// useful for creating artifacts and so on).
+    CiReleaseMode(bool, ReleaseCommitInfo),
 
     /// The program does not appear to be running in a CI environment. We infer
     /// that we're running in an individual development environment.

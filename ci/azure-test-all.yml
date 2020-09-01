@@ -10,24 +10,29 @@ steps:
 - checkout: self
   fetchDepth: 1
 
-- template: azure-install-rust.yml
-
-- bash: rustup target add $OTHER_TARGET
-  displayName: "Install cross-compile target"
-
-- bash: sudo apt update -y && sudo apt install gcc-multilib -y
-  displayName: "Install gcc-multilib (linux)"
-  condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'))
+- bash: |
+    set -e
+    rustup set profile minimal
+    rustup component remove --toolchain=$TOOLCHAIN rust-docs || echo "already removed"
+    rustup update --no-self-update $TOOLCHAIN
+    rustup default $TOOLCHAIN
+    # Log versions
+    set -ex
+    rustup -V
+    rustc -Vv
+    cargo -V
+  displayName: Set up Rust
 
 # Bootstrap a binary for the buildhost arch with the unmodified checkout at
-# 0.0.0 versions.
+# 0.0.0 versions. We're going to have to build everything in release mode
+# eventually, so it saves a bit of time to do that from the start.
 
-- bash: cargo build --all
+- bash: cargo build --all --release
   displayName: "cargo build (bootstrap)"
 
 - bash: |
     git status  # temp: Windows builds intermittently report changed files here??
-    cargo run -- release-workflow apply-versions
+    cargo run --release -- release-workflow apply-versions
   displayName: "cranko release-workflow apply-versions (using bootstrapped build)"
 
 # Now that we've applied versions, mainline test workflow
@@ -38,63 +43,36 @@ steps:
 - bash: cargo test --all --release
   displayName: "cargo test (release)"
 
-# For non-canary builds, export artifacts.
+# For non-canary builds, generate and export artifacts.
 
 - ${{ if eq(parameters.canaryBuild, false) }}:
   - bash: |
-      version="$(cargo run --release -- show version cranko)"
-      target="$(find . -name cranko-target.txt -execdir cat '{}' ';' -quit)"
-      echo "##vso[task.setvariable variable=rustTarget;]$target"
-      artifact_dir="$(Build.ArtifactStagingDirectory)/binary-$target"
-      mkdir -p "$artifact_dir"
-      tar="$artifact_dir/cranko-$version-$target.tar.gz"
-      ls -l target/release # XXX TEMP
-      cd target/release
-      tar czf "$tar" cranko
-    displayName: "Package binary (non-Windows)"
-    condition: and(succeeded(), ne(variables['Agent.OS'], 'Windows_NT'))
+      git add .
+      cargo run --release -- release-workflow commit
+      git show HEAD
+    displayName: "Make release commit"
 
   - bash: |
-      version="$(cargo run --release -- show version cranko)"
-      echo "##vso[task.setvariable variable=crankoVersion;]$version"
-      target="$(find . -name cranko-target.txt -execdir cat '{}' ';' -quit)"
-      echo "##vso[task.setvariable variable=rustTarget;]$target"
-      # at the moment, need to convert Windows paths to Cygwin:
-      staging=$(echo "$(Build.ArtifactStagingDirectory)" | sed -e 's|\\|\/|g' -e 's|^\([A-Za-z]\)\:/\(.*\)|/\L\1\E/\2|')
-      artifact_dir="$staging/binary-$target"
+      artifact_dir="$(Build.ArtifactStagingDirectory)/binary-$TARGET"
       mkdir -p "$artifact_dir"
-      mkdir -p temp_binary_archive
-      cp target/release/cranko.exe temp_binary_archive/
-    displayName: "Prep package binary (Windows)"
-    condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
-
-  - task: ArchiveFiles@2
-    displayName: "Package binary (Windows)"
-    inputs:
-      rootFolderOrFile: temp_binary_archive/cranko.exe
-      includeRootFolder: false
-      archiveType: 'zip'
-      archiveFile: "$(Build.ArtifactStagingDirectory)/binary-$(rustTarget)/cranko-$(crankoVersion)-$(rustTarget).zip"
-    condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
+      cargo run --release -- cargo package-released-binaries -t $TARGET $artifact_dir -- build --release
+    displayName: "Package binaries"
 
   - task: PublishPipelineArtifact@1
     displayName: Publish packaged binary artifact
     inputs:
-      targetPath: '$(Build.ArtifactStagingDirectory)/binary-$(rustTarget)'
-      artifactName: binary-$(rustTarget)
+      targetPath: '$(Build.ArtifactStagingDirectory)/binary-$(TARGET)'
+      artifactName: binary-$(TARGET)
 
-  # If, further, we're the primary build on the `rc` branch, generate and export
-  # the final release commit.
+  # If, further, we're the primary build on the `rc` branch, export our release
+  # commit as the canonical one.
 
   - ${{ if eq(parameters.primaryRcBuild, true) }}:
     - bash: |
-        git add .
-        cargo run -- release-workflow commit
-        git show HEAD
         artifact_dir="$(Build.ArtifactStagingDirectory)/git-release"
         mkdir -p "$artifact_dir"
         git bundle create "$artifact_dir/release.bundle" origin/master..HEAD
-      displayName: "Generate and Bundle release commit"
+      displayName: "Bundle release commit"
 
     - task: PublishPipelineArtifact@1
       displayName: Publish git bundle artifact

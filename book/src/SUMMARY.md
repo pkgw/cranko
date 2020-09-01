@@ -15,6 +15,7 @@
   - [cranko status](commands/dev/status.md)
 - [CI/CD Commands]()
   - [cranko cargo foreach-released](commands/cicd/cargo-foreach-released.md)
+  - [cranko cargo package-released-binaries](commands/cicd/cargo-package-released-binaries.md)
   - [cranko github create-releases](commands/cicd/github-create-releases.md)
   - [cranko github install-credential-helper](commands/cicd/github-install-credential-helper.md)
   - [cranko github upload-artifacts](commands/cicd/github-upload-artifacts.md)

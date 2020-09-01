@@ -8,12 +8,14 @@
 
 use anyhow::{anyhow, Context};
 use cargo_metadata::MetadataCommand;
-use log::warn;
+use log::{info, warn};
 use std::{
     collections::HashMap,
     ffi::OsString,
     fs::File,
-    io::{Read, Write},
+    io::{BufReader, Read, Write},
+    path::{Path, PathBuf},
+    process,
 };
 use structopt::StructOpt;
 use toml_edit::Document;
@@ -24,7 +26,7 @@ use crate::{
     app::AppSession,
     errors::{Error, Result},
     graph::GraphQueryBuilder,
-    project::ProjectId,
+    project::{Project, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::Version,
@@ -294,6 +296,10 @@ pub enum CargoCommands {
     #[structopt(name = "foreach-released")]
     /// Run a "cargo" command for each released Cargo project.
     ForeachReleased(ForeachReleasedCommand),
+
+    #[structopt(name = "package-released-binaries")]
+    /// Archive the executables associated with released Cargo projects.
+    PackageReleasedBinaries(PackageReleasedBinariesCommand),
 }
 
 #[derive(Debug, PartialEq, StructOpt)]
@@ -306,6 +312,7 @@ impl Command for CargoCommand {
     fn execute(self) -> anyhow::Result<i32> {
         match self.command {
             CargoCommands::ForeachReleased(o) => o.execute(),
+            CargoCommands::PackageReleasedBinaries(o) => o.execute(),
         }
     }
 }
@@ -322,7 +329,10 @@ impl Command for ForeachReleasedCommand {
         let mut sess = AppSession::initialize()?;
         sess.populated_graph()?;
 
-        let rel_info = sess.ensure_ci_release_mode()?;
+        let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
+        if dev_mode {
+            warn!("proceeding even though in dev mode");
+        }
 
         let mut q = GraphQueryBuilder::default();
         q.only_new_releases(rel_info);
@@ -332,7 +342,7 @@ impl Command for ForeachReleasedCommand {
             .query(q)
             .context("could not select projects for cargo foreach-released")?;
 
-        let mut cmd = std::process::Command::new("cargo");
+        let mut cmd = process::Command::new("cargo");
         cmd.args(&self.cargo_args[..]);
 
         let print_which = idents.len() > 1;
@@ -365,5 +375,230 @@ impl Command for ForeachReleasedCommand {
         }
 
         Ok(0)
+    }
+}
+
+/// `cranko cargo package-released-binaries`
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct PackageReleasedBinariesCommand {
+    #[structopt(short = "t", long = "target", help = "The binaries' target platform")]
+    target: String,
+
+    #[structopt(
+        help = "The directory into which the archive files should be placed",
+        required = true
+    )]
+    dest_dir: PathBuf,
+
+    #[structopt(
+        last(true),
+        help = "Arguments to the `cargo` command used to build/detect binaries",
+        required = true
+    )]
+    cargo_args: Vec<OsString>,
+}
+
+impl Command for PackageReleasedBinariesCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        use cargo_metadata::Message;
+
+        let mut sess = AppSession::initialize()?;
+        sess.populated_graph()?;
+
+        // For this command, it is OK to run in dev mode
+        let (_dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
+
+        let target: target_lexicon::Triple = self
+            .target
+            .parse()
+            .map_err(|e| anyhow!("could not parse target \"triple\" `{}`: {}", self.target, e))?;
+        let mode = BinaryArchiveMode::from(&target);
+
+        let mut q = GraphQueryBuilder::default();
+        q.only_new_releases(rel_info);
+        q.only_project_type("cargo");
+        let idents = sess.graph().query(q).context("could not select projects")?;
+
+        let mut cmd = process::Command::new("cargo");
+        cmd.args(&self.cargo_args[..])
+            .arg("--message-format=json")
+            .stdout(process::Stdio::piped());
+
+        for ident in &idents {
+            let proj = sess.graph().lookup(*ident);
+            let dir = sess.repo.resolve_workdir(&proj.prefix());
+            cmd.current_dir(&dir);
+
+            let mut child = cmd.spawn()?;
+            let reader = BufReader::new(child.stdout.take().unwrap());
+
+            let mut binaries = Vec::new();
+
+            for message in Message::parse_stream(reader) {
+                match message.unwrap() {
+                    Message::CompilerMessage(msg) => {
+                        println!("{}", msg);
+                    }
+
+                    Message::CompilerArtifact(artifact) => {
+                        if let Some(p) = artifact.executable {
+                            binaries.push(p);
+                        }
+                    }
+
+                    _ => {}
+                }
+            }
+
+            let status = child.wait().context("couldn't get cargo's exit status")?;
+            if !status.success() {
+                return Err(anyhow!(
+                    "the command cargo failed for project `{}`",
+                    proj.user_facing_name
+                ));
+            }
+
+            if binaries.is_empty() {
+                // Don't issue a warning -- we don't offer any way to filter the
+                // list of projects that is considered.
+                continue;
+            }
+
+            let archive_path = mode
+                .archive_binaries(proj, &self.dest_dir, &binaries, &target)
+                .context("couldn't create archive")?;
+            info!(
+                "`{}` => {} ({} files)",
+                proj.user_facing_name,
+                archive_path.display(),
+                binaries.len(),
+            );
+        }
+
+        Ok(0)
+    }
+}
+
+enum BinaryArchiveMode {
+    Tarball,
+    Zipball,
+}
+
+impl BinaryArchiveMode {
+    fn archive_binaries(
+        &self,
+        proj: &Project,
+        dest_dir: &Path,
+        binaries: &[PathBuf],
+        target: &target_lexicon::Triple,
+    ) -> Result<PathBuf> {
+        match self {
+            BinaryArchiveMode::Tarball => self.tarball(proj, dest_dir, binaries, target),
+            BinaryArchiveMode::Zipball => self.zipball(proj, dest_dir, binaries, target),
+        }
+    }
+
+    fn zipball(
+        &self,
+        proj: &Project,
+        dest_dir: &Path,
+        binaries: &[PathBuf],
+        target: &target_lexicon::Triple,
+    ) -> Result<PathBuf> {
+        let mut path = dest_dir.to_path_buf();
+        path.push(format!(
+            "{}-v{}-{}.zip",
+            proj.qualified_names()[0],
+            proj.version.to_string(),
+            target
+        ));
+
+        let out_file = File::create(&path)?;
+        let mut zip = zip::ZipWriter::new(out_file);
+        zip.set_comment("Created by Cranko");
+
+        let options = zip::write::FileOptions::default().unix_permissions(0o755);
+
+        for bin in binaries {
+            let name = bin.file_name().ok_or_else(|| {
+                Error::Environment(format!(
+                    "cargo output binary {} is a directory??",
+                    bin.display()
+                ))
+            })?;
+            let name = name.to_str().ok_or_else(|| {
+                Error::Environment(format!(
+                    "cargo output binary {} name is not Unicode-compatible",
+                    bin.display()
+                ))
+            })?;
+
+            let mut in_file = File::open(bin)?;
+
+            zip.start_file(name, options)
+                .map_err(|e| Error::Environment(format!("could not start Zip entry: {}", e)))?;
+            std::io::copy(&mut in_file, &mut zip)?;
+        }
+
+        zip.finish()
+            .map_err(|e| Error::Environment(format!("could not finalize Zip file: {}", e)))?;
+        Ok(path)
+    }
+
+    fn tarball(
+        &self,
+        proj: &Project,
+        dest_dir: &Path,
+        binaries: &[PathBuf],
+        target: &target_lexicon::Triple,
+    ) -> Result<PathBuf> {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+
+        let mut path = dest_dir.to_path_buf();
+        path.push(format!(
+            "{}-v{}-{}.tar.gz",
+            proj.qualified_names()[0],
+            proj.version.to_string(),
+            target
+        ));
+
+        let file = File::create(&path)?;
+        let enc = GzEncoder::new(file, Compression::default());
+        let mut tar = tar::Builder::new(enc);
+
+        for bin in binaries {
+            let name = bin.file_name().ok_or_else(|| {
+                Error::Environment(format!(
+                    "cargo output binary {} is a directory??",
+                    bin.display()
+                ))
+            })?;
+            tar.append_path_with_name(bin, name)?;
+        }
+
+        tar.finish()?;
+        Ok(path)
+    }
+}
+
+impl Default for BinaryArchiveMode {
+    #[cfg(windows)]
+    fn default() -> Self {
+        BinaryArchiveMode::Zipball
+    }
+
+    #[cfg(not(windows))]
+    fn default() -> Self {
+        BinaryArchiveMode::Tarball
+    }
+}
+
+impl From<&target_lexicon::Triple> for BinaryArchiveMode {
+    fn from(trip: &target_lexicon::Triple) -> Self {
+        match trip.operating_system {
+            target_lexicon::OperatingSystem::Windows => BinaryArchiveMode::Zipball,
+            _ => BinaryArchiveMode::Tarball,
+        }
     }
 }
