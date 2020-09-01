@@ -320,24 +320,34 @@ impl AppSession {
                 });
             }
 
-            let cur_version = proj.version.clone();
+            // Now, set the baseline version to the last release.
+
             let latest_release = latest_info.lookup_project(proj);
+
+            proj.version = if let Some(info) = latest_release {
+                proj.version.parse_like(&info.version)?
+            } else {
+                proj.version.zero_like()
+            };
+
+            let baseline_version = proj.version.clone();
+
+            // If there's a bump, apply it.
 
             if let Some(rc) = rc_info.lookup_project(proj) {
                 let scheme = proj.version.parse_bump_scheme(&rc.bump_spec)?;
-                proj.version = scheme.apply(&cur_version, latest_release)?;
+                scheme.apply(&mut proj.version)?;
                 new_versions.insert(proj.ident(), proj.version.clone());
                 info!(
                     "{}: {} => {}",
-                    proj.user_facing_name, cur_version, proj.version
+                    proj.user_facing_name, baseline_version, proj.version
+                );
+            } else {
+                info!(
+                    "{}: unchanged from {}",
+                    proj.user_facing_name, baseline_version
                 );
             }
-
-            // Bookkeeping so that we can produce updated release info.
-            proj.version_age = match (latest_release, proj.version == cur_version) {
-                (Some(info), true) => info.age + 1,
-                _ => 0,
-            };
         }
 
         Ok(())

@@ -43,6 +43,10 @@ trait Command {
 
 #[derive(Debug, PartialEq, StructOpt)]
 enum Commands {
+    #[structopt(name = "cargo")]
+    /// Commands specific to the Rust/Cargo packaging system.
+    Cargo(cargo::CargoCommand),
+
     #[structopt(name = "confirm")]
     /// Commit staged release requests to the `rc` branch
     Confirm(ConfirmCommand),
@@ -86,6 +90,7 @@ enum Commands {
 impl Command for Commands {
     fn execute(self) -> Result<i32> {
         match self {
+            Commands::Cargo(o) => o.execute(),
             Commands::Confirm(o) => o.execute(),
             Commands::Github(o) => o.execute(),
             Commands::GitUtil(o) => o.execute(),
@@ -216,18 +221,22 @@ impl Command for ConfirmCommand {
                 }
 
                 // OK. Analyze the version bump.
-                let proj = sess.graph().lookup(ident);
-                let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
                 let maybe_last_release = history.release_info(&sess.repo)?;
+                let proj = sess.graph_mut().lookup_mut(ident);
+                let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
 
                 let (old_version, new_version) = if let Some(last_release) = maybe_last_release {
                     // By definition, this project is will be present in the table:
                     let last_release = last_release.lookup_project(proj).unwrap();
-                    let new_version = scheme.apply(&proj.version, Some(last_release))?;
-                    (last_release.version.clone(), new_version.to_string())
+                    proj.version = proj.version.parse_like(&last_release.version)?;
+                    scheme.apply(&mut proj.version)?;
+                    (last_release.version.clone(), proj.version.to_string())
                 } else {
-                    let new_version = scheme.apply(&proj.version, None)?;
-                    ("[no previous releases]".to_owned(), new_version.to_string())
+                    scheme.apply(&mut proj.version)?;
+                    (
+                        "[no previous releases]".to_owned(),
+                        proj.version.to_string(),
+                    )
                 };
 
                 info!(
@@ -449,12 +458,12 @@ impl Command for ShowCommand {
     }
 }
 
+// TODO: add something like `--ifdev=latest` to print "latest"
+// instead of 0.0.0-dev.0 if we're not on a release commit for
+// this project.
 #[derive(Debug, PartialEq, StructOpt)]
 struct ShowVersionCommand {
-    // TODO: add something like `--ifdev=latest` to print "latest"
-    // instead of 0.0.0-dev.0 if we're not on a release commit for
-    // this project.
-    #[structopt(help = "Name(s) of the project(s) to query")]
+    #[structopt(help = "Name of the project to query")]
     proj_names: Vec<String>,
 }
 
@@ -463,13 +472,9 @@ impl Command for ShowVersionCommand {
         let mut sess = app::AppSession::initialize()?;
         sess.populated_graph()?;
 
-        // Get the list of projects that we're interested in.
-        //
-        // TODO: better validation and more flexible querying; if no names are
-        // provided, default to staging any changed projects.
         let mut q = graph::GraphQueryBuilder::default();
         q.names(self.proj_names);
-        let idents = sess.graph().query_ids(q)?;
+        let idents = sess.graph().query(q)?;
 
         if idents.len() != 1 {
             return Err(anyhow!("must specify exactly one project to show"));
@@ -516,10 +521,10 @@ impl Command for StageCommand {
         // Get the list of projects that we're interested in.
         let mut q = graph::GraphQueryBuilder::default();
         q.names(self.proj_names);
-        let empty_query = q.is_empty();
+        let no_names = q.no_names();
         let idents = sess
             .graph()
-            .query_or_all(q)
+            .query(q)
             .context("could not select projects for staging")?;
 
         if idents.len() == 0 {
@@ -541,7 +546,7 @@ impl Command for StageCommand {
             let dirty_allowed = self.force;
 
             if let Some(_) = sess.repo.scan_rc_info(proj, &mut changes, dirty_allowed)? {
-                if !empty_query {
+                if !no_names {
                     warn!(
                         "skipping {}: it appears to have already been staged",
                         proj.user_facing_name
@@ -551,7 +556,7 @@ impl Command for StageCommand {
             }
 
             if history.n_commits() == 0 {
-                if !empty_query {
+                if !no_names {
                     warn!("no changes detected for project {}", proj.user_facing_name);
                 }
             } else {
@@ -571,9 +576,9 @@ impl Command for StageCommand {
             }
         }
 
-        if empty_query && n_staged == 0 {
+        if no_names && n_staged == 0 {
             info!("nothing further to stage at this time");
-        } else if empty_query && n_staged != 1 {
+        } else if no_names && n_staged != 1 {
             info!("{} of {} projects staged", n_staged, idents.len());
         } else if n_staged != idents.len() {
             info!("{} of {} selected projects staged", n_staged, idents.len());
@@ -600,7 +605,7 @@ impl Command for StatusCommand {
         q.names(self.proj_names);
         let idents = sess
             .graph()
-            .query_or_all(q)
+            .query(q)
             .context("cannot get requested statuses")?;
 
         let histories = sess.analyze_histories()?;
@@ -693,6 +698,7 @@ fn list_commands() -> BTreeSet<String> {
         }
     }
 
+    commands.insert("cargo".to_owned());
     commands.insert("confirm".to_owned());
     commands.insert("git-util".to_owned());
     commands.insert("github".to_owned());

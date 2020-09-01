@@ -1,5 +1,12 @@
 # rc: micro bump
 
+- Oops! Fix the release process when only a subset of packages are being
+  released.
+- Add a `cargo foreach-released` subcommand
+- Tidy up project-graph querying framework and add more features.
+
+# cranko 0.0.14 (2020-08-31)
+
 - Make `--force` actually work for `cranko stage` and `cranko confirm`
 - book: a first pass of edits and tidying
 - Tidy up some internals that "shouldn't" affect the release pipeline, but I
