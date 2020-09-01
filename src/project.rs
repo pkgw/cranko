@@ -44,12 +44,6 @@ pub struct Project {
     /// The version associated with this project.
     pub version: Version,
 
-    /// The number of commits at which this project has kept the same version.
-    /// This isn't meant to be used in most cases, but it helps us with the
-    /// "project info" bookkeeping that we do in the commit messages on the
-    /// release branch.
-    pub version_age: usize,
-
     /// Steps to perform when rewriting this project's metadata to produce
     /// a release commit.
     pub rewriters: Vec<Box<dyn Rewriter>>,
@@ -164,7 +158,6 @@ impl<'a> ProjectBuilder<'a> {
             qnames: qnames,
             user_facing_name: String::new(),
             version,
-            version_age: 0,
             rewriters: Vec::new(),
             prefix: prefix.clone(),
             repo_paths: PathMatcher::new_include(prefix),
