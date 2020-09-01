@@ -376,7 +376,7 @@ impl Command for ReleaseWorkflowApplyVersionsCommand {
 
         sess.ensure_fully_clean()?;
 
-        let (dev_mode, rci) = sess.ensure_ci_rc_like_mode(self.force)?;
+        let (dev_mode, rci) = sess.ensure_ci_rc_mode(self.force)?;
         if dev_mode {
             info!("computing new versions for \"development\" mode");
         } else {
@@ -415,7 +415,7 @@ impl Command for ReleaseWorkflowCommitCommand {
         // to `master` or whatever: they might want to monitor that that part of
         // the workflow seems to be in good working order. Just so long as they
         // don't *push* that commit at the wrong time, it's OK.
-        let (_dev, _rci) = sess.ensure_ci_rc_like_mode(self.force)?;
+        let (_dev, _rci) = sess.ensure_ci_rc_mode(self.force)?;
         sess.make_release_commit()?;
         Ok(0)
     }
@@ -429,7 +429,12 @@ struct ReleaseWorkflowTagCommand {}
 impl Command for ReleaseWorkflowTagCommand {
     fn execute(self) -> Result<i32> {
         let mut sess = app::AppSession::initialize()?;
-        let rel_info = sess.ensure_ci_release_mode()?;
+        let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
+
+        if dev_mode {
+            return Err(anyhow!("refusing to create tags in dev mode"));
+        }
+
         sess.create_tags(&rel_info)?;
         Ok(0)
     }
