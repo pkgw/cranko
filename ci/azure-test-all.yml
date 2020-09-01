@@ -12,13 +12,6 @@ steps:
 
 - template: azure-install-rust.yml
 
-- bash: rustup target add $OTHER_TARGET
-  displayName: "Install cross-compile target"
-
-- bash: sudo apt update -y && sudo apt install gcc-multilib -y
-  displayName: "Install gcc-multilib (linux)"
-  condition: and(succeeded(), eq(variables['Agent.OS'], 'Linux'))
-
 # Bootstrap a binary for the buildhost arch with the unmodified checkout at
 # 0.0.0 versions.
 

@@ -24,7 +24,6 @@ stages:
           primaryRcBuild: ${{ eq(variables['Build.SourceBranchName'], 'rc') }}
     variables:
       TOOLCHAIN: stable
-      OTHER_TARGET: i686-unknown-linux-gnu
 
   # As far as I can tell, there is no way to matrix over a template *parameter*?
   # So we need a separate group for the "canary" jobs that test build success but
@@ -42,8 +41,6 @@ stages:
           TOOLCHAIN: beta
         nightly:
           TOOLCHAIN: nightly
-    variables:
-      OTHER_TARGET: i686-unknown-linux-gnu
 
   # Mac builds
   - job: macOS
@@ -53,7 +50,6 @@ stages:
       - template: azure-test-all.yml
     variables:
       TOOLCHAIN: stable
-      OTHER_TARGET: x86_64-apple-ios
 
   # Windows builds
   - job: Windows
@@ -65,10 +61,8 @@ stages:
       matrix:
         x86_64-msvc:
           TOOLCHAIN: stable-x86_64-pc-windows-msvc
-          OTHER_TARGET: i686-pc-windows-msvc
         x86_64-gnu:
           TOOLCHAIN: stable-x86_64-pc-windows-gnu
-          OTHER_TARGET: i686-pc-windows-gnu
 
   # rustfmt check
   - job: rustfmt
