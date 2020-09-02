@@ -7,6 +7,49 @@ trigger:
     - master
     - rc
 
+# We cannot use Pipeline's matrixing framework because only it works with
+# *runtime variables*, while we want to use templates with *parameters* which
+# are evaluated at *compile time* only. By coding our matrixing data as
+# top-level parameters, we can use them in compile-time template evaluation
+# (`${{ }}` expressions) to achieve a matrixing effect. Only a few variables can
+# be used at compile time: see "Available in templates?" in the table at:
+# https://docs.microsoft.com/en-us/azure/devops/pipelines/build/variables?view=azure-devops&tabs=yaml
+parameters:
+  - name: linuxBuilds
+    type: object
+    default:
+    - name: stable
+      params:
+        primaryBuild: true
+      vars:
+        TARGET: x86_64-unknown-linux-gnu
+        TOOLCHAIN: stable
+    - name: beta
+      params:
+        canaryBuild: true
+      vars:
+        TARGET: x86_64-unknown-linux-gnu
+        TOOLCHAIN: beta
+    - name: nightly
+      params:
+        canaryBuild: true
+      vars:
+        TARGET: x86_64-unknown-linux-gnu
+        TOOLCHAIN: nightly
+  - name: windowsBuilds
+    type: object
+    default:
+    - name: msvc
+      params: {}
+      vars:
+        TARGET: x86_64-pc-windows-msvc
+        TOOLCHAIN: stable-x86_64-pc-windows-msvc
+    - name: gnu
+      params: {}
+      vars:
+        TARGET: x86_64-pc-windows-gnu
+        TOOLCHAIN: stable-x86_64-pc-windows-gnu
+
 variables:
   MDBOOK_VERSION: 0.4.2
 
@@ -14,71 +57,49 @@ stages:
 - stage: BuildAndTest
   jobs:
 
-  # Main Linux build(s) that create release artifacts
-  - job: Linux
-    pool:
-      vmImage: ubuntu-16.04
-    steps:
+  # Linux builds
+  - ${{ each build in parameters.linuxBuilds }}:
+    - job: ${{ format('Linux_{0}', build.name) }}
+      pool:
+        vmImage: ubuntu-20.04
+      steps:
       - template: azure-build-and-test.yml
         parameters:
-          primaryRcBuild: ${{ eq(variables['Build.SourceBranchName'], 'rc') }}
-    variables:
-      TARGET: x86_64-unknown-linux-gnu
-      TOOLCHAIN: stable
-
-  # As far as I can tell, there is no way to matrix over a template *parameter*?
-  # So we need a separate group for the "canary" jobs that test build success but
-  # shouldn't create release artifacts.
-  - job: Linux_canary
-    pool:
-      vmImage: ubuntu-16.04
-    steps:
-      - template: azure-build-and-test.yml
-        parameters:
-          canaryBuild: true
-    strategy:
-      matrix:
-        beta:
-          TARGET: x86_64-unknown-linux-gnu
-          TOOLCHAIN: beta
-        nightly:
-          TARGET: x86_64-unknown-linux-gnu
-          TOOLCHAIN: nightly
+          ${{ insert }}: ${{ build.params }}
+      variables:
+        ${{ insert }}: ${{ build.vars }}
 
   # Mac builds
   - job: macOS
     pool:
       vmImage: macos-10.15
     steps:
-      - template: azure-build-and-test.yml
+    - template: azure-build-and-test.yml
     variables:
       TARGET: x86_64-apple-darwin
       TOOLCHAIN: stable
 
   # Windows builds
-  - job: Windows
-    pool:
-      vmImage: windows-2019
-    steps:
+  - ${{ each build in parameters.windowsBuilds }}:
+    - job: ${{ format('Windows_{0}', build.name) }}
+      pool:
+        vmImage: windows-2019
+      steps:
       - template: azure-build-and-test.yml
-    strategy:
-      matrix:
-        x86_64-msvc:
-          TARGET: x86_64-pc-windows-msvc
-          TOOLCHAIN: stable-x86_64-pc-windows-msvc
-        x86_64-gnu:
-          TARGET: x86_64-pc-windows-gnu
-          TOOLCHAIN: stable-x86_64-pc-windows-gnu
+        parameters:
+          ${{ insert }}: ${{ build.params }}
+      variables:
+        ${{ insert }}: ${{ build.vars }}
 
   # rustfmt check
   - job: rustfmt
     pool:
       vmImage: ubuntu-16.04
     steps:
-      - bash: rustup component add rustfmt
-        displayName: "Install rustfmt"
-      - bash: cargo fmt --all -- --check
-        displayName: "Check rustfmt (cargo)"
+    - bash: rustup component add rustfmt
+      displayName: "Install rustfmt"
+    - bash: cargo fmt --all -- --check
+      displayName: "Check rustfmt (cargo)"
     variables:
       TOOLCHAIN: stable
 
@@ -136,6 +157,6 @@ stages:
       runOnce:
         deploy:
           steps:
-            - template: azure-deployment.yml
-              parameters:
-                rcBuild: ${{ eq(variables['Build.SourceBranchName'], 'rc') }}
+          - template: azure-deployment.yml
+            parameters:
+              rcBuild: ${{ eq(variables['Build.SourceBranchName'], 'rc') }}
