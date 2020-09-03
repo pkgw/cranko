@@ -15,40 +15,53 @@ trigger:
 # be used at compile time: see "Available in templates?" in the table at:
 # https://docs.microsoft.com/en-us/azure/devops/pipelines/build/variables?view=azure-devops&tabs=yaml
 parameters:
-  - name: linuxBuilds
+  - name: builds
     type: object
     default:
-    - name: stable
+    - name: linux_stable
+      vmImage: ubuntu-20.04
       params:
         primaryBuild: true
       vars:
         TARGET: x86_64-unknown-linux-gnu
         TOOLCHAIN: stable
-    - name: beta
+
+    - name: linux_beta
+      vmImage: ubuntu-20.04
       params:
         canaryBuild: true
       vars:
         TARGET: x86_64-unknown-linux-gnu
         TOOLCHAIN: beta
-    - name: nightly
+
+    - name: linux_nightly
+      vmImage: ubuntu-20.04
       params:
         canaryBuild: true
       vars:
         TARGET: x86_64-unknown-linux-gnu
         TOOLCHAIN: nightly
-  - name: windowsBuilds
-    type: object
-    default:
-    - name: msvc
+
+    - name: windows_msvc
+      vmImage: windows-2019
       params: {}
       vars:
         TARGET: x86_64-pc-windows-msvc
         TOOLCHAIN: stable-x86_64-pc-windows-msvc
-    - name: gnu
+
+    - name: windows_gnu
+      vmImage: windows-2019
       params: {}
       vars:
         TARGET: x86_64-pc-windows-gnu
         TOOLCHAIN: stable-x86_64-pc-windows-gnu
+
+    - name: macos
+      vmImage: macos-10.15
+      params: {}
+      vars:
+        TARGET: x86_64-apple-darwin
+        TOOLCHAIN: stable
 
 variables:
   MDBOOK_VERSION: 0.4.2
@@ -57,33 +70,11 @@ stages:
 - stage: BuildAndTest
   jobs:
 
-  # Linux builds
-  - ${{ each build in parameters.linuxBuilds }}:
-    - job: ${{ format('Linux_{0}', build.name) }}
+  # Main builds
+  - ${{ each build in parameters.builds }}:
+    - job: ${{ format('build_{0}', build.name) }}
       pool:
-        vmImage: ubuntu-20.04
-      steps:
-      - template: azure-build-and-test.yml
-        parameters:
-          ${{ insert }}: ${{ build.params }}
-      variables:
-        ${{ insert }}: ${{ build.vars }}
-
-  # Mac builds
-  - job: macOS
-    pool:
-      vmImage: macos-10.15
-    steps:
-    - template: azure-build-and-test.yml
-    variables:
-      TARGET: x86_64-apple-darwin
-      TOOLCHAIN: stable
-
-  # Windows builds
-  - ${{ each build in parameters.windowsBuilds }}:
-    - job: ${{ format('Windows_{0}', build.name) }}
-      pool:
-        vmImage: windows-2019
+        vmImage: ${{ build.vmImage }}
       steps:
       - template: azure-build-and-test.yml
         parameters:
