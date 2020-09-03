@@ -59,7 +59,9 @@ steps:
 - bash: |
     artifact_dir="$(Build.ArtifactStagingDirectory)/binary-$TARGET"
     mkdir -p "$artifact_dir"
-    cargo run -- cargo package-released-binaries --command-name=./cross -t $TARGET $artifact_dir \
+    cargo run -- cargo package-released-binaries --command-name=./cross --reroot=. \
+      -t $TARGET \
+      $artifact_dir \
       -- build $CROSS_ARGS --all
   displayName: "Package binaries"
 

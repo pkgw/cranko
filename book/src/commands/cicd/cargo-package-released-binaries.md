@@ -10,6 +10,7 @@ that have had new releases.
 ```
 cranko cargo package-released-binaries
     [--command-name=COMMAND]
+    [--reroot=PREFIX]
     --target {TARGET}
     {DEST-DIR} -- [CARGO-ARGS...]
 ```
@@ -58,3 +59,11 @@ run instead of the default `cargo`. For instance, one might use
 the [rust-embedded/cross] framework.
 
 [rust-embedded/cross]: https://github.com/rust-embedded/cross
+
+The `--reroot` argument can be used to rewrite the paths returned by the build
+tool. This extremely specific operation is needed for the [rust-embedded/cross]
+framework, which runs inside a Docker container and therefore returns paths that
+look like `/target/$arch/debug/...`. The value of this argument is naively
+prepended to whatever paths are returned from the tool. In the
+[rust-embedded/cross] case, therefore, `--reroot=.` obtains paths that are
+meaningful on the build host.

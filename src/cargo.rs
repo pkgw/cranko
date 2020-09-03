@@ -395,6 +395,12 @@ pub struct PackageReleasedBinariesCommand {
     )]
     command_name: String,
 
+    #[structopt(
+        long = "reroot",
+        help = "A prefix to apply to paths returned by the invoked tool"
+    )]
+    reroot: Option<OsString>,
+
     #[structopt(short = "t", long = "target", help = "The binaries' target platform")]
     target: String,
 
@@ -456,7 +462,13 @@ impl Command for PackageReleasedBinariesCommand {
 
                     Message::CompilerArtifact(artifact) => {
                         if let Some(p) = artifact.executable {
-                            binaries.push(p);
+                            binaries.push(if let Some(ref root) = self.reroot {
+                                let mut prefixed = root.clone();
+                                prefixed.push(p);
+                                PathBuf::from(prefixed)
+                            } else {
+                                p
+                            });
                         }
                     }
 
