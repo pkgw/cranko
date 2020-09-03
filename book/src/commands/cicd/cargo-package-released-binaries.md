@@ -8,7 +8,11 @@ that have had new releases.
 #### Usage
 
 ```
-cranko cargo package-released-binaries --target {TARGET} {DEST-DIR} -- [CARGO-ARGS...]
+cranko cargo package-released-binaries
+    [--command-name=COMMAND]
+    [--reroot=PREFIX]
+    --target {TARGET}
+    {DEST-DIR} -- [CARGO-ARGS...]
 ```
 
 This command should be run in CI processing of an update to the `rc` branch,
@@ -48,3 +52,18 @@ an associated binary also named `foo`, the archive will unpack into a single
 file named `foo` or `foo.exe`. If the project contains multiple binaries, the
 archive will contain all of them (unless you add a `--bin` option to the Cargo
 arguments).
+
+The `--command-name` argument can be used to specify a different command to be
+run instead of the default `cargo`. For instance, one might use
+`--command-name=cross` for certain operations in a cross-compiled build using
+the [rust-embedded/cross] framework.
+
+[rust-embedded/cross]: https://github.com/rust-embedded/cross
+
+The `--reroot` argument can be used to rewrite the paths returned by the build
+tool. This extremely specific operation is needed for the [rust-embedded/cross]
+framework, which runs inside a Docker container and therefore returns paths that
+look like `/target/$arch/debug/...`. The value of this argument is naively
+prepended to whatever paths are returned from the tool. In the
+[rust-embedded/cross] case, therefore, `--reroot=.` obtains paths that are
+meaningful on the build host.

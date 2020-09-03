@@ -1,5 +1,14 @@
 # rc: micro bump
 
+- Get `cargo package-released-binaries` working with `cross` by adding
+  `--command-name` and `--reroot` options. Definitely hacky, but whatcha gonna
+  do.
+- With the above in hand, start providing sample prebuilt binaries for
+  `aarch64-unknown-linux-gnu` and `powerpc64le-unknown-linux-gnu` as a proof of
+  concept. These have not actually been tested in practice, though.
+
+# cranko 0.0.17 (2020-09-01)
+
 - cargo: take the "v" out of the binary package name template -- fixes the
   one-liner intallers
 - ci: minor tidying

@@ -8,7 +8,7 @@ had new releases.
 #### Usage
 
 ```
-cranko cargo foreach-released [CARGO-ARGS...]
+cranko cargo foreach-released [--command-name=COMMAND] [CARGO-ARGS...]
 ```
 
 This command should be run in CI processing of an update to the `rc` branch,
@@ -35,3 +35,10 @@ registries. See [the `cargo publish` docs][cargo-publish] for the official
 documentation.
 
 [Crates.io]: https://crates.io/
+
+The `--command-name` argument can be used to specify a different command to be
+run instead of the default `cargo`. For instance, one might use
+`--command-name=cross` for certain operations in a cross-compiled build using
+the [rust-embedded/cross] framework.
+
+[rust-embedded/cross]: https://github.com/rust-embedded/cross
