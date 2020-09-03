@@ -320,6 +320,13 @@ impl Command for CargoCommand {
 /// `cranko cargo foreach-released`
 #[derive(Debug, PartialEq, StructOpt)]
 pub struct ForeachReleasedCommand {
+    #[structopt(
+        long = "command-name",
+        help = "The command name to use for Cargo",
+        default_value = "cargo"
+    )]
+    command_name: String,
+
     #[structopt(help = "Arguments to the `cargo` command", required = true)]
     cargo_args: Vec<OsString>,
 }
@@ -342,7 +349,7 @@ impl Command for ForeachReleasedCommand {
             .query(q)
             .context("could not select projects for cargo foreach-released")?;
 
-        let mut cmd = process::Command::new("cargo");
+        let mut cmd = process::Command::new(&self.command_name);
         cmd.args(&self.cargo_args[..]);
 
         let print_which = idents.len() > 1;
@@ -381,6 +388,13 @@ impl Command for ForeachReleasedCommand {
 /// `cranko cargo package-released-binaries`
 #[derive(Debug, PartialEq, StructOpt)]
 pub struct PackageReleasedBinariesCommand {
+    #[structopt(
+        long = "command-name",
+        help = "The command name to use for Cargo",
+        default_value = "cargo"
+    )]
+    command_name: String,
+
     #[structopt(short = "t", long = "target", help = "The binaries' target platform")]
     target: String,
 
@@ -419,7 +433,7 @@ impl Command for PackageReleasedBinariesCommand {
         q.only_project_type("cargo");
         let idents = sess.graph().query(q).context("could not select projects")?;
 
-        let mut cmd = process::Command::new("cargo");
+        let mut cmd = process::Command::new(&self.command_name);
         cmd.args(&self.cargo_args[..])
             .arg("--message-format=json")
             .stdout(process::Stdio::piped());
