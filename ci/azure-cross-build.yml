@@ -22,6 +22,10 @@ steps:
   displayName: Install cross $(CROSS_VERSION)
 
 - bash: |
+    docker run --rm --privileged multiarch/qemu-user-static:register --reset --credential yes
+  displayName: Set up QEMU binfmt-misc
+
+- bash: |
     echo "##vso[task.setvariable variable=CROSS_ARGS;]--target=$TARGET --release --features=vendored-openssl"
   displayName: Set build variables
 

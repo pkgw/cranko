@@ -70,9 +70,9 @@ parameters:
       vars:
         TARGET: aarch64-unknown-linux-gnu
 
-    - name: powerpc64_unknown_linux_gnu
+    - name: powerpc64le_unknown_linux_gnu
       vars:
-        TARGET: powerpc64-unknown-linux-gnu
+        TARGET: powerpc64le-unknown-linux-gnu
 
 variables:
   CROSS_VERSION: 0.2.1
