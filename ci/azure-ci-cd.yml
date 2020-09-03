@@ -62,8 +62,15 @@ parameters:
       vars:
         TARGET: x86_64-apple-darwin
         TOOLCHAIN: stable
+  - name: crossBuilds
+    type: object
+    default:
+    - name: aarch64_unknown_linux_gnu
+      vars:
+        TARGET: aarch64-unknown-linux-gnu
 
 variables:
+  CROSS_VERSION: 0.2.1
   MDBOOK_VERSION: 0.4.2
 
 stages:
@@ -79,6 +86,16 @@ stages:
       - template: azure-build-and-test.yml
         parameters:
           ${{ insert }}: ${{ build.params }}
+      variables:
+        ${{ insert }}: ${{ build.vars }}
+
+  # Cross builds
+  - ${{ each build in parameters.crossBuilds }}:
+    - job: ${{ format('cross_{0}', build.name) }}
+      pool:
+        vmImage: ubuntu-20.04
+      steps:
+      - template: azure-cross-build.yml
       variables:
         ${{ insert }}: ${{ build.vars }}
 
