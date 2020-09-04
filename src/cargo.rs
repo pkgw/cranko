@@ -517,7 +517,7 @@ impl BinaryArchiveMode {
         dest_dir: &Path,
         binaries: &[PathBuf],
         target: &target_lexicon::Triple,
-    ) -> Result<PathBuf> {
+    ) -> anyhow::Result<PathBuf> {
         match self {
             BinaryArchiveMode::Tarball => self.tarball(proj, dest_dir, binaries, target),
             BinaryArchiveMode::Zipball => self.zipball(proj, dest_dir, binaries, target),
@@ -530,7 +530,7 @@ impl BinaryArchiveMode {
         dest_dir: &Path,
         binaries: &[PathBuf],
         target: &target_lexicon::Triple,
-    ) -> Result<PathBuf> {
+    ) -> anyhow::Result<PathBuf> {
         let mut path = dest_dir.to_path_buf();
         path.push(format!(
             "{}-{}-{}.zip",
@@ -539,35 +539,45 @@ impl BinaryArchiveMode {
             target
         ));
 
-        let out_file = File::create(&path)?;
+        let out_file = File::create(&path)
+            .with_context(|| format!("failed to create Zip file `{}`", path.display()))?;
         let mut zip = zip::ZipWriter::new(out_file);
         zip.set_comment("Created by Cranko");
 
         let options = zip::write::FileOptions::default().unix_permissions(0o755);
 
         for bin in binaries {
-            let name = bin.file_name().ok_or_else(|| {
-                Error::Environment(format!(
-                    "cargo output binary {} is a directory??",
-                    bin.display()
-                ))
-            })?;
+            let name = bin
+                .file_name()
+                .ok_or_else(|| anyhow!("cargo output binary {} is a directory??", bin.display()))?;
             let name = name.to_str().ok_or_else(|| {
-                Error::Environment(format!(
+                anyhow!(
                     "cargo output binary {} name is not Unicode-compatible",
                     bin.display()
-                ))
+                )
             })?;
 
-            let mut in_file = File::open(bin)?;
+            let mut in_file = File::open(bin)
+                .with_context(|| format!("failed to open executable file `{}`", bin.display()))?;
 
-            zip.start_file(name, options)
-                .map_err(|e| Error::Environment(format!("could not start Zip entry: {}", e)))?;
-            std::io::copy(&mut in_file, &mut zip)?;
+            zip.start_file(name, options).with_context(|| {
+                format!(
+                    "could not start record for executable `{}` in Zip `{}`",
+                    bin.display(),
+                    path.display()
+                )
+            })?;
+            std::io::copy(&mut in_file, &mut zip).with_context(|| {
+                format!(
+                    "could not copy data for executable `{}` into Zip `{}`",
+                    bin.display(),
+                    path.display()
+                )
+            })?;
         }
 
         zip.finish()
-            .map_err(|e| Error::Environment(format!("could not finalize Zip file: {}", e)))?;
+            .with_context(|| format!("failed to finish writing Zip file `{}`", path.display()))?;
         Ok(path)
     }
 
@@ -577,7 +587,7 @@ impl BinaryArchiveMode {
         dest_dir: &Path,
         binaries: &[PathBuf],
         target: &target_lexicon::Triple,
-    ) -> Result<PathBuf> {
+    ) -> anyhow::Result<PathBuf> {
         use flate2::write::GzEncoder;
         use flate2::Compression;
 
@@ -589,21 +599,21 @@ impl BinaryArchiveMode {
             target
         ));
 
-        let file = File::create(&path)?;
+        let file = File::create(&path)
+            .with_context(|| format!("failed to create tar file `{}`", path.display()))?;
         let enc = GzEncoder::new(file, Compression::default());
         let mut tar = tar::Builder::new(enc);
 
         for bin in binaries {
-            let name = bin.file_name().ok_or_else(|| {
-                Error::Environment(format!(
-                    "cargo output binary {} is a directory??",
-                    bin.display()
-                ))
-            })?;
-            tar.append_path_with_name(bin, name)?;
+            let name = bin
+                .file_name()
+                .ok_or_else(|| anyhow!("cargo output binary {} is a directory??", bin.display()))?;
+            tar.append_path_with_name(bin, name)
+                .with_context(|| format!("failed to add file `{}` to tar", bin.display()))?;
         }
 
-        tar.finish()?;
+        tar.finish()
+            .with_context(|| format!("failed to finish writing tar file `{}`", path.display()))?;
         Ok(path)
     }
 }

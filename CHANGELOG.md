@@ -1,5 +1,9 @@
 # rc: micro bump
 
+- Try to provide more error context in `cranko cargo package-released-binaries`.
+
+# cranko 0.0.18 (2020-09-03)
+
 - Get `cargo package-released-binaries` working with `cross` by adding
   `--command-name` and `--reroot` options. Definitely hacky, but whatcha gonna
   do.
