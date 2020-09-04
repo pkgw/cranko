@@ -439,17 +439,24 @@ impl Command for PackageReleasedBinariesCommand {
         q.only_project_type("cargo");
         let idents = sess.graph().query(q).context("could not select projects")?;
 
-        let mut cmd = process::Command::new(&self.command_name);
-        cmd.args(&self.cargo_args[..])
-            .arg("--message-format=json")
-            .stdout(process::Stdio::piped());
-
         for ident in &idents {
             let proj = sess.graph().lookup(*ident);
-            let dir = sess.repo.resolve_workdir(&proj.prefix());
-            cmd.current_dir(&dir);
 
-            let mut child = cmd.spawn()?;
+            // Unlike foreach-released, here we iterate over projects by passing
+            // a --package argument rather than spawning the process in a
+            // subdirectory. This is to ensure that we work with `cross`, which
+            // seemingly only looks for Cross.toml in the current directory, and
+            // also tempts people into using relative paths for arguments like
+            // `--reroot`.
+            let mut cmd = process::Command::new(&self.command_name);
+            cmd.args(&self.cargo_args[..])
+                .arg("--message-format=json")
+                .arg(format!("--package={}", proj.qualified_names()[0]))
+                .stdout(process::Stdio::piped());
+
+            let mut child = cmd
+                .spawn()
+                .with_context(|| format!("failed to spawn subcommand: {:?}", cmd))?;
             let reader = BufReader::new(child.stdout.take().unwrap());
 
             let mut binaries = Vec::new();
