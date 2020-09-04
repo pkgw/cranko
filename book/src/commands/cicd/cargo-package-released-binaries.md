@@ -23,6 +23,13 @@ current branch should be the `release` branch.
 
 ```shell
 $ cranko cargo package-released-binaries -t $target /tmp/artifacts/ -- build --release
+
+$ cranko cargo package-released-binaries \
+  --command-name=cross \
+  --reroot=$(pwd) \
+  -t $target \
+  /tmp/artifacts/ \
+  -- build --target=$target --features=vendored-openssl --release
 ```
 
 For each [Cargo] project known to Cranko that has a new release, this command
@@ -39,6 +46,12 @@ compiler artifacts. Typically, the command of interest would be `cargo build
 build --release`. However, you might want to include feature flags or other
 selectors as appropriate. The `--message-flags=json` argument will be
 automatically (and unconditionally) appended.
+
+Unlike [`cranko cargo foreach-released`](./cargo-foreach-released.md), this
+command selects projects by passing a `--package=` argument to the subcommand,
+rather than changing the starting directory in which it is invoked. This
+behavior is needed for the analysis to work when passing through to `cross` (see
+below) when there are any Rust packages not rooted at the repository root.
 
 The created archive files will be named according to the format
 `{cratename}-{version}-{target}.{format}`. The archive format is `.tar.gz` on

@@ -1,3 +1,10 @@
+# cranko 0.0.20 (2020-09-04)
+
+- Attempt to fix `cranko cargo package-released-binaries` when using the `cross`
+  tool in the presence of subprojects. We need to pass a `--package` argument to
+  the tool, rather than starting it in a different directory, due to various
+  assumptions that get broken when we do the latter.
+
 # cranko 0.0.19 (2020-09-04)
 
 - Try to provide more error context in `cranko cargo package-released-binaries`.
