@@ -11,6 +11,11 @@ repository = "https://github.com/pkgw/cranko"
 readme = "README.md"
 keywords = ["ci", "cli", "release-automation"]
 categories = ["command-line-utilities", "development-tools"]
+exclude = [
+  "book",
+  "ci",
+  "www"
+]
 
 [dependencies]
 anyhow = "^1"
