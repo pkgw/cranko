@@ -1,3 +1,8 @@
+# cranko 0.0.22 (2020-09-06)
+
+- Add `cranko show if-released`
+- ci: fix Crates.io publishing, hopefully?
+
 # cranko 0.0.21 (2020-09-06)
 
 - No code changes.

@@ -1,6 +1,6 @@
 [package]
 name = "cranko"
-version = "0.0.21"
+version = "0.0.22"
 authors = ["Peter Williams <peter@newton.cx>"]
 edition = "2018"
 license = "MIT"
