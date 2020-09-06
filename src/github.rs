@@ -84,6 +84,37 @@ impl GitHubInformation {
         format!("https://api.github.com/repos/{}/{}", self.slug, rest)
     }
 
+    /// Delete an existing release.
+    fn delete_release(&self, tag_name: &str, client: &mut reqwest::blocking::Client) -> Result<()> {
+        let query_url = self.api_url(&format!("releases/tags/{}", tag_name));
+
+        let resp = client.get(&query_url).send()?;
+        if !resp.status().is_success() {
+            return Err(Error::Environment(format!(
+                "no GitHub release for tag `{}`: {}",
+                tag_name,
+                resp.text()
+                    .unwrap_or_else(|_| "[non-textual server response]".to_owned())
+            )));
+        }
+
+        let metadata = json::parse(&resp.text()?)?;
+        let id = metadata["id"].to_string();
+
+        let delete_url = self.api_url(&format!("releases/{}", id));
+        let resp = client.delete(&delete_url).send()?;
+        if !resp.status().is_success() {
+            return Err(Error::Environment(format!(
+                "could not delete GitHub release for tag `{}`: {}",
+                tag_name,
+                resp.text()
+                    .unwrap_or_else(|_| "[non-textual server response]".to_owned())
+            )));
+        }
+
+        Ok(())
+    }
+
     /// Get information about an existing release.
     fn get_release_metadata(
         &self,
@@ -109,24 +140,22 @@ impl GitHubInformation {
     }
 
     /// Create a new GitHub release.
-    fn create_release(
+    fn create_custom_release(
         &self,
-        sess: &AppSession,
-        proj: &Project,
-        rel: &ReleasedProjectInfo,
-        cid: &CommitId,
+        tag_name: String,
+        release_name: String,
+        body: String,
+        is_draft: bool,
+        is_prerelease: bool,
         client: &mut reqwest::blocking::Client,
     ) -> Result<JsonValue> {
-        let tag_name = sess.repo.get_tag_name(proj, rel)?;
-
-        let changelog = proj.changelog.scan_changelog(proj, &sess.repo, cid)?;
-
+        let saved_tag_name = tag_name.clone();
         let release_info = object! {
-            "tag_name" => tag_name.clone(),
-            "name" => format!("{} {}", proj.user_facing_name, proj.version),
-            "body" => changelog,
-            "draft" => false,
-            "prerelease" => false,
+            "tag_name" => tag_name,
+            "name" => release_name,
+            "body" => body,
+            "draft" => is_draft,
+            "prerelease" => is_prerelease,
         };
 
         let create_url = self.api_url("releases");
@@ -138,14 +167,119 @@ impl GitHubInformation {
         let parsed = json::parse(&resp.text()?)?;
 
         if status.is_success() {
-            info!("created GitHub release for {}", tag_name);
+            info!("created GitHub release for {}", saved_tag_name);
             Ok(parsed)
         } else {
             Err(Error::Environment(format!(
                 "failed to create GitHub release for {}: {}",
-                tag_name, parsed
+                saved_tag_name, parsed
             )))
         }
+    }
+
+    /// Create a new GitHub release.
+    fn create_release(
+        &self,
+        sess: &AppSession,
+        proj: &Project,
+        rel: &ReleasedProjectInfo,
+        cid: &CommitId,
+        client: &mut reqwest::blocking::Client,
+    ) -> Result<JsonValue> {
+        let tag_name = sess.repo.get_tag_name(proj, rel)?;
+        let release_name = format!("{} {}", proj.user_facing_name, proj.version);
+        let changelog = proj.changelog.scan_changelog(proj, &sess.repo, cid)?;
+        self.create_custom_release(tag_name, release_name, changelog, false, false, client)
+    }
+}
+
+/// The `github` subcommands.
+#[derive(Debug, PartialEq, StructOpt)]
+pub enum GithubCommands {
+    #[structopt(name = "create-custom-release")]
+    /// Create a single, customized GitHub release
+    CreateCustomRelease(CreateCustomReleaseCommand),
+
+    #[structopt(name = "create-releases")]
+    /// Create one or more new GitHub releases
+    CreateReleases(CreateReleasesCommand),
+
+    #[structopt(name = "_credential-helper", setting = structopt::clap::AppSettings::Hidden)]
+    /// (hidden) github credential helper
+    CredentialHelper(CredentialHelperCommand),
+
+    #[structopt(name = "delete-release")]
+    /// Delete an existing GitHub release
+    DeleteRelease(DeleteReleaseCommand),
+
+    #[structopt(name = "install-credential-helper")]
+    /// Install Cranko as a Git "credential helper", using $GITHUB_TOKEN to log in
+    InstallCredentialHelper(InstallCredentialHelperCommand),
+
+    #[structopt(name = "upload-artifacts")]
+    /// Upload one or more files as GitHub release artifacts
+    UploadArtifacts(UploadArtifactsCommand),
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct GithubCommand {
+    #[structopt(subcommand)]
+    command: GithubCommands,
+}
+
+impl Command for GithubCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        match self.command {
+            GithubCommands::CreateCustomRelease(o) => o.execute(),
+            GithubCommands::CreateReleases(o) => o.execute(),
+            GithubCommands::CredentialHelper(o) => o.execute(),
+            GithubCommands::DeleteRelease(o) => o.execute(),
+            GithubCommands::InstallCredentialHelper(o) => o.execute(),
+            GithubCommands::UploadArtifacts(o) => o.execute(),
+        }
+    }
+}
+
+/// Create a single custom GitHub release.
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct CreateCustomReleaseCommand {
+    #[structopt(long = "name", help = "The user-facing name for the release")]
+    release_name: String,
+
+    #[structopt(
+        long = "desc",
+        help = "The release description text (Markdown-formatted)",
+        default_value = "Release automatically created by Cranko."
+    )]
+    body: String,
+
+    #[structopt(long = "draft", help = "Whether to mark this release as a draft")]
+    is_draft: bool,
+
+    #[structopt(
+        long = "prerelease",
+        help = "Whether to mark this release as a pre-release"
+    )]
+    is_prerelease: bool,
+
+    #[structopt(help = "Name of the Git(Hub) tag to use as the release basis")]
+    tag_name: String,
+}
+
+impl Command for CreateCustomReleaseCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        let sess = AppSession::initialize()?;
+        let info = GitHubInformation::new(&sess)?;
+        let mut client = info.make_blocking_client()?;
+        info.create_custom_release(
+            self.tag_name,
+            self.release_name,
+            self.body,
+            self.is_draft,
+            self.is_prerelease,
+            &mut client,
+        )?;
+        Ok(0)
     }
 }
 
@@ -239,6 +373,27 @@ impl Command for CredentialHelperCommand {
             println!("password={}", token);
         }
 
+        Ok(0)
+    }
+}
+
+/// Delete a release from GitHub.
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct DeleteReleaseCommand {
+    #[structopt(help = "Name of the release's tag on GitHub")]
+    tag_name: String,
+}
+
+impl Command for DeleteReleaseCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        let sess = AppSession::initialize()?;
+        let info = GitHubInformation::new(&sess)?;
+        let mut client = info.make_blocking_client()?;
+        info.delete_release(&self.tag_name, &mut client)?;
+        info!(
+            "deleted GitHub release associated with tag `{}`",
+            self.tag_name
+        );
         Ok(0)
     }
 }
@@ -391,41 +546,5 @@ impl Command for UploadArtifactsCommand {
 
         info!("success!");
         Ok(0)
-    }
-}
-
-#[derive(Debug, PartialEq, StructOpt)]
-pub enum GithubCommands {
-    #[structopt(name = "create-releases")]
-    /// Create one or more new GitHub releases
-    CreateReleases(CreateReleasesCommand),
-
-    #[structopt(name = "_credential-helper", setting = structopt::clap::AppSettings::Hidden)]
-    /// (hidden) github credential helper
-    CredentialHelper(CredentialHelperCommand),
-
-    #[structopt(name = "install-credential-helper")]
-    /// Install Cranko as a Git "credential helper", using $GITHUB_TOKEN to log in
-    InstallCredentialHelper(InstallCredentialHelperCommand),
-
-    #[structopt(name = "upload-artifacts")]
-    /// Upload one or more files as GitHub release artifacts
-    UploadArtifacts(UploadArtifactsCommand),
-}
-
-#[derive(Debug, PartialEq, StructOpt)]
-pub struct GithubCommand {
-    #[structopt(subcommand)]
-    command: GithubCommands,
-}
-
-impl Command for GithubCommand {
-    fn execute(self) -> anyhow::Result<i32> {
-        match self.command {
-            GithubCommands::CreateReleases(o) => o.execute(),
-            GithubCommands::CredentialHelper(o) => o.execute(),
-            GithubCommands::InstallCredentialHelper(o) => o.execute(),
-            GithubCommands::UploadArtifacts(o) => o.execute(),
-        }
     }
 }
