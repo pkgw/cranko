@@ -171,5 +171,3 @@ stages:
         deploy:
           steps:
           - template: azure-deployment.yml
-            parameters:
-              rcBuild: ${{ eq(variables['Build.SourceBranchName'], 'rc') }}
