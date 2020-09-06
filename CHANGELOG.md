@@ -1,5 +1,10 @@
 # rc: micro bump
 
+- No code changes.
+- ci: first publication to Crates.io. Hopefully.
+
+# cranko 0.0.20 (2020-09-04)
+
 - Attempt to fix `cranko cargo package-released-binaries` when using the `cross`
   tool in the presence of subprojects. We need to pass a `--package` argument to
   the tool, rather than starting it in a different directory, due to various

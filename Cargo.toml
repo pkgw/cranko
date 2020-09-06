@@ -3,6 +3,19 @@ name = "cranko"
 version = "0.0.0-dev.0"
 authors = ["Peter Williams <peter@newton.cx>"]
 edition = "2018"
+license = "MIT"
+description = "A cross-platform, cross-language release automation tool"
+homepage = "https://pkgw.github.io/cranko/"
+documentation = "https://docs.rs/cranko"
+repository = "https://github.com/pkgw/cranko"
+readme = "README.md"
+keywords = ["ci", "cli", "release-automation"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = [
+  "book",
+  "ci",
+  "www"
+]
 
 [dependencies]
 anyhow = "^1"
