@@ -1,3 +1,12 @@
+# cranko 0.0.23 (2020-09-06)
+
+- Add `github create-custom-release` and `github delete-release`. These
+  utilities will help with the Tectonic `continuous` release, which I want to
+  maintain. But it's important to note that the intent is that in most cases
+  you'll want to create releases with `github create-releases` —
+  `create-custom-release` is a more specialized tool. And of course, in most
+  cases you shouldn't be deleting releases.
+
 # cranko 0.0.22 (2020-09-06)
 
 - Add `cranko show if-released`
@@ -31,7 +40,7 @@
 # cranko 0.0.17 (2020-09-01)
 
 - cargo: take the "v" out of the binary package name template -- fixes the
-  one-liner intallers
+  one-liner installers
 - ci: minor tidying
 
 # cranko 0.0.16 (2020-09-01)

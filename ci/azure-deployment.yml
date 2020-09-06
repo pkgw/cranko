@@ -1,27 +1,13 @@
 # Cranko deployment pipline, run when all CI tests pass on the `master` or `rc
-# branches. NB: make sure to properly handle both cases!
-
-parameters:
-- name: rcBuild
-  type: boolean
-  default: false
+# branches. NB: right now we do nothing on `master`! That could change.
 
 steps:
-- bash: |
-    cd $(Pipeline.Workspace)
-    mkdir artifact-collection
-    cp binary-*/* artifact-collection/
-  displayName: Collect release artifacts
-
-- publish: $(Pipeline.Workspace)/artifact-collection
-  displayName: Publish release artifacts
-  artifact: artifact-collection
 
 # if we're on the `rc` branch, the release has been fully vetted and the
 # internal artifacts have been gathered -- time to lock in a new `release`
 # commit and invoke the full release processes.
 
-- ${{ if eq(parameters.rcBuild, true) }}:
+- ${{ if eq(variables['Build.SourceBranchName'], 'rc') }}:
   - checkout: self
 
   - bash: |
@@ -44,7 +30,7 @@ steps:
       # If `./cranko` isn't moved, Cargo will complain about the dirty
       # working directory.
       mv ./cranko /tmp/
-      /tmp/cranko cargo foreach-released publish
+      /tmp/cranko cargo foreach-released publish --no-verify
       mv /tmp/cranko .
     displayName: Publish updated Cargo crates
     env:
@@ -52,7 +38,7 @@ steps:
 
   - bash: |
       ./cranko github create-releases
-      ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/artifact-collection/*
+      ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/binary-*/*
     displayName: Create GitHub releases
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
