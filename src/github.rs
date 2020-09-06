@@ -84,6 +84,37 @@ impl GitHubInformation {
         format!("https://api.github.com/repos/{}/{}", self.slug, rest)
     }
 
+    /// Delete an existing release.
+    fn delete_release(&self, tag_name: &str, client: &mut reqwest::blocking::Client) -> Result<()> {
+        let query_url = self.api_url(&format!("releases/tags/{}", tag_name));
+
+        let resp = client.get(&query_url).send()?;
+        if !resp.status().is_success() {
+            return Err(Error::Environment(format!(
+                "no GitHub release for tag `{}`: {}",
+                tag_name,
+                resp.text()
+                    .unwrap_or_else(|_| "[non-textual server response]".to_owned())
+            )));
+        }
+
+        let metadata = json::parse(&resp.text()?)?;
+        let id = metadata["id"].to_string();
+
+        let delete_url = self.api_url(&format!("releases/{}", id));
+        let resp = client.delete(&delete_url).send()?;
+        if !resp.status().is_success() {
+            return Err(Error::Environment(format!(
+                "could not delete GitHub release for tag `{}`: {}",
+                tag_name,
+                resp.text()
+                    .unwrap_or_else(|_| "[non-textual server response]".to_owned())
+            )));
+        }
+
+        Ok(())
+    }
+
     /// Get information about an existing release.
     fn get_release_metadata(
         &self,
@@ -145,6 +176,48 @@ impl GitHubInformation {
                 "failed to create GitHub release for {}: {}",
                 tag_name, parsed
             )))
+        }
+    }
+}
+
+/// The `github` subcommands.
+#[derive(Debug, PartialEq, StructOpt)]
+pub enum GithubCommands {
+    #[structopt(name = "create-releases")]
+    /// Create one or more new GitHub releases
+    CreateReleases(CreateReleasesCommand),
+
+    #[structopt(name = "_credential-helper", setting = structopt::clap::AppSettings::Hidden)]
+    /// (hidden) github credential helper
+    CredentialHelper(CredentialHelperCommand),
+
+    #[structopt(name = "delete-release")]
+    /// Delete an existing GitHub release
+    DeleteRelease(DeleteReleaseCommand),
+
+    #[structopt(name = "install-credential-helper")]
+    /// Install Cranko as a Git "credential helper", using $GITHUB_TOKEN to log in
+    InstallCredentialHelper(InstallCredentialHelperCommand),
+
+    #[structopt(name = "upload-artifacts")]
+    /// Upload one or more files as GitHub release artifacts
+    UploadArtifacts(UploadArtifactsCommand),
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct GithubCommand {
+    #[structopt(subcommand)]
+    command: GithubCommands,
+}
+
+impl Command for GithubCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        match self.command {
+            GithubCommands::CreateReleases(o) => o.execute(),
+            GithubCommands::CredentialHelper(o) => o.execute(),
+            GithubCommands::DeleteRelease(o) => o.execute(),
+            GithubCommands::InstallCredentialHelper(o) => o.execute(),
+            GithubCommands::UploadArtifacts(o) => o.execute(),
         }
     }
 }
@@ -239,6 +312,27 @@ impl Command for CredentialHelperCommand {
             println!("password={}", token);
         }
 
+        Ok(0)
+    }
+}
+
+/// Delete a release from GitHub.
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct DeleteReleaseCommand {
+    #[structopt(help = "Name of the release's tag on GitHub")]
+    tag_name: String,
+}
+
+impl Command for DeleteReleaseCommand {
+    fn execute(self) -> anyhow::Result<i32> {
+        let sess = AppSession::initialize()?;
+        let info = GitHubInformation::new(&sess)?;
+        let mut client = info.make_blocking_client()?;
+        info.delete_release(&self.tag_name, &mut client)?;
+        info!(
+            "deleted GitHub release associated with tag `{}`",
+            self.tag_name
+        );
         Ok(0)
     }
 }
@@ -391,41 +485,5 @@ impl Command for UploadArtifactsCommand {
 
         info!("success!");
         Ok(0)
-    }
-}
-
-#[derive(Debug, PartialEq, StructOpt)]
-pub enum GithubCommands {
-    #[structopt(name = "create-releases")]
-    /// Create one or more new GitHub releases
-    CreateReleases(CreateReleasesCommand),
-
-    #[structopt(name = "_credential-helper", setting = structopt::clap::AppSettings::Hidden)]
-    /// (hidden) github credential helper
-    CredentialHelper(CredentialHelperCommand),
-
-    #[structopt(name = "install-credential-helper")]
-    /// Install Cranko as a Git "credential helper", using $GITHUB_TOKEN to log in
-    InstallCredentialHelper(InstallCredentialHelperCommand),
-
-    #[structopt(name = "upload-artifacts")]
-    /// Upload one or more files as GitHub release artifacts
-    UploadArtifacts(UploadArtifactsCommand),
-}
-
-#[derive(Debug, PartialEq, StructOpt)]
-pub struct GithubCommand {
-    #[structopt(subcommand)]
-    command: GithubCommands,
-}
-
-impl Command for GithubCommand {
-    fn execute(self) -> anyhow::Result<i32> {
-        match self.command {
-            GithubCommands::CreateReleases(o) => o.execute(),
-            GithubCommands::CredentialHelper(o) => o.execute(),
-            GithubCommands::InstallCredentialHelper(o) => o.execute(),
-            GithubCommands::UploadArtifacts(o) => o.execute(),
-        }
     }
 }
