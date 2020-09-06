@@ -41,7 +41,11 @@ steps:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
 
   - bash: |
-      ./cranko cargo foreach-released publish
+      # If `./cranko` isn't moved, Cargo will complain about the dirty
+      # working directory.
+      mv ./cranko /tmp/
+      /tmp/cranko cargo foreach-released publish
+      mv /tmp/cranko .
     displayName: Publish updated Cargo crates
     env:
       CARGO_REGISTRY_TOKEN: $(CARGO_REGISTRY_TOKEN)
