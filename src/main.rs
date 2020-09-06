@@ -8,7 +8,7 @@
 //!
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{bail, Context, Result};
 use log::{error, info, warn};
 use std::{
     collections::{BTreeSet, HashMap},
@@ -153,7 +153,7 @@ impl Command for ConfirmCommand {
                 e
             );
             if !self.force {
-                return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+                bail!("refusing to proceed (use `--force` to override)");
             }
         }
 
@@ -216,7 +216,7 @@ impl Command for ConfirmCommand {
                             error!("... the required commit was unknown or unspecified");
                         }
 
-                        return Err(anyhow!("cannot confirm release submission"));
+                        bail!("cannot confirm release submission");
                     }
                 }
 
@@ -432,7 +432,7 @@ impl Command for ReleaseWorkflowTagCommand {
         let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
 
         if dev_mode {
-            return Err(anyhow!("refusing to create tags in dev mode"));
+            bail!("refusing to create tags in dev mode");
         }
 
         sess.create_tags(&rel_info)?;
@@ -450,6 +450,10 @@ struct ShowCommand {
 
 #[derive(Debug, PartialEq, StructOpt)]
 enum ShowCommands {
+    #[structopt(name = "if-released")]
+    /// Report if a project was just released
+    IfReleased(ShowIfReleasedCommand),
+
     #[structopt(name = "version")]
     /// Print the current version number of a project
     Version(ShowVersionCommand),
@@ -459,7 +463,61 @@ impl Command for ShowCommand {
     fn execute(self) -> Result<i32> {
         match self.command {
             ShowCommands::Version(o) => o.execute(),
+            ShowCommands::IfReleased(o) => o.execute(),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ShowIfReleasedCommand {
+    #[structopt(
+        long = "exit-code",
+        help = "Exit the program with success if released, failure if not"
+    )]
+    exit_code: bool,
+
+    #[structopt(long = "tf", help = "Print \"true\" if released, \"false\" if not")]
+    true_false: bool,
+
+    #[structopt(help = "Name of the project to query")]
+    proj_names: Vec<String>,
+}
+
+impl Command for ShowIfReleasedCommand {
+    fn execute(self) -> Result<i32> {
+        let mut sess = app::AppSession::initialize()?;
+        sess.populated_graph()?;
+
+        if !(self.exit_code || self.true_false) {
+            bail!("must specify at least one output mechanism");
+        }
+
+        let mut q = graph::GraphQueryBuilder::default();
+        q.names(self.proj_names);
+        let idents = sess.graph().query(q)?;
+
+        if idents.len() != 1 {
+            bail!("must specify exactly one project to show");
+        }
+
+        let (_dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
+
+        let proj = sess.graph().lookup(idents[0]);
+        let was_released = rel_info.lookup_if_released(proj).is_some();
+
+        if self.true_false {
+            println!("{}", if was_released { "true" } else { "false" });
+        }
+
+        Ok(if self.exit_code {
+            if was_released {
+                0
+            } else {
+                1
+            }
+        } else {
+            0
+        })
     }
 }
 
@@ -482,7 +540,7 @@ impl Command for ShowVersionCommand {
         let idents = sess.graph().query(q)?;
 
         if idents.len() != 1 {
-            return Err(anyhow!("must specify exactly one project to show"));
+            bail!("must specify exactly one project to show");
         }
 
         let proj = sess.graph().lookup(idents[0]);
@@ -517,7 +575,7 @@ impl Command for StageCommand {
                 e
             );
             if !self.force {
-                return Err(anyhow!("refusing to proceed (use `--force` to override)"));
+                bail!("refusing to proceed (use `--force` to override)");
             }
         }
 
