@@ -41,6 +41,12 @@ steps:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
 
   - bash: |
+      ./cranko cargo foreach-released publish
+    displayName: Publish updated Cargo crates
+    env:
+      CARGO_REGISTRY_TOKEN: $(CARGO_REGISTRY_TOKEN)
+
+  - bash: |
       ./cranko github create-releases
       ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/artifact-collection/*
     displayName: Create GitHub releases
