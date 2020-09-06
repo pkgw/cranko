@@ -1,3 +1,8 @@
+# cranko 0.0.21 (2020-09-06)
+
+- No code changes.
+- ci: first publication to Crates.io. Hopefully.
+
 # cranko 0.0.20 (2020-09-04)
 
 - Attempt to fix `cranko cargo package-released-binaries` when using the `cross`
