@@ -16,6 +16,7 @@
 - [CI/CD Commands]()
   - [cranko cargo foreach-released](commands/cicd/cargo-foreach-released.md)
   - [cranko cargo package-released-binaries](commands/cicd/cargo-package-released-binaries.md)
+  - [cranko ci-util env-to-file](commands/cicd/ci-util-env-to-file.md)
   - [cranko github create-custom-release](commands/cicd/github-create-custom-release.md)
   - [cranko github create-releases](commands/cicd/github-create-releases.md)
   - [cranko github delete-release](commands/cicd/github-delete-release.md)

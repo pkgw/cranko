@@ -197,6 +197,7 @@ version = "0.0.0-dev.0"
 dependencies = [
  "anyhow",
  "atomicwrites",
+ "base64",
  "cargo_metadata",
  "chrono",
  "ci_info",
