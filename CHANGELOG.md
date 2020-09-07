@@ -1,5 +1,9 @@
 # rc: micro bump
 
+- Add a `--by-tag` mode to `cranko github upload-artifacts`
+
+# cranko 0.0.23 (2020-09-06)
+
 - Add `github create-custom-release` and `github delete-release`. These
   utilities will help with the Tectonic `continuous` release, which I want to
   maintain. But it's important to note that the intent is that in most cases

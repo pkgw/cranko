@@ -30,7 +30,7 @@ steps:
       # If `./cranko` isn't moved, Cargo will complain about the dirty
       # working directory.
       mv ./cranko /tmp/
-      /tmp/cranko cargo foreach-released publish --no-verify
+      /tmp/cranko cargo foreach-released -- publish --no-verify
       mv /tmp/cranko .
     displayName: Publish updated Cargo crates
     env:

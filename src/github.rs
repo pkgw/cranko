@@ -115,15 +115,12 @@ impl GitHubInformation {
         Ok(())
     }
 
-    /// Get information about an existing release.
-    fn get_release_metadata(
+    /// Get information about an existing release by its tag name.
+    fn get_custom_release_metadata(
         &self,
-        sess: &AppSession,
-        proj: &Project,
-        rel: &ReleasedProjectInfo,
+        tag_name: &str,
         client: &mut reqwest::blocking::Client,
     ) -> Result<JsonValue> {
-        let tag_name = sess.repo.get_tag_name(proj, rel)?;
         let query_url = self.api_url(&format!("releases/tags/{}", tag_name));
 
         let resp = client.get(&query_url).send()?;
@@ -137,6 +134,18 @@ impl GitHubInformation {
                     .unwrap_or_else(|_| "[non-textual server response]".to_owned())
             )))
         }
+    }
+
+    /// Get information about an existing release of a project.
+    fn get_release_metadata(
+        &self,
+        sess: &AppSession,
+        proj: &Project,
+        rel: &ReleasedProjectInfo,
+        client: &mut reqwest::blocking::Client,
+    ) -> Result<JsonValue> {
+        let tag_name = sess.repo.get_tag_name(proj, rel)?;
+        self.get_custom_release_metadata(&tag_name, client)
     }
 
     /// Create a new GitHub release.
@@ -431,7 +440,13 @@ pub struct UploadArtifactsCommand {
     )]
     overwrite: bool,
 
-    #[structopt(help = "The released project for which to upload content")]
+    #[structopt(
+        long = "by-tag",
+        help = "Identify the target release by Git tag name, not Cranko project name"
+    )]
+    by_tag: bool,
+
+    #[structopt(help = "The released project or tag for which to upload content")]
     proj_name: String,
 
     #[structopt(help = "The path(s) to the file(s) to upload", required = true)]
@@ -442,34 +457,37 @@ impl Command for UploadArtifactsCommand {
     fn execute(self) -> anyhow::Result<i32> {
         let mut sess = AppSession::initialize()?;
         let info = GitHubInformation::new(&sess)?;
-
-        sess.populated_graph()?;
-
-        let rel_info = sess
-            .repo
-            .parse_release_info_from_head()
-            .context("expected Cranko release metadata in the HEAD commit but could not load it")?;
-
         let mut client = info.make_blocking_client()?;
 
-        let ident = sess
-            .graph()
-            .lookup_ident(&self.proj_name)
-            .ok_or_else(|| anyhow!("no such project `{}`", self.proj_name))?;
+        let mut metadata = if self.by_tag {
+            info.get_custom_release_metadata(&self.proj_name, &mut client)
+        } else {
+            sess.populated_graph()?;
 
-        let rel = rel_info
-            .lookup_if_released(sess.graph().lookup(ident))
-            .ok_or_else(|| {
-                anyhow!(
-                    "project `{}` does not seem to be freshly released",
-                    self.proj_name
-                )
-            })?;
+            let rel_info = sess.repo.parse_release_info_from_head().context(
+                "expected Cranko release metadata in the HEAD commit but could not load it",
+            )?;
 
-        // Get information about the release
+            let ident = sess
+                .graph()
+                .lookup_ident(&self.proj_name)
+                .ok_or_else(|| anyhow!("no such project `{}`", self.proj_name))?;
 
-        let proj = sess.graph().lookup(ident);
-        let mut metadata = info.get_release_metadata(&sess, proj, rel, &mut client)?;
+            let rel = rel_info
+                .lookup_if_released(sess.graph().lookup(ident))
+                .ok_or_else(|| {
+                    anyhow!(
+                        "project `{}` does not seem to be freshly released",
+                        self.proj_name
+                    )
+                })?;
+
+            // Get information about the release
+
+            let proj = sess.graph().lookup(ident);
+            info.get_release_metadata(&sess, proj, rel, &mut client)
+        }?;
+
         let upload_url = metadata["upload_url"]
             .take_string()
             .ok_or_else(|| anyhow!("no upload_url in release metadata?"))?;
