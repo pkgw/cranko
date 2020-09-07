@@ -35,8 +35,8 @@ does is leverage its GitHub API authentication hooks.
 
 By default, GitHub associates each release with a tarball and zipball of the
 repository contents at the time of the release. If you want to associate
-additional artifacts, use [cranko github
-upload-artifacts](./github-upload-artifacts.md).
+additional artifacts, use [`cranko github
+upload-artifacts`](./github-upload-artifacts.md) with the `--by-tag` option.
 
 Note that GitHub “draft” releases seem to be treated a bit specially by the API.
 If you create a draft release with this command, some other release-related
