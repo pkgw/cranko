@@ -1,3 +1,7 @@
+# cranko 0.0.24 (2020-09-07)
+
+- Add a `--by-tag` mode to `cranko github upload-artifacts`
+
 # cranko 0.0.23 (2020-09-06)
 
 - Add `github create-custom-release` and `github delete-release`. These

@@ -8,7 +8,7 @@ had new releases.
 #### Usage
 
 ```
-cranko cargo foreach-released [--command-name=COMMAND] [CARGO-ARGS...]
+cranko cargo foreach-released [--command-name=COMMAND] [--] [CARGO-ARGS...]
 ```
 
 This command should be run in CI processing of an update to the `rc` branch,
@@ -18,12 +18,15 @@ current branch should be the `release` branch.
 #### Example
 
 ```shell
-$ cranko cargo foreach-released publish
+$ cranko cargo foreach-released -- publish --no-verify
 ```
 
-Note that the name of the `cargo` program should *not* be one of the arguments.
-The example above would run [`cargo publish`][cargo-publish] for each released
-package — which is basically the whole reason that this command exists.
+Note that the name of `cargo` itself should *not* be one of the arguments.
+Furthermore, due to the way that Cranko parses its command-line arguments, if
+any option flags are to be passed to Cargo, you must precede the whole set of
+Cargo options with a double-dash (`--`). The example above would run [`cargo
+publish --no-verify`][cargo-publish] for each released package — which is
+basically the whole reason that this command exists.
 
 [cargo-publish]: https://doc.rust-lang.org/cargo/commands/cargo-publish.html
 

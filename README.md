@@ -51,6 +51,38 @@ book.
 [getting-started]: https://pkgw.github.io/cranko/book/latest/getting-started/
 
 
+## Development Roadmap
+
+Cranko is still a new project and is lacking many features that would be useful.
+Here are some of the things on the radar:
+
+- Built-in support for more languages / frameworks:
+  - [x] Rust
+  - [ ] NPM
+  - [ ] Python
+  - [ ] Visual Studio?
+- [ ] Per-repo config file
+  - [ ] Identify upstream remote from its URL
+  - [ ] Customize project configuration
+    - [ ] Custom per-project "rewriter" additions
+  - [ ] Defined "unaffiliated" projects
+- [ ] Revamp error handling infrastructure
+- [ ] Split main implementation into multiple crates?
+- [ ] `cranko bootstrap` command to help people onboard
+- [ ] Figure out how we're going to make a test suite for this beast
+
+Here are some larger projects that would be cool:
+
+- Pluggable framework for auto-generating release notes (e.g., taking advantage
+  of Conventional Commit formats, auto-linking to GitHub pull requests)
+- Pluggable framework for knowing when releases should be made and/or
+  determining how to bump version numbers (e.g., Conventional Commits plus
+  semantic-release type standards)
+- Pluggable framework for deciding which commits affect which projects
+- Additional templates for release notes, tag names, etc. etc.
+- More robust CLI interface for querying the project/release graph so that
+  external tools can build on Cranko as a base layer.
+
 ## cargo Features
 
 The `cranko` Cargo package provides the following optional [features]:
