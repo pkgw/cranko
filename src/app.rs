@@ -290,6 +290,7 @@ impl AppSession {
                     CommitAvailability::NotAvailable => {
                         return Err(Error::UnsatisfiedInternalRequirement(
                             proj.user_facing_name.to_string(),
+                            self.graph.lookup(dep.ident).user_facing_name.to_string(),
                         ))
                     }
 
@@ -301,6 +302,7 @@ impl AppSession {
                         } else {
                             return Err(Error::UnsatisfiedInternalRequirement(
                                 proj.user_facing_name.to_string(),
+                                self.graph.lookup(dep.ident).user_facing_name.to_string(),
                             ));
                         }
                     }

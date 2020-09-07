@@ -1,3 +1,9 @@
+# cranko 0.0.25 (2020-09-07)
+
+- Add `cranko ci-util env-to-file`
+- Make the "unsatisfied internal dependency" error message slightly more
+  informative.
+
 # cranko 0.0.24 (2020-09-07)
 
 - Add a `--by-tag` mode to `cranko github upload-artifacts`

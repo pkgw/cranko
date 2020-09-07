@@ -8,11 +8,14 @@
 //!
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use log::{error, info, warn};
 use std::{
     collections::{BTreeSet, HashMap},
-    env, fs,
+    env,
+    ffi::OsString,
+    fs,
+    io::Write,
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
@@ -46,6 +49,10 @@ enum Commands {
     #[structopt(name = "cargo")]
     /// Commands specific to the Rust/Cargo packaging system.
     Cargo(cargo::CargoCommand),
+
+    #[structopt(name = "ci-util")]
+    /// Utilities useful in CI environments
+    CiUtil(CiUtilCommand),
 
     #[structopt(name = "confirm")]
     /// Commit staged release requests to the `rc` branch
@@ -91,6 +98,7 @@ impl Command for Commands {
     fn execute(self) -> Result<i32> {
         match self {
             Commands::Cargo(o) => o.execute(),
+            Commands::CiUtil(o) => o.execute(),
             Commands::Confirm(o) => o.execute(),
             Commands::Github(o) => o.execute(),
             Commands::GitUtil(o) => o.execute(),
@@ -126,6 +134,134 @@ fn main() -> Result<()> {
     };
 
     std::process::exit(exitcode);
+}
+
+// ci-util
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct CiUtilCommand {
+    #[structopt(subcommand)]
+    command: CiUtilCommands,
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+enum CiUtilCommands {
+    #[structopt(name = "env-to-file")]
+    /// Save an environment variable to a file
+    EnvToFile(CiUtilEnvToFileCommand),
+}
+
+impl Command for CiUtilCommand {
+    fn execute(self) -> Result<i32> {
+        match self.command {
+            CiUtilCommands::EnvToFile(o) => o.execute(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum EnvDecodingMode {
+    /// The value is interpreted as text and written out as UTF8.
+    Text,
+
+    /// The value is encoded in the variable in base64 format.
+    Base64,
+}
+
+impl std::str::FromStr for EnvDecodingMode {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "text" => Ok(EnvDecodingMode::Text),
+            "base64" => Ok(EnvDecodingMode::Base64),
+            _ => Err(anyhow!("unrecognized encoding mode `{}`", s)),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct CiUtilEnvToFileCommand {
+    #[structopt(
+        long = "decode",
+        default_value = "text",
+        help = "How to decode the variable value into bytes"
+    )]
+    decode_mode: EnvDecodingMode,
+
+    #[structopt(help = "Name of the environment variable")]
+    var_name: OsString,
+
+    #[structopt(help = "The destination file name")]
+    file_name: PathBuf,
+}
+
+impl Command for CiUtilEnvToFileCommand {
+    fn execute(self) -> Result<i32> {
+        use std::fs::OpenOptions;
+
+        // Get the variable value.
+        let value = std::env::var_os(&self.var_name).ok_or_else(|| {
+            anyhow!(
+                "environment variable `{}` not available",
+                &self.var_name.to_string_lossy()
+            )
+        })?;
+
+        // Set up to create the file, as securely as we can manage. AFAICT,
+        // there aren't any Windows options that help here?
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+
+        #[cfg(unix)]
+        fn platform_options(o: &mut OpenOptions) {
+            use std::os::unix::fs::OpenOptionsExt;
+            o.mode(0o600);
+        }
+
+        #[cfg(not(unix))]
+        fn platform_options(o: &mut OpenOptions) {}
+
+        platform_options(&mut options);
+
+        let mut file = options.open(&self.file_name).with_context(|| {
+            format!(
+                "cannot securely open `{}` for writing",
+                self.file_name.display()
+            )
+        })?;
+
+        // Write the data. Eventually we might have more options, but for now we
+        // always interpret the OsString into text, then convert it into a
+        // Vec<[u8]> for writing.
+
+        let value = value.into_string().map_err(|_| {
+            anyhow!(
+                "cannot interpret value of environment variable `{}` as Unicode text",
+                self.var_name.to_string_lossy()
+            )
+        })?;
+
+        let b = match self.decode_mode {
+            EnvDecodingMode::Text => value.into_bytes(),
+
+            EnvDecodingMode::Base64 => base64::decode(&value).with_context(|| {
+                format!(
+                    "failed to decode value of environment variable `{}` as BASE64",
+                    self.var_name.to_string_lossy()
+                )
+            })?,
+        };
+
+        file.write_all(&b[..]).with_context(|| {
+            format!(
+                "failed trying to write data to file `{}`",
+                self.file_name.display()
+            )
+        })?;
+
+        Ok(0)
+    }
 }
 
 // confirm
@@ -762,6 +898,7 @@ fn list_commands() -> BTreeSet<String> {
     }
 
     commands.insert("cargo".to_owned());
+    commands.insert("ci-util".to_owned());
     commands.insert("confirm".to_owned());
     commands.insert("git-util".to_owned());
     commands.insert("github".to_owned());

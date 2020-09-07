@@ -193,10 +193,11 @@ checksum = "b3a71ab494c0b5b860bdc8407ae08978052417070c2ced38573a9157ad75b8ac"
 
 [[package]]
 name = "cranko"
-version = "0.0.24"
+version = "0.0.25"
 dependencies = [
  "anyhow",
  "atomicwrites",
+ "base64",
  "cargo_metadata",
  "chrono",
  "ci_info",
