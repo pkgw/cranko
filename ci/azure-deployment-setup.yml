@@ -1,0 +1,30 @@
+# Generic setup in the deployment stage. We download all artifacts, install
+# Cranko, and recover the `release` commit. We assume that we are running on
+# Linux.
+
+parameters:
+- name: setupGit
+  type: boolean
+  default: false
+
+steps:
+- download: current
+
+- checkout: self
+
+- bash: |
+    git switch -c release
+    git pull --ff-only $(Pipeline.Workspace)/git-release/release.bundle
+    git show
+  displayName: Restore release commit
+
+- bash: |
+    tar xzf $(Pipeline.Workspace)/binary-x86_64-unknown-linux-gnu/cranko-*.tar.gz
+  displayName: Install Cranko
+
+- ${{ if parameters.setupGit }}:
+  - bash: |
+      ./cranko github install-credential-helper
+    displayName: Set up Git pushes
+    env:
+      GITHUB_TOKEN: $(GITHUB_TOKEN)

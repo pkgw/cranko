@@ -1,5 +1,10 @@
 # rc: micro bump
 
+- Fix `cranko stage` when no previous changelog is in the history
+- See if we can parallelize deployment tasks in the CI pipeline.
+
+# cranko 0.0.25 (2020-09-07)
+
 - Add `cranko ci-util env-to-file`
 - Make the "unsatisfied internal dependency" error message slightly more
   informative.

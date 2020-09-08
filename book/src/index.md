@@ -7,7 +7,7 @@ designed from the ground up to work with [monorepos].
 
 [monorepos]: https://en.wikipedia.org/wiki/Monorepo
 
-If you’re just getting started, your first step should probably be to to
+If you’re just getting started, your first step should probably be to
 [install cranko][installation]. Or, check the table of contents to the left if
 you’d like to skip directly to a topic of interest.
 
