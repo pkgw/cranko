@@ -122,11 +122,11 @@ impl Changelog for MarkdownChangelog {
 
         let changelog_repopath = self.changelog_repopath(proj);
 
-        let prev_log = if let Some(prc) = prev_release_commit {
-            sess.repo.get_file_at_commit(&prc, &changelog_repopath)?
-        } else {
-            Vec::new()
-        };
+        let prev_log: Vec<u8> = prev_release_commit
+            .map(|prc| sess.repo.get_file_at_commit(&prc, &changelog_repopath))
+            .transpose()?
+            .flatten()
+            .unwrap_or_else(|| Vec::new());
 
         // Now populate the augmented log.
 
@@ -300,7 +300,10 @@ impl Changelog for MarkdownChangelog {
 
     fn scan_changelog(&self, proj: &Project, repo: &Repository, cid: &CommitId) -> Result<String> {
         let changelog_path = self.changelog_repopath(proj);
-        let data = repo.get_file_at_commit(cid, &changelog_path)?;
+        let data = match repo.get_file_at_commit(cid, &changelog_path)? {
+            Some(d) => d,
+            None => return Ok(String::new()),
+        };
         let reader = Cursor::new(data);
 
         enum State {

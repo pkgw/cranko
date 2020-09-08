@@ -311,11 +311,20 @@ impl Repository {
     }
 
     /// Get the binary content of the file at the specified path, at the time of
-    /// the specified commit.
-    pub fn get_file_at_commit(&self, cid: &CommitId, path: &RepoPath) -> Result<Vec<u8>> {
+    /// the specified commit. If the path did not exist, `Ok(None)` is returned.
+    pub fn get_file_at_commit(&self, cid: &CommitId, path: &RepoPath) -> Result<Option<Vec<u8>>> {
         let commit = self.repo.find_commit(cid.0)?;
         let tree = commit.tree()?;
-        let entry = tree.get_path(path.as_path())?;
+        let entry = match tree.get_path(path.as_path()) {
+            Ok(e) => e,
+            Err(e) => {
+                return if e.code() == git2::ErrorCode::NotFound {
+                    Ok(None)
+                } else {
+                    Err(e.into())
+                };
+            }
+        };
         let object = entry.to_object(&self.repo)?;
         let blob = object.as_blob().ok_or_else(|| {
             Error::Environment(format!(
@@ -324,7 +333,7 @@ impl Repository {
             ))
         })?;
 
-        Ok(blob.content().to_owned())
+        Ok(Some(blob.content().to_owned()))
     }
 
     /// Get information about the state of the projects in the repository as

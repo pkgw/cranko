@@ -157,17 +157,4 @@ stages:
 - stage: Deploy
   condition: and(succeeded('BuildAndTest'), not(eq(variables['build.reason'], 'PullRequest')))
   jobs:
-  - deployment: Deploy
-    environment: Deploy
-    displayName: Deploy
-    pool:
-      vmImage: ubuntu-16.04
-
-    variables:
-    - group: Deployment Credentials
-
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - template: azure-deployment.yml
+  - template: azure-deployment.yml
