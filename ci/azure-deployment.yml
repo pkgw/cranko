@@ -24,6 +24,7 @@ jobs:
       parameters:
         setupGit: true
     - bash: |
+        set -xeou pipefail
         ./cranko release-workflow tag
         git push --tags origin release:release
       displayName: Tag and push
@@ -38,6 +39,7 @@ jobs:
     steps:
     - template: azure-deployment-setup.yml
     - bash: |
+        set -xeou pipefail
         # If `./cranko` isn't moved, Cargo will complain about the dirty
         # working directory.
         mv ./cranko /tmp/
@@ -56,6 +58,7 @@ jobs:
       parameters:
         setupGit: true
     - bash: |
+        set -xeou pipefail
         ./cranko github create-releases
         ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/binary-*/*
       displayName: Create GitHub releases
@@ -65,11 +68,14 @@ jobs:
   - job: update_website
     pool:
       vmImage: ubuntu-20.04
+    variables:
+      - group: Deployment Credentials
     steps:
     - template: azure-deployment-setup.yml
       parameters:
         setupGit: true
     - bash: |
+        set -xeou pipefail
         git fetch $(Pipeline.Workspace)/git-gh-pages/gh-pages.bundle gh-pages
         git branch -f gh-pages FETCH_HEAD
         git push --force origin gh-pages:gh-pages
