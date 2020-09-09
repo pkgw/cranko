@@ -10,12 +10,6 @@ use thiserror::Error;
 
 use crate::version::Version;
 
-#[derive(Debug, Error)]
-pub enum CliError {
-    #[error("no internal or external subcommand `{0}` is available (install `cranko-{0}`?)")]
-    NoSuchSubcommand(String),
-}
-
 #[non_exhaustive]
 #[derive(Debug, Error)]
 pub enum Error {

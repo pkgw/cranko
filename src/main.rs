@@ -844,7 +844,12 @@ fn do_external(all_args: Vec<String>) -> Result<i32> {
         .map(|dir| dir.join(&command_exe))
         .find(|file| is_executable(file));
 
-    let command = path.ok_or_else(|| errors::CliError::NoSuchSubcommand(cmd.to_owned()))?;
+    let command = path.ok_or_else(|| {
+        anyhow!(
+            "no internal or external subcommand `{0}` is available (install `cranko-{0}`?)",
+            cmd.to_owned()
+        )
+    })?;
     exec_or_spawn(std::process::Command::new(command).args(args))
 }
 
