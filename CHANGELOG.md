@@ -1,7 +1,8 @@
 # See GitHub for changelog
 
-Changelogs for this project are curated from the Git history of its main branch.
-You can find them by looking at the `release` branch or the project's [GitHub
-release history][releases].
+This project’s release notes are curated from the Git history of its main
+branch. You can find them by looking at [the version of this file on the
+`release` branch][branch] or the [GitHub release history][gh-releases].
 
-[releases]: https://github.com/pkgw/cranko/releases
+[branch]: https://github.com/pkgw/cranko/blob/release/CHANGELOG.md
+[gh-releases]: https://github.com/pkgw/cranko/releases
