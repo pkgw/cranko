@@ -12,7 +12,7 @@ use structopt::StructOpt;
 use super::Command;
 use crate::{
     app::AppSession,
-    errors::{Error, Result},
+    errors::Result,
     graph,
     project::Project,
     repository::{CommitId, ReleasedProjectInfo},
@@ -27,10 +27,10 @@ fn maybe_var(key: &str) -> Result<Option<String>> {
                 Ok(None)
             }
         } else {
-            Err(Error::Environment(format!(
+            Err(anyhow!(
                 "could not parse environment variable {} as Unicode",
                 key
-            )))
+            ))
         }
     } else {
         Ok(None)
@@ -38,8 +38,7 @@ fn maybe_var(key: &str) -> Result<Option<String>> {
 }
 
 fn require_var(key: &str) -> Result<String> {
-    maybe_var(key)?
-        .ok_or_else(|| Error::Environment(format!("environment variable {} must be provided", key)))
+    maybe_var(key)?.ok_or_else(|| anyhow!("environment variable {} must be provided", key))
 }
 
 struct GitHubInformation {
@@ -54,12 +53,8 @@ impl GitHubInformation {
         let upstream_url = sess.repo.upstream_url()?;
         info!("upstream url: {}", upstream_url);
 
-        let upstream_url = git_url_parse::GitUrl::parse(&upstream_url).map_err(|e| {
-            Error::Environment(format!(
-                "cannot parse upstream Git URL `{}`: {}",
-                upstream_url, e
-            ))
-        })?;
+        let upstream_url = git_url_parse::GitUrl::parse(&upstream_url)
+            .map_err(|e| anyhow!("cannot parse upstream Git URL `{}`: {}", upstream_url, e))?;
 
         let slug = upstream_url.fullname;
 
@@ -90,12 +85,12 @@ impl GitHubInformation {
 
         let resp = client.get(&query_url).send()?;
         if !resp.status().is_success() {
-            return Err(Error::Environment(format!(
+            return Err(anyhow!(
                 "no GitHub release for tag `{}`: {}",
                 tag_name,
                 resp.text()
                     .unwrap_or_else(|_| "[non-textual server response]".to_owned())
-            )));
+            ));
         }
 
         let metadata = json::parse(&resp.text()?)?;
@@ -104,12 +99,12 @@ impl GitHubInformation {
         let delete_url = self.api_url(&format!("releases/{}", id));
         let resp = client.delete(&delete_url).send()?;
         if !resp.status().is_success() {
-            return Err(Error::Environment(format!(
+            return Err(anyhow!(
                 "could not delete GitHub release for tag `{}`: {}",
                 tag_name,
                 resp.text()
                     .unwrap_or_else(|_| "[non-textual server response]".to_owned())
-            )));
+            ));
         }
 
         Ok(())
@@ -127,12 +122,12 @@ impl GitHubInformation {
         if resp.status().is_success() {
             Ok(json::parse(&resp.text()?)?)
         } else {
-            Err(Error::Environment(format!(
+            Err(anyhow!(
                 "no GitHub release for tag `{}`: {}",
                 tag_name,
                 resp.text()
                     .unwrap_or_else(|_| "[non-textual server response]".to_owned())
-            )))
+            ))
         }
     }
 
@@ -179,10 +174,11 @@ impl GitHubInformation {
             info!("created GitHub release for {}", saved_tag_name);
             Ok(parsed)
         } else {
-            Err(Error::Environment(format!(
+            Err(anyhow!(
                 "failed to create GitHub release for {}: {}",
-                saved_tag_name, parsed
-            )))
+                saved_tag_name,
+                parsed
+            ))
         }
     }
 

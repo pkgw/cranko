@@ -3,6 +3,7 @@
 
 //! State of the backing version control repository.
 
+use anyhow::anyhow;
 use dynfmt::{Format, SimpleCurlyFormat};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -14,7 +15,7 @@ use std::{
 };
 
 use crate::{
-    errors::{Error, Result},
+    errors::{Error, OldError, Result},
     graph::ProjectGraph,
     project::Project,
     version::Version,
@@ -63,7 +64,7 @@ impl Repository {
         let repo = git2::Repository::open_from_env()?;
 
         if repo.is_bare() {
-            return Err(Error::BareRepository);
+            return Err(OldError::BareRepository.into());
         }
 
         // Guess the name of the upstream remote. If there's only one remote, we
@@ -92,7 +93,7 @@ impl Repository {
 
         if upstream_name.is_none() || (n_remotes > 1 && upstream_name.as_deref() != Some("origin"))
         {
-            return Err(Error::NoUpstreamRemote);
+            return Err(OldError::NoUpstreamRemote.into());
         }
 
         let upstream_name = upstream_name.unwrap();
@@ -136,10 +137,10 @@ impl Repository {
         Ok(upstream
             .url()
             .ok_or_else(|| {
-                Error::Environment(format!(
+                anyhow!(
                     "URL of upstream remote {} not parseable as Unicode",
                     self.upstream_name
-                ))
+                )
             })?
             .to_owned())
     }
@@ -157,9 +158,7 @@ impl Repository {
             Some(
                 head_ref
                     .shorthand()
-                    .ok_or_else(|| {
-                        Error::Environment("current branch name not Unicode".to_owned())
-                    })?
+                    .ok_or_else(|| anyhow!("current branch name not Unicode"))?
                     .to_owned(),
             )
         })
@@ -176,7 +175,7 @@ impl Repository {
                 salt: text[11..].to_owned(),
             })
         } else {
-            Err(Error::InvalidCommitReference(text.to_owned()))
+            Err(OldError::InvalidCommitReference(text.to_owned()).into())
         }
     }
 
@@ -216,11 +215,11 @@ impl Repository {
             }
 
             if !found_it {
-                return Err(Error::Environment(format!(
+                return Err(anyhow!(
                     "commit-ref key `{}` not found in contents of file {}",
                     salt,
                     ref_source_path.escaped(),
-                )));
+                ));
             }
 
             let blame = repo.repo.blame_file(ref_source_path.as_path(), None)?;
@@ -228,12 +227,12 @@ impl Repository {
                 // TODO: this happens if the line in question hasn't yet been
                 // committed. Need to figure out how to handle that
                 // circumstance.
-                Error::Environment(format!(
+                anyhow!(
                     "commit-ref key `{}` found in non-existent line {} of file {}??",
                     salt,
                     line_no,
                     ref_source_path.escaped()
-                ))
+                )
             })?;
 
             Ok(CommitId(hunk.final_commit_id()))
@@ -258,7 +257,7 @@ impl Repository {
         let c_p = p.as_ref().canonicalize()?;
         let rel = c_p
             .strip_prefix(&c_root)
-            .map_err(|_| Error::OutsideOfRepository(c_p.display().to_string()))?;
+            .map_err(|_| OldError::OutsideOfRepository(c_p.display().to_string()))?;
         RepoPathBuf::from_path(rel)
     }
 
@@ -327,10 +326,10 @@ impl Repository {
         };
         let object = entry.to_object(&self.repo)?;
         let blob = object.as_blob().ok_or_else(|| {
-            Error::Environment(format!(
+            anyhow!(
                 "path `{}` should correspond to a Git blob but does not",
                 path.escaped(),
-            ))
+            )
         })?;
 
         Ok(Some(blob.content().to_owned()))
@@ -493,7 +492,7 @@ impl Repository {
 
     /// Get information about a release from the HEAD commit.
     fn parse_release_info_from_commit(&self, commit: &git2::Commit) -> Result<ReleaseCommitInfo> {
-        let msg = commit.message().ok_or_else(|| Error::NotUnicodeError)?;
+        let msg = commit.message().ok_or_else(|| OldError::NotUnicodeError)?;
 
         let mut data = String::new();
         let mut in_body = false;
@@ -517,7 +516,7 @@ impl Repository {
         }
 
         if data.len() == 0 {
-            return Err(Error::InvalidCommitMessageFormat);
+            return Err(OldError::InvalidCommitMessageFormat.into());
         }
 
         let srci: SerializedReleaseCommitInfo = toml::from_str(&data)?;
@@ -733,7 +732,7 @@ impl Repository {
 
             if changelog_matcher.repo_path_matches(path) {
                 if status.is_conflicted() {
-                    return Err(Error::DirtyRepository(path.escaped()));
+                    return Err(OldError::DirtyRepository(path.escaped()).into());
                 } else if status.is_index_new()
                     || status.is_index_modified()
                     || status.is_wt_new()
@@ -745,7 +744,7 @@ impl Repository {
             } else {
                 if status.is_ignored() || status.is_wt_new() || status == git2::Status::CURRENT {
                 } else if !dirty_allowed {
-                    return Err(Error::DirtyRepository(path.escaped()));
+                    return Err(OldError::DirtyRepository(path.escaped()).into());
                 }
             }
         }
@@ -836,7 +835,7 @@ impl Repository {
         let head_commit = head_ref.peel_to_commit()?;
         let msg = head_commit
             .message()
-            .ok_or_else(|| Error::NotUnicodeError)?;
+            .ok_or_else(|| OldError::NotUnicodeError)?;
 
         let mut data = String::new();
         let mut in_body = false;
@@ -860,7 +859,7 @@ impl Repository {
         }
 
         if data.len() == 0 {
-            return Err(Error::InvalidCommitMessageFormat);
+            return Err(OldError::InvalidCommitMessageFormat.into());
         }
 
         let srci: SerializedRcCommitInfo = toml::from_str(&data)?;
@@ -901,7 +900,8 @@ impl Repository {
         tagname_args.insert("project_slug", proj.user_facing_name.to_owned());
         tagname_args.insert("version", rel.version.clone());
         Ok(SimpleCurlyFormat
-            .format(&self.release_tag_name_format, &tagname_args)?
+            .format(&self.release_tag_name_format, &tagname_args)
+            .map_err(|e| Error::msg(e.to_string()))?
             .to_string())
     }
 
@@ -1435,7 +1435,7 @@ impl RepoPathBuf {
             if let std::path::Component::Normal(c) = cmpt {
                 b.extend(c.to_str().unwrap().as_bytes());
             } else {
-                return Err(Error::OutsideOfRepository(format!(
+                return Err(OldError::OutsideOfRepository(format!(
                     "path with unexpected components: {}",
                     p.as_ref().display()
                 )));

@@ -24,7 +24,7 @@ use super::Command;
 
 use crate::{
     app::AppSession,
-    errors::{Error, Result},
+    errors::{OldError, Result},
     graph::GraphQueryBuilder,
     project::{Project, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf},
@@ -212,7 +212,7 @@ impl Rewriter for CargoRewriter {
         {
             let ct_root = doc.as_table_mut();
             let ct_package = ct_root.entry("package").as_table_mut().ok_or_else(|| {
-                Error::RewriteFormatError(format!(
+                OldError::RewriteFormatError(format!(
                     "no [package] section in {}?!",
                     self.toml_path.escaped()
                 ))
@@ -267,10 +267,10 @@ impl Rewriter for CargoRewriter {
                             dep_tbl.get_or_insert("version", format!("^{}", min_version));
                         }
                     } else {
-                        return Err(Error::Environment(format!(
+                        return Err(anyhow!(
                             "unexpected internal dependency item in a Cargo.toml: {:?}",
                             tbl.entry(dep)
-                        )));
+                        ));
                     }
                 }
             }

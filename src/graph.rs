@@ -17,7 +17,7 @@ use petgraph::{
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    errors::{Error, Result},
+    errors::{OldError, Result},
     project::{Project, ProjectBuilder, ProjectId},
     repository::{CommitAvailability, CommitId, ReleaseCommitInfo, RepoHistory, Repository},
 };
@@ -110,7 +110,7 @@ impl ProjectGraph {
 
         let node_ixs = toposort(&self.graph, None).map_err(|cycle| {
             let ident = self.graph[cycle.node_id()];
-            Error::Cycle(self.projects[ident].user_facing_name.to_owned())
+            OldError::Cycle(self.projects[ident].user_facing_name.to_owned())
         })?;
 
         let name_to_id = &mut self.name_to_id;
@@ -205,7 +205,9 @@ impl ProjectGraph {
                     } else if n2 > n1 {
                         states[ident2].n_narrow = std::cmp::max(states[ident2].n_narrow, n1 + 1);
                     } else {
-                        return Err(Error::NamingClash(states[ident1].compute_name(proj1)));
+                        return Err(
+                            OldError::NamingClash(states[ident1].compute_name(proj1)).into()
+                        );
                     }
                 }
 
@@ -280,7 +282,7 @@ impl ProjectGraph {
         let idents = toposort(&self.graph, None)
             .map_err(|cycle| {
                 let ident = self.graph[cycle.node_id()];
-                Error::Cycle(self.projects[ident].user_facing_name.to_owned())
+                OldError::Cycle(self.projects[ident].user_facing_name.to_owned())
             })?
             .iter()
             .map(|ix| self.graph[*ix])
@@ -302,7 +304,7 @@ impl ProjectGraph {
     pub fn toposort(&self) -> Result<GraphIter> {
         let node_idxs = toposort(&self.graph, None).map_err(|cycle| {
             let ident = self.graph[cycle.node_id()];
-            Error::Cycle(self.projects[ident].user_facing_name.to_owned())
+            OldError::Cycle(self.projects[ident].user_facing_name.to_owned())
         })?;
 
         Ok(GraphIter {
@@ -318,7 +320,7 @@ impl ProjectGraph {
     pub fn toposort_mut(&mut self) -> Result<GraphIterMut> {
         let node_idxs = toposort(&self.graph, None).map_err(|cycle| {
             let ident = self.graph[cycle.node_id()];
-            Error::Cycle(self.projects[ident].user_facing_name.to_owned())
+            OldError::Cycle(self.projects[ident].user_facing_name.to_owned())
         })?;
 
         Ok(GraphIterMut {
@@ -342,7 +344,7 @@ impl ProjectGraph {
             toposort(&self.graph, None)
                 .map_err(|cycle| {
                     let ident = self.graph[cycle.node_id()];
-                    Error::Cycle(self.projects[ident].user_facing_name.to_owned())
+                    OldError::Cycle(self.projects[ident].user_facing_name.to_owned())
                 })?
                 .iter()
                 .map(|ix| self.graph[*ix])
@@ -354,7 +356,7 @@ impl ProjectGraph {
                 if let Some(id) = self.name_to_id.get(&name) {
                     root_idents.push(*id);
                 } else {
-                    return Err(Error::NoSuchProject(name));
+                    return Err(OldError::NoSuchProject(name).into());
                 }
             }
 

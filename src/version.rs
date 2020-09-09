@@ -5,7 +5,7 @@
 
 use chrono::{offset::Local, Datelike};
 
-use crate::errors::{Error, Result};
+use crate::errors::{OldError, Result};
 
 /// A version number associated with a project.
 ///
@@ -55,7 +55,7 @@ impl Version {
             "minor bump" => Ok(VersionBumpScheme::MinorBump),
             "major bump" => Ok(VersionBumpScheme::MajorBump),
             "dev-datecode" => Ok(VersionBumpScheme::DevDatecode),
-            _ => Err(Error::UnsupportedBumpScheme(text.to_owned(), self.clone())),
+            _ => Err(OldError::UnsupportedBumpScheme(text.to_owned(), self.clone()).into()),
         }
     }
 }

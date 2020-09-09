@@ -3,11 +3,12 @@
 
 //! State for the Cranko CLI application.
 
+use anyhow::anyhow;
 use log::{error, info, warn};
 use std::collections::HashMap;
 
 use crate::{
-    errors::{Error, Result},
+    errors::{OldError, Result},
     graph::{ProjectGraph, RepoHistories},
     project::{ProjectId, ResolvedRequirement},
     repository::{
@@ -133,8 +134,8 @@ impl AppSession {
                 if force {
                     Ok(())
                 } else {
-                    Err(Error::Environment(
-                        "refusing to proceed (use \"force\" mode to override)".to_owned(),
+                    Err(anyhow!(
+                        "refusing to proceed (use \"force\" mode to override)",
                     ))
                 }
             }
@@ -151,8 +152,8 @@ impl AppSession {
         match self.execution_environment()? {
             ExecutionEnvironment::NotCi => {
                 error!("no CI environment detected; this is unexpected for this command");
-                Err(Error::Environment(
-                    "don't know how to obtain release information -- cannot proceed".to_owned(),
+                Err(anyhow!(
+                    "don't know how to obtain release information -- cannot proceed",
                 ))
             }
 
@@ -161,8 +162,8 @@ impl AppSession {
             _ => {
                 error!("unexpected CI environment detected");
                 error!("... this command should only be run after switching to a local `release`-type branch");
-                Err(Error::Environment(
-                    "don't know how to obtain release information -- cannot proceed".to_owned(),
+                Err(anyhow!(
+                    "don't know how to obtain release information -- cannot proceed",
                 ))
             }
         }
@@ -181,8 +182,8 @@ impl AppSession {
                 if force {
                     Ok((true, self.default_dev_rc_info()))
                 } else {
-                    Err(Error::Environment(
-                        "refusing to proceed (use \"force\" mode to override)".to_owned(),
+                    Err(anyhow!(
+                        "refusing to proceed (use \"force\" mode to override)",
                     ))
                 }
             }
@@ -193,8 +194,8 @@ impl AppSession {
                 if force {
                     Ok((true, self.default_dev_rc_info()))
                 } else {
-                    Err(Error::Environment(
-                        "refusing to proceed (use \"force\" mode to override)".to_owned(),
+                    Err(anyhow!(
+                        "refusing to proceed (use \"force\" mode to override)",
                     ))
                 }
             }
@@ -206,7 +207,7 @@ impl AppSession {
     /// if clean, Err if not.
     pub fn ensure_fully_clean(&self) -> Result<()> {
         if let Some(changed_path) = self.repo.check_if_dirty(&[])? {
-            Err(Error::DirtyRepository(changed_path))
+            Err(OldError::DirtyRepository(changed_path).into())
         } else {
             Ok(())
         }
@@ -224,7 +225,7 @@ impl AppSession {
         let matchers = matchers?;
 
         if let Some(changed_path) = self.repo.check_if_dirty(&matchers[..])? {
-            Err(Error::DirtyRepository(changed_path))
+            Err(OldError::DirtyRepository(changed_path).into())
         } else {
             Ok(())
         }
@@ -288,10 +289,11 @@ impl AppSession {
             for dep in &deps[..] {
                 let min_version = match dep.availability {
                     CommitAvailability::NotAvailable => {
-                        return Err(Error::UnsatisfiedInternalRequirement(
+                        return Err(OldError::UnsatisfiedInternalRequirement(
                             proj.user_facing_name.to_string(),
                             self.graph.lookup(dep.ident).user_facing_name.to_string(),
-                        ))
+                        )
+                        .into())
                     }
 
                     CommitAvailability::ExistingRelease(ref v) => v.clone(),
@@ -300,10 +302,11 @@ impl AppSession {
                         if let Some(v) = new_versions.get(&dep.ident) {
                             v.clone()
                         } else {
-                            return Err(Error::UnsatisfiedInternalRequirement(
+                            return Err(OldError::UnsatisfiedInternalRequirement(
                                 proj.user_facing_name.to_string(),
                                 self.graph.lookup(dep.ident).user_facing_name.to_string(),
-                            ));
+                            )
+                            .into());
                         }
                     }
                 };
