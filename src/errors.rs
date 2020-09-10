@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("invalid \"rc\" changelog format in `{0}`")]
-    InvalidChangelogFormat(String),
-
     #[error("invalid commit message format")]
     InvalidCommitMessageFormat,
 
