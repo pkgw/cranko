@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("operation on bare repositories is not allowed")]
-    BareRepository,
-
     #[error("internal dependency cycle associated with project {0}")]
     Cycle(String),
 

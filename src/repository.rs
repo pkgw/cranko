@@ -13,6 +13,7 @@ use std::{
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
+use thiserror::Error as ThisError;
 
 use crate::{
     errors::{Error, OldError, Result},
@@ -30,6 +31,10 @@ impl std::fmt::Display for CommitId {
         self.0.fmt(f)
     }
 }
+
+#[derive(Debug, ThisError)]
+#[error("cannot operate on a bare repository")]
+pub struct BareRepositoryError;
 
 /// Information about the backing version control repository.
 pub struct Repository {
@@ -60,11 +65,14 @@ impl Repository {
     /// repository and the necessary Git environment variables are missing, if
     /// the repository is "bare" (has no working directory), if there is some
     /// data corruption issue, etc.
+    ///
+    /// If the repository is "bare", an error downcastable into
+    /// BareRepositoryError will be returned.
     pub fn open_from_env() -> Result<Repository> {
         let repo = git2::Repository::open_from_env()?;
 
         if repo.is_bare() {
-            return Err(OldError::BareRepository.into());
+            return Err(BareRepositoryError.into());
         }
 
         // Guess the name of the upstream remote. If there's only one remote, we
