@@ -24,7 +24,7 @@ use super::Command;
 
 use crate::{
     app::AppSession,
-    errors::{OldError, Result},
+    errors::Result,
     graph::GraphQueryBuilder,
     project::{Project, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf},
@@ -211,12 +211,10 @@ impl Rewriter for CargoRewriter {
 
         {
             let ct_root = doc.as_table_mut();
-            let ct_package = ct_root.entry("package").as_table_mut().ok_or_else(|| {
-                OldError::RewriteFormatError(format!(
-                    "no [package] section in {}?!",
-                    self.toml_path.escaped()
-                ))
-            })?;
+            let ct_package = ct_root
+                .entry("package")
+                .as_table_mut()
+                .ok_or_else(|| anyhow!("no [package] section in {}?!", self.toml_path.escaped()))?;
 
             ct_package["version"] = toml_edit::value(proj.version.to_string());
 

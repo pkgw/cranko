@@ -22,13 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    /// Used when our rewriting logic encounters an unexpected file structure,
-    /// missing template, etc -- not for I/O errors encountered in process.
-    /// E.g., this variant is for when we don't know what to do, not when we try
-    /// to do something but it fails.
-    #[error("repo rewrite error: {0}")]
-    RewriteFormatError(String),
-
     #[error("unsatisfied internal requirement: `{0}` needs newer `{1}`")]
     UnsatisfiedInternalRequirement(String, String),
 
