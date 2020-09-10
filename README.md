@@ -66,7 +66,7 @@ Here are some of the things on the radar:
   - [ ] Customize project configuration
     - [ ] Custom per-project "rewriter" additions
   - [ ] Defined "unaffiliated" projects
-- [ ] Revamp error handling infrastructure
+- [x] Revamp error handling infrastructure
 - [ ] Split main implementation into multiple crates?
 - [ ] `cranko bootstrap` command to help people onboard
 - [ ] Figure out how we're going to make a test suite for this beast
