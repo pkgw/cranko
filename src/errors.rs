@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("unsatisfied internal requirement: `{0}` needs newer `{1}`")]
-    UnsatisfiedInternalRequirement(String, String),
-
     #[error("unsupported version-bump scheme \"{0}\" for version template {1:?}")]
     UnsupportedBumpScheme(String, Version),
 }

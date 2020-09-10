@@ -6,9 +6,10 @@
 use anyhow::anyhow;
 use log::{error, info, warn};
 use std::collections::HashMap;
+use thiserror::Error as ThisError;
 
 use crate::{
-    errors::{OldError, Result},
+    errors::Result,
     graph::{ProjectGraph, RepoHistories},
     project::{ProjectId, ResolvedRequirement},
     repository::{
@@ -17,6 +18,13 @@ use crate::{
     },
     version::Version,
 };
+
+/// An error returned when one project in the repository needs a newer release
+/// of another project. The inner values are the user-facing names of the two
+/// projects: the first named project depends on the second one.
+#[derive(Debug, ThisError)]
+#[error("unsatisfied internal requirement: `{0}` needs newer `{1}`")]
+pub struct UnsatisfiedInternalRequirementError(pub String, pub String);
 
 /// The main Cranko CLI application state structure.
 pub struct AppSession {
@@ -281,7 +289,8 @@ impl AppSession {
     /// specifications.
     ///
     /// This also involves solving the version requirements for internal
-    /// dependencies.
+    /// dependencies. If an internal dependency is unsatisfiable, the returned
+    /// error will be downcastable to an UnsatisfiedInternalRequirementError.
     pub fn apply_versions(&mut self, rc_info: &RcCommitInfo) -> Result<()> {
         let mut new_versions: HashMap<ProjectId, Version> = HashMap::new();
         let latest_info = self.repo.get_latest_release_info()?;
@@ -296,7 +305,7 @@ impl AppSession {
             for dep in &deps[..] {
                 let min_version = match dep.availability {
                     CommitAvailability::NotAvailable => {
-                        return Err(OldError::UnsatisfiedInternalRequirement(
+                        return Err(UnsatisfiedInternalRequirementError(
                             proj.user_facing_name.to_string(),
                             self.graph.lookup(dep.ident).user_facing_name.to_string(),
                         )
@@ -309,7 +318,7 @@ impl AppSession {
                         if let Some(v) = new_versions.get(&dep.ident) {
                             v.clone()
                         } else {
-                            return Err(OldError::UnsatisfiedInternalRequirement(
+                            return Err(UnsatisfiedInternalRequirementError(
                                 proj.user_facing_name.to_string(),
                                 self.graph.lookup(dep.ident).user_facing_name.to_string(),
                             )
