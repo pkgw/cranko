@@ -4,8 +4,9 @@
 //! Version numbers.
 
 use chrono::{offset::Local, Datelike};
+use thiserror::Error as ThisError;
 
-use crate::errors::{OldError, Result};
+use crate::errors::Result;
 
 /// A version number associated with a project.
 ///
@@ -45,7 +46,10 @@ impl Version {
     ///
     /// Not all bump schemes are compatible with all versioning styles, which is
     /// why this operation depends on the version template and is fallible.
-    pub fn parse_bump_scheme(&self, text: &str) -> Result<VersionBumpScheme> {
+    pub fn parse_bump_scheme(
+        &self,
+        text: &str,
+    ) -> std::result::Result<VersionBumpScheme, UnsupportedBumpSchemeError> {
         if text.starts_with("force ") {
             return Ok(VersionBumpScheme::Force(text[6..].to_owned()));
         }
@@ -55,10 +59,17 @@ impl Version {
             "minor bump" => Ok(VersionBumpScheme::MinorBump),
             "major bump" => Ok(VersionBumpScheme::MajorBump),
             "dev-datecode" => Ok(VersionBumpScheme::DevDatecode),
-            _ => Err(OldError::UnsupportedBumpScheme(text.to_owned(), self.clone()).into()),
+            _ => Err(UnsupportedBumpSchemeError(text.to_owned(), self.clone()).into()),
         }
     }
 }
+
+/// An error returned when a "version bump scheme" cannot be parsed, or if it is
+/// not allowed for the version template. The first inner value is the bump
+/// scheme text, and the second inner value is the template version.
+#[derive(Debug, ThisError)]
+#[error("illegal version-bump scheme \"{0}\" for version template {1:?}")]
+pub struct UnsupportedBumpSchemeError(pub String, pub Version);
 
 /// A scheme for assigning a new version number to a project.
 #[derive(Clone, Debug, Eq, PartialEq)]

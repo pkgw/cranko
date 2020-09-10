@@ -1,10 +1,7 @@
 // Copyright 2020 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
-//! Error handling for the CLI application.
-//!
-//! **Note** this enum approach is not great and leaks all sorts of
-//! implementation details. I need to go through and clean it up.
+//! Error handling for Cranko.
 
 /// The generic error type, for complex operations that can fail for a wide
 /// range of reasons. This type is a reexport of the `anyhow` 1.x series Error
@@ -15,15 +12,5 @@
 /// different type.
 pub use anyhow::Error;
 
-use thiserror::Error as ThisError;
-
-use crate::version::Version;
-
-#[non_exhaustive]
-#[derive(Debug, ThisError)]
-pub enum OldError {
-    #[error("unsupported version-bump scheme \"{0}\" for version template {1:?}")]
-    UnsupportedBumpScheme(String, Version),
-}
-
+/// A preloaded result type, in which the error type is our generic error type.
 pub type Result<T> = std::result::Result<T, Error>;
