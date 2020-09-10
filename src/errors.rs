@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("reference to resource {0} contained outside of the repository")]
-    OutsideOfRepository(String),
-
     /// Used when our rewriting logic encounters an unexpected file structure,
     /// missing template, etc -- not for I/O errors encountered in process.
     /// E.g., this variant is for when we don't know what to do, not when we try

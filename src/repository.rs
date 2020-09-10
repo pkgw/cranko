@@ -16,7 +16,7 @@ use std::{
 use thiserror::Error as ThisError;
 
 use crate::{
-    errors::{Error, OldError, Result},
+    errors::{Error, Result},
     graph::ProjectGraph,
     project::Project,
     version::Version,
@@ -287,9 +287,12 @@ impl Repository {
     pub fn convert_path<P: AsRef<Path>>(&self, p: P) -> Result<RepoPathBuf> {
         let c_root = self.repo.workdir().unwrap().canonicalize()?;
         let c_p = p.as_ref().canonicalize()?;
-        let rel = c_p
-            .strip_prefix(&c_root)
-            .map_err(|_| OldError::OutsideOfRepository(c_p.display().to_string()))?;
+        let rel = c_p.strip_prefix(&c_root).map_err(|_| {
+            anyhow!(
+                "path `{}` lies outside of the working directory",
+                c_p.display()
+            )
+        })?;
         RepoPathBuf::from_path(rel)
     }
 
@@ -1473,10 +1476,10 @@ impl RepoPathBuf {
             if let std::path::Component::Normal(c) = cmpt {
                 b.extend(c.to_str().unwrap().as_bytes());
             } else {
-                return Err(OldError::OutsideOfRepository(format!(
-                    "path with unexpected components: {}",
+                bail!(
+                    "path with unexpected components: `{}`",
                     p.as_ref().display()
-                )));
+                );
             }
         }
 
