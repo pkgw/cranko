@@ -44,6 +44,12 @@ pub struct BareRepositoryError;
 #[derive(Debug, ThisError)]
 pub struct DirtyRepositoryError(pub RepoPathBuf);
 
+/// An error returned when some metadata references a commit in the repository,
+/// and that reference is bogus. The inner value is the text of the reference.
+#[derive(Debug, ThisError)]
+#[error("commit reference `{0}` is invalid or refers to a nonexistent commit")]
+pub struct InvalidCommitReferenceError(pub String);
+
 impl std::fmt::Display for DirtyRepositoryError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
@@ -201,7 +207,7 @@ impl Repository {
                 salt: text[11..].to_owned(),
             })
         } else {
-            Err(OldError::InvalidCommitReference(text.to_owned()).into())
+            Err(InvalidCommitReferenceError(text.to_owned()).into())
         }
     }
 
