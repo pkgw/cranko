@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
-
     #[error("multiple projects with same name {0} (?!)")]
     NamingClash(String),
 
