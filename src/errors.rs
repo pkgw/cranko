@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("internal dependency cycle associated with project {0}")]
-    Cycle(String),
-
     #[error("cannot proceed with a dirty backing repository (path: {0})")]
     DirtyRepository(String),
 

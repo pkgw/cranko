@@ -32,6 +32,8 @@ impl std::fmt::Display for CommitId {
     }
 }
 
+/// An empty error returned when the backing repository is "bare", without a
+/// working directory. Cranko cannot operate on such repositories.
 #[derive(Debug, ThisError)]
 #[error("cannot operate on a bare repository")]
 pub struct BareRepositoryError;
