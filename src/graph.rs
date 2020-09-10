@@ -49,6 +49,13 @@ pub struct ProjectGraph {
 #[error("detected an internal dependency cycle associated with project {0}")]
 pub struct DependencyCycleError(pub String);
 
+/// An error returned when it is impossible to come up with distinct names for
+/// two projects. This "should never happen", but ... The inner value is the
+/// clashing name.
+#[derive(Debug, ThisError)]
+#[error("multiple projects with same name `{0}`")]
+pub struct NamingClashError(pub String);
+
 impl ProjectGraph {
     /// Get the number of projects in the graph.
     pub fn len(&self) -> usize {
@@ -218,9 +225,7 @@ impl ProjectGraph {
                     } else if n2 > n1 {
                         states[ident2].n_narrow = std::cmp::max(states[ident2].n_narrow, n1 + 1);
                     } else {
-                        return Err(
-                            OldError::NamingClash(states[ident1].compute_name(proj1)).into()
-                        );
+                        return Err(NamingClashError(states[ident1].compute_name(proj1)).into());
                     }
                 }
 

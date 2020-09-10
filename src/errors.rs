@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("multiple projects with same name {0} (?!)")]
-    NamingClash(String),
-
     #[error("no such project `{0}`")]
     NoSuchProject(String),
 
