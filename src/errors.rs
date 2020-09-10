@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("cannot identify the upstream remote for the backing repository")]
-    NoUpstreamRemote,
-
     #[error("reference to resource {0} contained outside of the repository")]
     OutsideOfRepository(String),
 

@@ -125,7 +125,7 @@ impl Repository {
 
         if upstream_name.is_none() || (n_remotes > 1 && upstream_name.as_deref() != Some("origin"))
         {
-            return Err(OldError::NoUpstreamRemote.into());
+            bail!("cannot identify the upstream Git remote");
         }
 
         let upstream_name = upstream_name.unwrap();
