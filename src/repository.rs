@@ -3,7 +3,7 @@
 
 //! State of the backing version control repository.
 
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use dynfmt::{Format, SimpleCurlyFormat};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -542,7 +542,7 @@ impl Repository {
         }
 
         if data.len() == 0 {
-            return Err(OldError::InvalidCommitMessageFormat.into());
+            bail!("empty cranko-release-info body in release commit message");
         }
 
         let srci: SerializedReleaseCommitInfo = toml::from_str(&data)?;
@@ -889,7 +889,7 @@ impl Repository {
         }
 
         if data.len() == 0 {
-            return Err(OldError::InvalidCommitMessageFormat.into());
+            bail!("empty cranko-rc-info body in RC commit message");
         }
 
         let srci: SerializedRcCommitInfo = toml::from_str(&data)?;

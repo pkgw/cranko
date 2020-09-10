@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("invalid commit message format")]
-    InvalidCommitMessageFormat,
-
     #[error("invalid commit reference `{0}`")]
     InvalidCommitReference(String),
 
