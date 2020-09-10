@@ -18,7 +18,7 @@ use std::collections::{HashMap, HashSet};
 use thiserror::Error as ThisError;
 
 use crate::{
-    errors::{OldError, Result},
+    errors::Result,
     project::{Project, ProjectBuilder, ProjectId},
     repository::{CommitAvailability, CommitId, ReleaseCommitInfo, RepoHistory, Repository},
 };
@@ -55,6 +55,12 @@ pub struct DependencyCycleError(pub String);
 #[derive(Debug, ThisError)]
 #[error("multiple projects with same name `{0}`")]
 pub struct NamingClashError(pub String);
+
+/// An error returned when an input has requested a project with a certain name,
+/// and it just doesn't exist.
+#[derive(Debug, ThisError)]
+#[error("no such project with the name `{0}`")]
+pub struct NoSuchProjectError(pub String);
 
 impl ProjectGraph {
     /// Get the number of projects in the graph.
@@ -338,7 +344,10 @@ impl ProjectGraph {
         })
     }
 
-    /// Process the query and return a vector of matched project IDs
+    /// Process the query and return a vector of matched project IDs.
+    ///
+    /// If one of the specified project names does not correspond to a project,
+    /// the returned error will be downcastable to a NoSuchProjectError.
     pub fn query(&self, query: GraphQueryBuilder) -> Result<Vec<ProjectId>> {
         // Note: while it generally feels "right" to not allow repeated visits
         // to the same project, this is especially important if a query is used
@@ -361,7 +370,7 @@ impl ProjectGraph {
                 if let Some(id) = self.name_to_id.get(&name) {
                     root_idents.push(*id);
                 } else {
-                    return Err(OldError::NoSuchProject(name).into());
+                    return Err(NoSuchProjectError(name).into());
                 }
             }
 

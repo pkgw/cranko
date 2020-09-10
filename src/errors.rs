@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("no such project `{0}`")]
-    NoSuchProject(String),
-
     #[error("data are not parseable as Unicode")]
     NotUnicodeError,
 
