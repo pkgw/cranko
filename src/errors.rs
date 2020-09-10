@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("cannot proceed with a dirty backing repository (path: {0})")]
-    DirtyRepository(String),
-
     #[error("invalid \"rc\" changelog format in `{0}`")]
     InvalidChangelogFormat(String),
 

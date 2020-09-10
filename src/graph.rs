@@ -44,9 +44,10 @@ pub struct ProjectGraph {
 }
 
 /// An error returned when the internal project graph has a dependency cycle.
+/// The inner value is the user-facing name of a project involved in the cycle.
 #[derive(Debug, ThisError)]
 #[error("detected an internal dependency cycle associated with project {0}")]
-pub struct DependencyCycleError(String);
+pub struct DependencyCycleError(pub String);
 
 impl ProjectGraph {
     /// Get the number of projects in the graph.

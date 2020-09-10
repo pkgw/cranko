@@ -38,6 +38,22 @@ impl std::fmt::Display for CommitId {
 #[error("cannot operate on a bare repository")]
 pub struct BareRepositoryError;
 
+/// An error returned when the backing repository is "dirty", i.e. there are
+/// modified files, and this has situation has been deemed unacceptable. The
+/// inner value is one of the culprit paths.
+#[derive(Debug, ThisError)]
+pub struct DirtyRepositoryError(pub RepoPathBuf);
+
+impl std::fmt::Display for DirtyRepositoryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "the file backing repository is dirty: file {} has been modified",
+            self.0.escaped()
+        )
+    }
+}
+
 /// Information about the backing version control repository.
 pub struct Repository {
     /// The underlying `git2` repository object.
@@ -293,7 +309,7 @@ impl Repository {
     /// will be the first one encountered in the check, an essentially arbitrary
     /// selection.) Modifications to any of the paths matched by `ok_matchers`
     /// are allowed.
-    pub fn check_if_dirty(&self, ok_matchers: &[PathMatcher]) -> Result<Option<String>> {
+    pub fn check_if_dirty(&self, ok_matchers: &[PathMatcher]) -> Result<Option<RepoPathBuf>> {
         // Default options are what we want.
         let mut opts = git2::StatusOptions::new();
 
@@ -311,7 +327,7 @@ impl Repository {
                 }
 
                 if !is_ok {
-                    return Ok(Some(repo_path.escaped()));
+                    return Ok(Some(repo_path.to_owned()));
                 }
             }
         }
@@ -718,7 +734,11 @@ impl Repository {
     /// Returns None if there's nothing wrong but this project doesn't seem to
     /// have been staged for release.
     ///
-    /// Modified changelog files are register with the *changes* listing.
+    /// If `dirty_allowed` is false and there are modified files *besides
+    /// changelogs* in the working tree, an error downcastable to
+    /// DirtyRepositoryError is returned.
+    ///
+    /// Modified changelog files are registered with the *changes* listing.
     pub fn scan_rc_info(
         &self,
         proj: &Project,
@@ -742,7 +762,7 @@ impl Repository {
 
             if changelog_matcher.repo_path_matches(path) {
                 if status.is_conflicted() {
-                    return Err(OldError::DirtyRepository(path.escaped()).into());
+                    return Err(DirtyRepositoryError(path.to_owned()).into());
                 } else if status.is_index_new()
                     || status.is_index_modified()
                     || status.is_wt_new()
@@ -754,7 +774,7 @@ impl Repository {
             } else {
                 if status.is_ignored() || status.is_wt_new() || status == git2::Status::CURRENT {
                 } else if !dirty_allowed {
-                    return Err(OldError::DirtyRepository(path.escaped()).into());
+                    return Err(DirtyRepositoryError(path.to_owned()).into());
                 }
             }
         }

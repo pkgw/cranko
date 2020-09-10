@@ -203,19 +203,26 @@ impl AppSession {
     }
 
     /// Check that the working tree is completely clean. We allow untracked and
-    /// ignored files but otherwise don't want any modifications, etc. Returns Ok
-    /// if clean, Err if not.
+    /// ignored files but otherwise don't want any modifications, etc. Returns
+    /// Ok if clean, an Err downcastable to DirtyRepositoryError if not. The
+    /// error may have a different cause if, e.g., there is an I/O failure.
     pub fn ensure_fully_clean(&self) -> Result<()> {
+        use crate::repository::DirtyRepositoryError;
+
         if let Some(changed_path) = self.repo.check_if_dirty(&[])? {
-            Err(OldError::DirtyRepository(changed_path).into())
+            Err(DirtyRepositoryError(changed_path).into())
         } else {
             Ok(())
         }
     }
 
     /// Check that the working tree is clean, excepting modifications to any
-    /// files interpreted as changelogs. Returns Ok if clean, Err if not.
+    /// files interpreted as changelogs. Returns Ok if clean, an Err
+    /// downcastable to DirtyRepositoryError if not. The error may have a
+    /// different cause if, e.g., there is an I/O failure.
     pub fn ensure_changelog_clean(&self) -> Result<()> {
+        use crate::repository::DirtyRepositoryError;
+
         let mut matchers: Vec<Result<PathMatcher>> = self
             .graph
             .projects()
@@ -225,7 +232,7 @@ impl AppSession {
         let matchers = matchers?;
 
         if let Some(changed_path) = self.repo.check_if_dirty(&matchers[..])? {
-            Err(OldError::DirtyRepository(changed_path).into())
+            Err(DirtyRepositoryError(changed_path).into())
         } else {
             Ok(())
         }
