@@ -22,9 +22,6 @@ use crate::version::Version;
 #[non_exhaustive]
 #[derive(Debug, ThisError)]
 pub enum OldError {
-    #[error("data are not parseable as Unicode")]
-    NotUnicodeError,
-
     #[error("cannot identify the upstream remote for the backing repository")]
     NoUpstreamRemote,
 

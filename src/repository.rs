@@ -524,7 +524,9 @@ impl Repository {
 
     /// Get information about a release from the HEAD commit.
     fn parse_release_info_from_commit(&self, commit: &git2::Commit) -> Result<ReleaseCommitInfo> {
-        let msg = commit.message().ok_or_else(|| OldError::NotUnicodeError)?;
+        let msg = commit
+            .message()
+            .ok_or_else(|| anyhow!("cannot parse release commit message: it is not Unicode"))?;
 
         let mut data = String::new();
         let mut in_body = false;
@@ -871,7 +873,7 @@ impl Repository {
         let head_commit = head_ref.peel_to_commit()?;
         let msg = head_commit
             .message()
-            .ok_or_else(|| OldError::NotUnicodeError)?;
+            .ok_or_else(|| anyhow!("cannot parse rc commit message: it is not Unicode"))?;
 
         let mut data = String::new();
         let mut in_body = false;
