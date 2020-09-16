@@ -23,7 +23,7 @@ use toml_edit::Document;
 use super::Command;
 
 use crate::{
-    app::AppSession,
+    app::{AppBuilder, AppSession},
     errors::Result,
     graph::GraphQueryBuilder,
     project::{Project, ProjectId},
@@ -77,7 +77,7 @@ impl CargoLoader {
     ///
     /// If this repository contains one or more `Cargo.toml` files, the
     /// `cargo_metadata` crate will be used to load project information.
-    pub fn finalize(self, app: &mut AppSession) -> Result<()> {
+    pub fn finalize(self, app: &mut AppBuilder) -> Result<()> {
         let shortest_toml_dirname = match self.shortest_toml_dirname {
             Some(d) => d,
             None => return Ok(()),
@@ -103,7 +103,7 @@ impl CargoLoader {
             let manifest_repopath = app.repo.convert_path(&pkg.manifest_path)?;
             let (prefix, _) = manifest_repopath.split_basename();
 
-            let mut pb = app.graph_mut().add_project();
+            let mut pb = app.graph.add_project();
 
             // Q: should we include a registry name as a qualifier?
             pb.qnames(&[&pkg.name, "cargo"])
@@ -115,7 +115,7 @@ impl CargoLoader {
 
             // Auto-register a rewriter to update this package's Cargo.toml.
             let cargo_rewrite = CargoRewriter::new(ident, manifest_repopath);
-            app.graph_mut()
+            app.graph
                 .lookup_mut(ident)
                 .rewriters
                 .push(Box::new(cargo_rewrite));
@@ -156,7 +156,7 @@ impl CargoLoader {
                                 &dep.name, &pkg.name);
                         }
 
-                        app.graph_mut()
+                        app.graph
                             .add_dependency(*depender_id, *dependee_id, min_version);
                     }
                 }
@@ -331,8 +331,7 @@ pub struct ForeachReleasedCommand {
 
 impl Command for ForeachReleasedCommand {
     fn execute(self) -> anyhow::Result<i32> {
-        let mut sess = AppSession::initialize()?;
-        sess.populated_graph()?;
+        let sess = AppSession::initialize_default()?;
 
         let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
         if dev_mode {
@@ -420,8 +419,7 @@ impl Command for PackageReleasedBinariesCommand {
     fn execute(self) -> anyhow::Result<i32> {
         use cargo_metadata::Message;
 
-        let mut sess = AppSession::initialize()?;
-        sess.populated_graph()?;
+        let sess = AppSession::initialize_default()?;
 
         // For this command, it is OK to run in dev mode
         let (_dev_mode, rel_info) = sess.ensure_ci_release_mode()?;

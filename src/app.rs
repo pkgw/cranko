@@ -3,12 +3,13 @@
 
 //! State for the Cranko CLI application.
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use log::{error, info, warn};
 use std::collections::HashMap;
 use thiserror::Error as ThisError;
 
 use crate::{
+    config::ConfigurationFile,
     errors::Result,
     graph::{ProjectGraph, RepoHistories},
     project::{ProjectId, ResolvedRequirement},
@@ -18,6 +19,79 @@ use crate::{
     },
     version::Version,
 };
+
+/// Setting up a Cranko application session.
+pub struct AppBuilder {
+    pub repo: Repository,
+    pub graph: ProjectGraph,
+    ci_info: ci_info::types::CiInfo,
+    populate_graph: bool,
+}
+
+impl AppBuilder {
+    /// Start initializing an application session.
+    ///
+    /// This first phase of initialization may fail if the environment doesn't
+    /// associate the process with a proper Git repository with a work tree.
+    pub fn new() -> Result<AppBuilder> {
+        let repo = Repository::open_from_env()?;
+        let graph = ProjectGraph::default();
+        let ci_info = ci_info::get();
+
+        Ok(AppBuilder {
+            graph,
+            repo,
+            ci_info,
+            populate_graph: true,
+        })
+    }
+
+    pub fn populate_graph(mut self, do_populate: bool) -> Self {
+        self.populate_graph = do_populate;
+        self
+    }
+
+    /// Finish app initialization, yielding a full AppSession object.
+    pub fn initialize(mut self) -> Result<AppSession> {
+        // Start by loading the configuration file, if it exists. If it doesn't
+        // we'll get a sensible default.
+
+        let mut cfg_path = self.repo.resolve_config_dir();
+        cfg_path.push("config.toml");
+        let config = ConfigurationFile::get(&cfg_path).with_context(|| {
+            format!(
+                "failed to load repository config file `{}`",
+                cfg_path.display()
+            )
+        })?;
+
+        self.repo
+            .apply_config(config.repo)
+            .with_context(|| "failed to finalize repository setup")?;
+
+        // Now auto-detect everything in the repo index.
+
+        let mut cargo = crate::cargo::CargoLoader::default();
+
+        self.repo.scan_paths(|p| {
+            let (dirname, basename) = p.split_basename();
+            cargo.process_index_item(dirname, basename);
+        })?;
+
+        cargo.finalize(&mut self)?;
+
+        self.graph.complete_loading()?;
+
+        // TODO: tweak auto-detected state based on relevant configuration.
+
+        // All done.
+        Ok(AppSession {
+            repo: self.repo,
+            graph: self.graph,
+            ci_info: self.ci_info,
+        })
+    }
+}
 
 /// An error returned when one project in the repository needs a newer release
 /// of another project. The inner values are the user-facing names of the two
@@ -39,20 +113,9 @@ pub struct AppSession {
 }
 
 impl AppSession {
-    /// Initialize a new application session.
-    ///
-    /// Initialization may fail if the environment doesn't associate the process
-    /// with a proper Git repository with a work tree.
-    pub fn initialize() -> Result<AppSession> {
-        let repo = Repository::open_from_env()?;
-        let graph = ProjectGraph::default();
-        let ci_info = ci_info::get();
-
-        Ok(AppSession {
-            graph,
-            repo,
-            ci_info,
-        })
+    /// Create a new app session with totally default parameters
+    pub fn initialize_default() -> Result<Self> {
+        AppBuilder::new()?.initialize()
     }
 
     /// Characterize the repository environment in which this process is
@@ -256,35 +319,6 @@ impl AppSession {
         &mut self.graph
     }
 
-    /// Get the graph of projects inside this app session.
-    ///
-    /// If the graph has not yet been loaded, this triggers processing of the
-    /// config file and repository to fill in the graph information, hence the
-    /// fallibility.
-    pub fn populated_graph(&mut self) -> Result<&ProjectGraph> {
-        if self.graph.len() == 0 {
-            self.populate_graph()?;
-        }
-
-        Ok(&self.graph)
-    }
-
-    fn populate_graph(&mut self) -> Result<()> {
-        // Start by auto-detecting everything in the repo index.
-
-        let mut cargo = crate::cargo::CargoLoader::default();
-
-        self.repo.scan_paths(|p| {
-            let (dirname, basename) = p.split_basename();
-            cargo.process_index_item(dirname, basename);
-        })?;
-
-        cargo.finalize(self)?;
-
-        self.graph.complete_loading()?;
-        Ok(())
-    }
-
     /// Apply version numbers given the current repository state and bump
     /// specifications.
     ///
@@ -430,8 +464,6 @@ impl AppSession {
 
     /// Create version control tags for new releases.
     pub fn create_tags(&mut self, rel_info: &ReleaseCommitInfo) -> Result<()> {
-        self.populate_graph()?;
-
         for proj in self.graph.toposort_mut()? {
             if let Some(rel) = rel_info.lookup_if_released(proj) {
                 self.repo.tag_project_at_head(proj, rel)?;

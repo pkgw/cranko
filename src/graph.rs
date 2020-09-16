@@ -63,11 +63,6 @@ pub struct NamingClashError(pub String);
 pub struct NoSuchProjectError(pub String);
 
 impl ProjectGraph {
-    /// Get the number of projects in the graph.
-    pub fn len(&self) -> usize {
-        self.projects.len()
-    }
-
     /// Start the process of adding a new project to the graph.
     pub fn add_project<'a>(&'a mut self) -> ProjectBuilder<'a> {
         if self.name_to_id.len() != 0 {

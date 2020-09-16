@@ -61,8 +61,8 @@ Here are some of the things on the radar:
   - [ ] NPM
   - [ ] Python
   - [ ] Visual Studio?
-- [ ] Per-repo config file
-  - [ ] Identify upstream remote from its URL
+- [x] Per-repo config file
+  - [x] Identify upstream remote from its URL
   - [ ] Customize project configuration
     - [ ] Custom per-project "rewriter" additions
   - [ ] Defined "unaffiliated" projects

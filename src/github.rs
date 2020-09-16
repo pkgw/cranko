@@ -11,7 +11,7 @@ use structopt::StructOpt;
 
 use super::Command;
 use crate::{
-    app::AppSession,
+    app::{AppBuilder, AppSession},
     errors::Result,
     graph,
     project::Project,
@@ -273,7 +273,7 @@ pub struct CreateCustomReleaseCommand {
 
 impl Command for CreateCustomReleaseCommand {
     fn execute(self) -> anyhow::Result<i32> {
-        let sess = AppSession::initialize()?;
+        let sess = AppBuilder::new()?.populate_graph(false).initialize()?;
         let info = GitHubInformation::new(&sess)?;
         let mut client = info.make_blocking_client()?;
         info.create_custom_release(
@@ -297,10 +297,8 @@ pub struct CreateReleasesCommand {
 
 impl Command for CreateReleasesCommand {
     fn execute(self) -> anyhow::Result<i32> {
-        let mut sess = AppSession::initialize()?;
+        let sess = AppSession::initialize_default()?;
         let info = GitHubInformation::new(&sess)?;
-
-        sess.populated_graph()?;
 
         let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
         let rel_commit = rel_info
@@ -391,7 +389,7 @@ pub struct DeleteReleaseCommand {
 
 impl Command for DeleteReleaseCommand {
     fn execute(self) -> anyhow::Result<i32> {
-        let sess = AppSession::initialize()?;
+        let sess = AppSession::initialize_default()?;
         let info = GitHubInformation::new(&sess)?;
         let mut client = info.make_blocking_client()?;
         info.delete_release(&self.tag_name, &mut client)?;
@@ -451,15 +449,13 @@ pub struct UploadArtifactsCommand {
 
 impl Command for UploadArtifactsCommand {
     fn execute(self) -> anyhow::Result<i32> {
-        let mut sess = AppSession::initialize()?;
+        let sess = AppSession::initialize_default()?;
         let info = GitHubInformation::new(&sess)?;
         let mut client = info.make_blocking_client()?;
 
         let mut metadata = if self.by_tag {
             info.get_custom_release_metadata(&self.proj_name, &mut client)
         } else {
-            sess.populated_graph()?;
-
             let rel_info = sess.repo.parse_release_info_from_head().context(
                 "expected Cranko release metadata in the HEAD commit but could not load it",
             )?;

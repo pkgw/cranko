@@ -5,7 +5,7 @@
 
 use anyhow::{anyhow, bail};
 use dynfmt::{Format, SimpleCurlyFormat};
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -16,6 +16,7 @@ use std::{
 use thiserror::Error as ThisError;
 
 use crate::{
+    config::RepoConfiguration,
     errors::{Error, Result},
     graph::ProjectGraph,
     project::Project,
@@ -99,50 +100,14 @@ impl Repository {
             return Err(BareRepositoryError.into());
         }
 
-        // Guess the name of the upstream remote. If there's only one remote, we
-        // use it; if there are multiple and one is "origin", we use it.
-        // Otherwise, we error out. TODO: make this configurable, add more
-        // heuristics. Note that this config item should not be stored in the
-        // repo since it can be unique to each checkout. (What *could* be stored
-        // in the repo would be a list of URLs corresponding to the official
-        // upstream, and we could see if any of the remotes have one of those
-        // URLs.)
+        // Default configuration. This can/will be overridden later, after we've
+        // read the config file ... but we can't read that file until the repo
+        // is available.
 
-        let mut upstream_name = None;
-        let mut n_remotes = 0;
-
-        for remote_name in &repo.remotes()? {
-            // `None` happens if a remote name is not valid UTF8. At the moment
-            // I can't be bothered to properly handle that.
-            if let Some(remote_name) = remote_name {
-                n_remotes += 1;
-
-                if upstream_name.is_none() || remote_name == "origin" {
-                    upstream_name = Some(remote_name.to_owned());
-                }
-            }
-        }
-
-        if upstream_name.is_none() || (n_remotes > 1 && upstream_name.as_deref() != Some("origin"))
-        {
-            bail!("cannot identify the upstream Git remote");
-        }
-
-        let upstream_name = upstream_name.unwrap();
-
-        // Now that we've got that, check for the upstream `rc` and `release`
-        // branches. This could/should also be configurable. Note that this
-        // configuration could be stored in the repository since every checkout
-        // should be talking about the same upstream.
-
+        let upstream_name = "origin".to_owned();
         let upstream_rc_name = "rc".to_owned();
         let upstream_release_name = "release".to_owned();
-
-        // Release tag name format. Should also become configurable.
-
         let release_tag_name_format = "{project_slug}@{version}".to_owned();
-
-        // All set up.
 
         Ok(Repository {
             repo,
@@ -151,6 +116,69 @@ impl Repository {
             upstream_release_name,
             release_tag_name_format,
         })
+    }
+
+    /// Update the repository configuration with values read from the config file.
+    pub fn apply_config(&mut self, cfg: RepoConfiguration) -> Result<()> {
+        // Get the name of the upstream remote. If there's only one remote, we
+        // use it. If we're given a list of URLs and one matches, we use that.
+        // If no URLs match but there is a remote named "origin", use that.
+
+        let mut first_upstream_name = None;
+        let mut n_remotes = 0;
+        let mut url_matched = None;
+        let mut saw_origin = false;
+
+        for remote_name in &self.repo.remotes()? {
+            // `None` happens if a remote name is not valid UTF8. At the moment
+            // I can't be bothered to properly handle that.
+            if let Some(remote_name) = remote_name {
+                n_remotes += 1;
+
+                if first_upstream_name.is_none() {
+                    first_upstream_name = Some(remote_name.to_owned());
+                }
+
+                if remote_name == "origin" {
+                    saw_origin = true;
+                }
+
+                match self.repo.find_remote(remote_name) {
+                    Err(e) => {
+                        warn!("error querying Git remote `{}`: {}", remote_name, e);
+                    }
+
+                    Ok(remote) => {
+                        if let Some(remote_url) = remote.url() {
+                            for url in &cfg.upstream_urls {
+                                if remote_url == url {
+                                    url_matched = Some(remote_name.to_owned());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if url_matched.is_some() {
+                break;
+            }
+        }
+
+        self.upstream_name = if let Some(n) = url_matched {
+            n
+        } else if n_remotes == 1 {
+            first_upstream_name.unwrap()
+        } else if saw_origin {
+            "origin".to_owned()
+        } else {
+            bail!("cannot identify the upstream Git remote");
+        };
+
+        // TODO: make everything else configurable
+
+        Ok(())
     }
 
     /// Get the name of the `rc`-type branch.
@@ -277,6 +305,11 @@ impl Repository {
         let mut fullpath = self.repo.workdir().unwrap().to_owned();
         fullpath.push(p.as_path());
         fullpath
+    }
+
+    /// Resolve the path to the per-repository configuration directory.
+    pub fn resolve_config_dir(&self) -> PathBuf {
+        self.resolve_workdir(RepoPath::new(b".config/cranko"))
     }
 
     /// Convert a filesystem path pointing inside the working directory into a
