@@ -8,22 +8,32 @@
 //! per-repository level.
 
 use anyhow::Context;
-use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read, path::Path};
 
 use crate::errors::{Error, Result};
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct SerializedConfiguration {
-    /// General per-repository configuration.
-    pub repo: RepoConfiguration,
+/// The configuration file structures as explicitly serialized into the TOML
+/// format.
+mod syntax {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Deserialize, Serialize)]
+    pub struct SerializedConfiguration {
+        /// General per-repository configuration.
+        pub repo: RepoConfiguration,
+    }
+
+    #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+    pub struct RepoConfiguration {
+        /// Git URLs that the upstream remote might be using.
+        pub upstream_urls: Vec<String>,
+    }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct RepoConfiguration {
-    /// Git URLs that the upstream remote might be using.
-    pub upstream_urls: Vec<String>,
-}
+// The rest of this module normalizes the on-disk format into forms more useful
+// at runtime.
+
+pub use syntax::RepoConfiguration;
 
 #[derive(Clone, Debug)]
 pub struct ConfigurationFile {
@@ -59,7 +69,7 @@ impl ConfigurationFile {
         f.read_to_string(&mut text)
             .with_context(|| format!("failed to read config file `{}`", path.as_ref().display()))?;
 
-        let sercfg: SerializedConfiguration = toml::from_str(&text).with_context(|| {
+        let sercfg: syntax::SerializedConfiguration = toml::from_str(&text).with_context(|| {
             format!(
                 "could not parse config file `{}` as TOML",
                 path.as_ref().display()
