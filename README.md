@@ -1,4 +1,4 @@
-[![Build Status](https://dev.azure.com/peter-bulk/Misc/_apis/build/status/pkgw.cranko?branchName=rc)](https://dev.azure.com/peter-bulk/Misc/_build/latest?definitionId=2&branchName=rc)
+[![Build Status](https://dev.azure.com/peter-bulk/Misc/_apis/build/status/pkgw.cranko?branchName=master)](https://dev.azure.com/peter-bulk/Misc/_build/latest?definitionId=2&branchName=master)
 [![](https://meritbadge.herokuapp.com/cranko)](https://crates.io/crates/cranko)
 
 # cranko
