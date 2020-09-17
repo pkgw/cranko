@@ -23,6 +23,7 @@ The `config.toml` file may contain the following items:
 - [`[repo]`](#the-repo-section) — Configuration relating to the backing repository
   - [`rc_name`](#the-rc_name-field) — The name of the `rc`-like branch
   - [`release_name`](#the-release_name-field) — The name of the `release`-like branch
+  - [`release_tag_name_format`](#the-release_tag_name_format-field) — The format for release tag names
   - [`upstream_urls`](#the-upstream_urls-field) — How the upstream remote is recognized
 
 As mentioned above, additional items are planned to be added as the need arises.
@@ -42,6 +43,20 @@ the local checkout and when consulting the upstream repository.
 This field is a string specifying the name of the `release`-like branch that
 will be used. If unspecified, the default is indeed `release`. The same name
 will be used in the local checkout and when consulting the upstream repository.
+
+#### The `release_tag_name_format` field
+
+This field is a string specifying how the names of Git tags corresponding to
+releases will be constructed. The default is `{project_slug}@{version}`.
+
+Values are interpolated using a standard curly-brace substitution scheme (as
+implemented by the `curly` module of the [dynfmt] crate). Available input
+variables are:
+
+- `project_slug`: the “user facing name” of the released project
+- `version`: the stringification of the version of the released project
+
+[dynfmt]: https://github.com/jan-auer/dynfmt
 
 #### The `upstream_urls` field
 

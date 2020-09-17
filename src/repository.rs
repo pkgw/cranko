@@ -178,6 +178,7 @@ impl Repository {
 
         self.upstream_rc_name = cfg.rc_name;
         self.upstream_release_name = cfg.release_name;
+        self.release_tag_name_format = cfg.release_tag_name_format;
 
         Ok(())
     }

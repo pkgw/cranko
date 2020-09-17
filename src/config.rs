@@ -36,6 +36,9 @@ mod syntax {
 
         /// The name of the `release`-like branch.
         pub release_name: String,
+
+        /// The format for release tag names.
+        pub release_tag_name_format: String,
     }
 
     impl Default for RepoConfiguration {
@@ -44,6 +47,7 @@ mod syntax {
                 upstream_urls: Vec::new(),
                 rc_name: "rc".to_owned(),
                 release_name: "release".to_owned(),
+                release_tag_name_format: "{project_slug}@{version}".to_owned(),
             }
         }
     }
