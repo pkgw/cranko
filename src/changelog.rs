@@ -16,6 +16,7 @@ use std::{
     io::{prelude::*, BufReader, Cursor},
     path::PathBuf,
 };
+use thiserror::Error as ThisError;
 
 use crate::{
     app::AppSession,
@@ -73,6 +74,23 @@ pub trait Changelog: std::fmt::Debug {
 /// This uses the Markdown format.
 pub fn default() -> Box<dyn Changelog> {
     Box::new(MarkdownChangelog::default())
+}
+
+/// An error returned when a changelog file does not obey the special structure
+/// expected by Cranko's processing routines. The inner value is the path to the
+/// offending changelog (not a RepoPathBuf since it may not have yet been added
+/// to the repo).
+#[derive(Debug, ThisError)]
+pub struct InvalidChangelogFormatError(pub PathBuf);
+
+impl std::fmt::Display for InvalidChangelogFormatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "changelog file `{}` does not obey the expected formatting",
+            self.0.display()
+        )
+    }
 }
 
 /// Settings for Markdown-formatted changelogs.
@@ -142,7 +160,9 @@ impl Changelog for MarkdownChangelog {
 
             let mut headfoot_args = HashMap::new();
             headfoot_args.insert("bump_spec", "micro bump");
-            let header = SimpleCurlyFormat.format(&self.stage_header_format, &headfoot_args)?;
+            let header = SimpleCurlyFormat
+                .format(&self.stage_header_format, &headfoot_args)
+                .map_err(|e| Error::msg(e.to_string()))?;
             writeln!(new_f, "{}", header)?;
 
             // Commit summaries! Note: if we're staging muliple projects and the
@@ -163,7 +183,9 @@ impl Changelog for MarkdownChangelog {
 
             // Footer
 
-            let footer = SimpleCurlyFormat.format(&self.footer_format, &headfoot_args)?;
+            let footer = SimpleCurlyFormat
+                .format(&self.footer_format, &headfoot_args)
+                .map_err(|e| Error::msg(e.to_string()))?;
             writeln!(new_f, "{}", footer)?;
 
             // Write back all of the previous contents, and we're done.
@@ -202,13 +224,10 @@ impl Changelog for MarkdownChangelog {
                 break;
             }
 
-            return Err(Error::InvalidChangelogFormat(
-                changelog_path.display().to_string(),
-            ));
+            return Err(InvalidChangelogFormatError(changelog_path).into());
         }
 
-        let bump_spec = bump_spec
-            .ok_or_else(|| Error::InvalidChangelogFormat(changelog_path.display().to_string()))?;
+        let bump_spec = bump_spec.ok_or_else(|| InvalidChangelogFormatError(changelog_path))?;
         let _check_scheme = proj.version.parse_bump_scheme(&bump_spec)?;
 
         Ok(RcProjectInfo {
@@ -262,14 +281,13 @@ impl Changelog for MarkdownChangelog {
                         }
 
                         if !line.starts_with("# rc:") {
-                            return Err(Error::InvalidChangelogFormat(
-                                changelog_path.display().to_string(),
-                            ));
+                            return Err(InvalidChangelogFormatError(changelog_path).into());
                         }
 
                         state = State::BlanksAfterHeader;
-                        let header =
-                            SimpleCurlyFormat.format(&self.release_header_format, &header_args)?;
+                        let header = SimpleCurlyFormat
+                            .format(&self.release_header_format, &header_args)
+                            .map_err(|e| Error::msg(e.to_string()))?;
                         writeln!(new_f, "{}", header)?;
                     }
 

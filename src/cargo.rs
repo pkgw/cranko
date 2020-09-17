@@ -23,8 +23,8 @@ use toml_edit::Document;
 use super::Command;
 
 use crate::{
-    app::AppSession,
-    errors::{Error, Result},
+    app::{AppBuilder, AppSession},
+    errors::Result,
     graph::GraphQueryBuilder,
     project::{Project, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf},
@@ -77,7 +77,7 @@ impl CargoLoader {
     ///
     /// If this repository contains one or more `Cargo.toml` files, the
     /// `cargo_metadata` crate will be used to load project information.
-    pub fn finalize(self, app: &mut AppSession) -> Result<()> {
+    pub fn finalize(self, app: &mut AppBuilder) -> Result<()> {
         let shortest_toml_dirname = match self.shortest_toml_dirname {
             Some(d) => d,
             None => return Ok(()),
@@ -103,7 +103,7 @@ impl CargoLoader {
             let manifest_repopath = app.repo.convert_path(&pkg.manifest_path)?;
             let (prefix, _) = manifest_repopath.split_basename();
 
-            let mut pb = app.graph_mut().add_project();
+            let mut pb = app.graph.add_project();
 
             // Q: should we include a registry name as a qualifier?
             pb.qnames(&[&pkg.name, "cargo"])
@@ -115,7 +115,7 @@ impl CargoLoader {
 
             // Auto-register a rewriter to update this package's Cargo.toml.
             let cargo_rewrite = CargoRewriter::new(ident, manifest_repopath);
-            app.graph_mut()
+            app.graph
                 .lookup_mut(ident)
                 .rewriters
                 .push(Box::new(cargo_rewrite));
@@ -156,7 +156,7 @@ impl CargoLoader {
                                 &dep.name, &pkg.name);
                         }
 
-                        app.graph_mut()
+                        app.graph
                             .add_dependency(*depender_id, *dependee_id, min_version);
                     }
                 }
@@ -211,12 +211,10 @@ impl Rewriter for CargoRewriter {
 
         {
             let ct_root = doc.as_table_mut();
-            let ct_package = ct_root.entry("package").as_table_mut().ok_or_else(|| {
-                Error::RewriteFormatError(format!(
-                    "no [package] section in {}?!",
-                    self.toml_path.escaped()
-                ))
-            })?;
+            let ct_package = ct_root
+                .entry("package")
+                .as_table_mut()
+                .ok_or_else(|| anyhow!("no [package] section in {}?!", self.toml_path.escaped()))?;
 
             ct_package["version"] = toml_edit::value(proj.version.to_string());
 
@@ -267,10 +265,10 @@ impl Rewriter for CargoRewriter {
                             dep_tbl.get_or_insert("version", format!("^{}", min_version));
                         }
                     } else {
-                        return Err(Error::Environment(format!(
+                        return Err(anyhow!(
                             "unexpected internal dependency item in a Cargo.toml: {:?}",
                             tbl.entry(dep)
-                        )));
+                        ));
                     }
                 }
             }
@@ -333,8 +331,7 @@ pub struct ForeachReleasedCommand {
 
 impl Command for ForeachReleasedCommand {
     fn execute(self) -> anyhow::Result<i32> {
-        let mut sess = AppSession::initialize()?;
-        sess.populated_graph()?;
+        let sess = AppSession::initialize_default()?;
 
         let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
         if dev_mode {
@@ -422,8 +419,7 @@ impl Command for PackageReleasedBinariesCommand {
     fn execute(self) -> anyhow::Result<i32> {
         use cargo_metadata::Message;
 
-        let mut sess = AppSession::initialize()?;
-        sess.populated_graph()?;
+        let sess = AppSession::initialize_default()?;
 
         // For this command, it is OK to run in dev mode
         let (_dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
