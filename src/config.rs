@@ -26,30 +26,19 @@ mod syntax {
 
     /// Configuration relating to the backing repository. This is applied
     /// directly to the runtime Repository instance.
-    #[derive(Clone, Debug, Deserialize, Serialize)]
+    #[derive(Clone, Debug, Default, Deserialize, Serialize)]
     pub struct RepoConfiguration {
         /// Git URLs that the upstream remote might be using.
         pub upstream_urls: Vec<String>,
 
         /// The name of the `rc`-like branch.
-        pub rc_name: String,
+        pub rc_name: Option<String>,
 
         /// The name of the `release`-like branch.
-        pub release_name: String,
+        pub release_name: Option<String>,
 
         /// The format for release tag names.
-        pub release_tag_name_format: String,
-    }
-
-    impl Default for RepoConfiguration {
-        fn default() -> Self {
-            RepoConfiguration {
-                upstream_urls: Vec::new(),
-                rc_name: "rc".to_owned(),
-                release_name: "release".to_owned(),
-                release_tag_name_format: "{project_slug}@{version}".to_owned(),
-            }
-        }
+        pub release_tag_name_format: Option<String>,
     }
 }
 

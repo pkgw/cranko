@@ -176,9 +176,17 @@ impl Repository {
             bail!("cannot identify the upstream Git remote");
         };
 
-        self.upstream_rc_name = cfg.rc_name;
-        self.upstream_release_name = cfg.release_name;
-        self.release_tag_name_format = cfg.release_tag_name_format;
+        if let Some(n) = cfg.rc_name {
+            self.upstream_rc_name = n;
+        }
+
+        if let Some(n) = cfg.release_name {
+            self.upstream_release_name = n;
+        }
+
+        if let Some(n) = cfg.release_tag_name_format {
+            self.release_tag_name_format = n;
+        }
 
         Ok(())
     }
