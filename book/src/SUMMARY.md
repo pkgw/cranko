@@ -7,6 +7,10 @@
 - [Developer Workflows](workflows-dev/index.md)
 - [CI/CD Workflows](workflows-cicd/index.md)
 
+# Reference Material
+
+- [Configuration](configuration/index.md)
+
 # CLI Commands
 
 - [Developer Commands]()
