@@ -176,7 +176,8 @@ impl Repository {
             bail!("cannot identify the upstream Git remote");
         };
 
-        // TODO: make everything else configurable
+        self.upstream_rc_name = cfg.rc_name;
+        self.upstream_release_name = cfg.release_name;
 
         Ok(())
     }

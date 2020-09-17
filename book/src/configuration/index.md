@@ -21,7 +21,9 @@ files are supported.
 The `config.toml` file may contain the following items:
 
 - [`[repo]`](#the-repo-section) — Configuration relating to the backing repository
-  - [`upstream_urls`](#the-uptream_urls-field) — How the upstream remote is recognized
+  - [`rc_name`](#the-rc_name-field) — The name of the `rc`-like branch
+  - [`release_name`](#the-release_name-field) — The name of the `release`-like branch
+  - [`upstream_urls`](#the-upstream_urls-field) — How the upstream remote is recognized
 
 As mentioned above, additional items are planned to be added as the need arises.
 
@@ -29,7 +31,19 @@ As mentioned above, additional items are planned to be added as the need arises.
 
 This section contains configuration relating to the backing Git repository.
 
-### The `upstream_urls` field
+#### The `rc_name` field
+
+This field is a string specifying the name of the `rc`-like branch that will be
+used. If unspecified, the default is indeed `rc`. The same name will be used in
+the local checkout and when consulting the upstream repository.
+
+#### The `release_name` field
+
+This field is a string specifying the name of the `release`-like branch that
+will be used. If unspecified, the default is indeed `release`. The same name
+will be used in the local checkout and when consulting the upstream repository.
+
+#### The `upstream_urls` field
 
 This field is a list of strings giving the Git URLs associated with the
 canonical upstream repository, which is the one that will perform automated

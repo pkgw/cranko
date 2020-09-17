@@ -17,16 +17,35 @@ use crate::errors::{Error, Result};
 mod syntax {
     use serde::{Deserialize, Serialize};
 
+    /// The toplevel (per-repo) configuration structure.
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct SerializedConfiguration {
         /// General per-repository configuration.
         pub repo: RepoConfiguration,
     }
 
-    #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+    /// Configuration relating to the backing repository. This is applied
+    /// directly to the runtime Repository instance.
+    #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct RepoConfiguration {
         /// Git URLs that the upstream remote might be using.
         pub upstream_urls: Vec<String>,
+
+        /// The name of the `rc`-like branch.
+        pub rc_name: String,
+
+        /// The name of the `release`-like branch.
+        pub release_name: String,
+    }
+
+    impl Default for RepoConfiguration {
+        fn default() -> Self {
+            RepoConfiguration {
+                upstream_urls: Vec::new(),
+                rc_name: "rc".to_owned(),
+                release_name: "release".to_owned(),
+            }
+        }
     }
 }
 
