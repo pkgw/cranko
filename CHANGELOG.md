@@ -1,5 +1,15 @@
 # rc: micro bump
 
+- Start working on the configuration framework, with a per-repository file at
+  `.config/cranko/config.toml`. Only a few demonstration options are available
+  as of yet.
+- Replace the first-draft error handling with what I hope is a better design.
+  Still need to go back and start adding helpful context everywhere. Seems like
+  a helper macro could potentially be useful.
+- Fix some more problems in the CI/CD deployment pipeline.
+
+# cranko 0.0.26 (2020-09-08)
+
 - Fix `cranko stage` when no previous changelog is in the history
 - See if we can parallelize deployment tasks in the CI pipeline.
 

@@ -23,6 +23,7 @@ use structopt::StructOpt;
 mod app;
 mod cargo;
 mod changelog;
+mod config;
 mod errors;
 mod github;
 mod gitutil;
@@ -278,9 +279,7 @@ struct ConfirmCommand {
 
 impl Command for ConfirmCommand {
     fn execute(self) -> Result<i32> {
-        let mut sess = app::AppSession::initialize()?;
-        sess.populated_graph()?;
-
+        let mut sess = app::AppSession::initialize_default()?;
         sess.ensure_not_ci(self.force)?;
 
         if let Err(e) = sess.ensure_changelog_clean() {
@@ -507,9 +506,7 @@ struct ReleaseWorkflowApplyVersionsCommand {
 
 impl Command for ReleaseWorkflowApplyVersionsCommand {
     fn execute(self) -> Result<i32> {
-        let mut sess = app::AppSession::initialize()?;
-        sess.populated_graph()?;
-
+        let mut sess = app::AppSession::initialize_default()?;
         sess.ensure_fully_clean()?;
 
         let (dev_mode, rci) = sess.ensure_ci_rc_mode(self.force)?;
@@ -544,8 +541,7 @@ struct ReleaseWorkflowCommitCommand {
 
 impl Command for ReleaseWorkflowCommitCommand {
     fn execute(self) -> Result<i32> {
-        let mut sess = app::AppSession::initialize()?;
-        sess.populated_graph()?;
+        let mut sess = app::AppSession::initialize_default()?;
 
         // We won't complain if people want to make a release commit on updates
         // to `master` or whatever: they might want to monitor that that part of
@@ -564,7 +560,7 @@ struct ReleaseWorkflowTagCommand {}
 
 impl Command for ReleaseWorkflowTagCommand {
     fn execute(self) -> Result<i32> {
-        let mut sess = app::AppSession::initialize()?;
+        let mut sess = app::AppSession::initialize_default()?;
         let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
 
         if dev_mode {
@@ -621,8 +617,7 @@ struct ShowIfReleasedCommand {
 
 impl Command for ShowIfReleasedCommand {
     fn execute(self) -> Result<i32> {
-        let mut sess = app::AppSession::initialize()?;
-        sess.populated_graph()?;
+        let sess = app::AppSession::initialize_default()?;
 
         if !(self.exit_code || self.true_false) {
             bail!("must specify at least one output mechanism");
@@ -668,8 +663,7 @@ struct ShowVersionCommand {
 
 impl Command for ShowVersionCommand {
     fn execute(self) -> Result<i32> {
-        let mut sess = app::AppSession::initialize()?;
-        sess.populated_graph()?;
+        let sess = app::AppSession::initialize_default()?;
 
         let mut q = graph::GraphQueryBuilder::default();
         q.names(self.proj_names);
@@ -702,8 +696,7 @@ struct StageCommand {
 
 impl Command for StageCommand {
     fn execute(self) -> Result<i32> {
-        let mut sess = app::AppSession::initialize()?;
-        sess.populated_graph()?;
+        let sess = app::AppSession::initialize_default()?;
 
         if let Err(e) = sess.ensure_changelog_clean() {
             warn!(
@@ -797,8 +790,7 @@ struct StatusCommand {
 
 impl Command for StatusCommand {
     fn execute(self) -> Result<i32> {
-        let mut sess = app::AppSession::initialize()?;
-        sess.populated_graph()?;
+        let sess = app::AppSession::initialize_default()?;
 
         let mut q = graph::GraphQueryBuilder::default();
         q.names(self.proj_names);
@@ -844,7 +836,12 @@ fn do_external(all_args: Vec<String>) -> Result<i32> {
         .map(|dir| dir.join(&command_exe))
         .find(|file| is_executable(file));
 
-    let command = path.ok_or_else(|| errors::CliError::NoSuchSubcommand(cmd.to_owned()))?;
+    let command = path.ok_or_else(|| {
+        anyhow!(
+            "no internal or external subcommand `{0}` is available (install `cranko-{0}`?)",
+            cmd.to_owned()
+        )
+    })?;
     exec_or_spawn(std::process::Command::new(command).args(args))
 }
 

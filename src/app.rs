@@ -3,11 +3,14 @@
 
 //! State for the Cranko CLI application.
 
+use anyhow::{anyhow, Context};
 use log::{error, info, warn};
 use std::collections::HashMap;
+use thiserror::Error as ThisError;
 
 use crate::{
-    errors::{Error, Result},
+    config::ConfigurationFile,
+    errors::Result,
     graph::{ProjectGraph, RepoHistories},
     project::{ProjectId, ResolvedRequirement},
     repository::{
@@ -16,6 +19,86 @@ use crate::{
     },
     version::Version,
 };
+
+/// Setting up a Cranko application session.
+pub struct AppBuilder {
+    pub repo: Repository,
+    pub graph: ProjectGraph,
+    ci_info: ci_info::types::CiInfo,
+    populate_graph: bool,
+}
+
+impl AppBuilder {
+    /// Start initializing an application session.
+    ///
+    /// This first phase of initialization may fail if the environment doesn't
+    /// associate the process with a proper Git repository with a work tree.
+    pub fn new() -> Result<AppBuilder> {
+        let repo = Repository::open_from_env()?;
+        let graph = ProjectGraph::default();
+        let ci_info = ci_info::get();
+
+        Ok(AppBuilder {
+            graph,
+            repo,
+            ci_info,
+            populate_graph: true,
+        })
+    }
+
+    pub fn populate_graph(mut self, do_populate: bool) -> Self {
+        self.populate_graph = do_populate;
+        self
+    }
+
+    /// Finish app initialization, yielding a full AppSession object.
+    pub fn initialize(mut self) -> Result<AppSession> {
+        // Start by loading the configuration file, if it exists. If it doesn't
+        // we'll get a sensible default.
+
+        let mut cfg_path = self.repo.resolve_config_dir();
+        cfg_path.push("config.toml");
+        let config = ConfigurationFile::get(&cfg_path).with_context(|| {
+            format!(
+                "failed to load repository config file `{}`",
+                cfg_path.display()
+            )
+        })?;
+
+        self.repo
+            .apply_config(config.repo)
+            .with_context(|| "failed to finalize repository setup")?;
+
+        // Now auto-detect everything in the repo index.
+
+        let mut cargo = crate::cargo::CargoLoader::default();
+
+        self.repo.scan_paths(|p| {
+            let (dirname, basename) = p.split_basename();
+            cargo.process_index_item(dirname, basename);
+        })?;
+
+        cargo.finalize(&mut self)?;
+
+        self.graph.complete_loading()?;
+
+        // TODO: tweak auto-detected state based on relevant configuration.
+
+        // All done.
+        Ok(AppSession {
+            repo: self.repo,
+            graph: self.graph,
+            ci_info: self.ci_info,
+        })
+    }
+}
+
+/// An error returned when one project in the repository needs a newer release
+/// of another project. The inner values are the user-facing names of the two
+/// projects: the first named project depends on the second one.
+#[derive(Debug, ThisError)]
+#[error("unsatisfied internal requirement: `{0}` needs newer `{1}`")]
+pub struct UnsatisfiedInternalRequirementError(pub String, pub String);
 
 /// The main Cranko CLI application state structure.
 pub struct AppSession {
@@ -30,20 +113,9 @@ pub struct AppSession {
 }
 
 impl AppSession {
-    /// Initialize a new application session.
-    ///
-    /// Initialization may fail if the environment doesn't associate the process
-    /// with a proper Git repository with a work tree.
-    pub fn initialize() -> Result<AppSession> {
-        let repo = Repository::open_from_env()?;
-        let graph = ProjectGraph::default();
-        let ci_info = ci_info::get();
-
-        Ok(AppSession {
-            graph,
-            repo,
-            ci_info,
-        })
+    /// Create a new app session with totally default parameters
+    pub fn initialize_default() -> Result<Self> {
+        AppBuilder::new()?.initialize()
     }
 
     /// Characterize the repository environment in which this process is
@@ -133,8 +205,8 @@ impl AppSession {
                 if force {
                     Ok(())
                 } else {
-                    Err(Error::Environment(
-                        "refusing to proceed (use \"force\" mode to override)".to_owned(),
+                    Err(anyhow!(
+                        "refusing to proceed (use \"force\" mode to override)",
                     ))
                 }
             }
@@ -151,8 +223,8 @@ impl AppSession {
         match self.execution_environment()? {
             ExecutionEnvironment::NotCi => {
                 error!("no CI environment detected; this is unexpected for this command");
-                Err(Error::Environment(
-                    "don't know how to obtain release information -- cannot proceed".to_owned(),
+                Err(anyhow!(
+                    "don't know how to obtain release information -- cannot proceed",
                 ))
             }
 
@@ -161,8 +233,8 @@ impl AppSession {
             _ => {
                 error!("unexpected CI environment detected");
                 error!("... this command should only be run after switching to a local `release`-type branch");
-                Err(Error::Environment(
-                    "don't know how to obtain release information -- cannot proceed".to_owned(),
+                Err(anyhow!(
+                    "don't know how to obtain release information -- cannot proceed",
                 ))
             }
         }
@@ -181,8 +253,8 @@ impl AppSession {
                 if force {
                     Ok((true, self.default_dev_rc_info()))
                 } else {
-                    Err(Error::Environment(
-                        "refusing to proceed (use \"force\" mode to override)".to_owned(),
+                    Err(anyhow!(
+                        "refusing to proceed (use \"force\" mode to override)",
                     ))
                 }
             }
@@ -193,8 +265,8 @@ impl AppSession {
                 if force {
                     Ok((true, self.default_dev_rc_info()))
                 } else {
-                    Err(Error::Environment(
-                        "refusing to proceed (use \"force\" mode to override)".to_owned(),
+                    Err(anyhow!(
+                        "refusing to proceed (use \"force\" mode to override)",
                     ))
                 }
             }
@@ -202,19 +274,26 @@ impl AppSession {
     }
 
     /// Check that the working tree is completely clean. We allow untracked and
-    /// ignored files but otherwise don't want any modifications, etc. Returns Ok
-    /// if clean, Err if not.
+    /// ignored files but otherwise don't want any modifications, etc. Returns
+    /// Ok if clean, an Err downcastable to DirtyRepositoryError if not. The
+    /// error may have a different cause if, e.g., there is an I/O failure.
     pub fn ensure_fully_clean(&self) -> Result<()> {
+        use crate::repository::DirtyRepositoryError;
+
         if let Some(changed_path) = self.repo.check_if_dirty(&[])? {
-            Err(Error::DirtyRepository(changed_path))
+            Err(DirtyRepositoryError(changed_path).into())
         } else {
             Ok(())
         }
     }
 
     /// Check that the working tree is clean, excepting modifications to any
-    /// files interpreted as changelogs. Returns Ok if clean, Err if not.
+    /// files interpreted as changelogs. Returns Ok if clean, an Err
+    /// downcastable to DirtyRepositoryError if not. The error may have a
+    /// different cause if, e.g., there is an I/O failure.
     pub fn ensure_changelog_clean(&self) -> Result<()> {
+        use crate::repository::DirtyRepositoryError;
+
         let mut matchers: Vec<Result<PathMatcher>> = self
             .graph
             .projects()
@@ -224,7 +303,7 @@ impl AppSession {
         let matchers = matchers?;
 
         if let Some(changed_path) = self.repo.check_if_dirty(&matchers[..])? {
-            Err(Error::DirtyRepository(changed_path))
+            Err(DirtyRepositoryError(changed_path).into())
         } else {
             Ok(())
         }
@@ -240,40 +319,12 @@ impl AppSession {
         &mut self.graph
     }
 
-    /// Get the graph of projects inside this app session.
-    ///
-    /// If the graph has not yet been loaded, this triggers processing of the
-    /// config file and repository to fill in the graph information, hence the
-    /// fallibility.
-    pub fn populated_graph(&mut self) -> Result<&ProjectGraph> {
-        if self.graph.len() == 0 {
-            self.populate_graph()?;
-        }
-
-        Ok(&self.graph)
-    }
-
-    fn populate_graph(&mut self) -> Result<()> {
-        // Start by auto-detecting everything in the repo index.
-
-        let mut cargo = crate::cargo::CargoLoader::default();
-
-        self.repo.scan_paths(|p| {
-            let (dirname, basename) = p.split_basename();
-            cargo.process_index_item(dirname, basename);
-        })?;
-
-        cargo.finalize(self)?;
-
-        self.graph.complete_loading()?;
-        Ok(())
-    }
-
     /// Apply version numbers given the current repository state and bump
     /// specifications.
     ///
     /// This also involves solving the version requirements for internal
-    /// dependencies.
+    /// dependencies. If an internal dependency is unsatisfiable, the returned
+    /// error will be downcastable to an UnsatisfiedInternalRequirementError.
     pub fn apply_versions(&mut self, rc_info: &RcCommitInfo) -> Result<()> {
         let mut new_versions: HashMap<ProjectId, Version> = HashMap::new();
         let latest_info = self.repo.get_latest_release_info()?;
@@ -288,10 +339,11 @@ impl AppSession {
             for dep in &deps[..] {
                 let min_version = match dep.availability {
                     CommitAvailability::NotAvailable => {
-                        return Err(Error::UnsatisfiedInternalRequirement(
+                        return Err(UnsatisfiedInternalRequirementError(
                             proj.user_facing_name.to_string(),
                             self.graph.lookup(dep.ident).user_facing_name.to_string(),
-                        ))
+                        )
+                        .into())
                     }
 
                     CommitAvailability::ExistingRelease(ref v) => v.clone(),
@@ -300,10 +352,11 @@ impl AppSession {
                         if let Some(v) = new_versions.get(&dep.ident) {
                             v.clone()
                         } else {
-                            return Err(Error::UnsatisfiedInternalRequirement(
+                            return Err(UnsatisfiedInternalRequirementError(
                                 proj.user_facing_name.to_string(),
                                 self.graph.lookup(dep.ident).user_facing_name.to_string(),
-                            ));
+                            )
+                            .into());
                         }
                     }
                 };
@@ -411,8 +464,6 @@ impl AppSession {
 
     /// Create version control tags for new releases.
     pub fn create_tags(&mut self, rel_info: &ReleaseCommitInfo) -> Result<()> {
-        self.populate_graph()?;
-
         for proj in self.graph.toposort_mut()? {
             if let Some(rel) = rel_info.lookup_if_released(proj) {
                 self.repo.tag_project_at_head(proj, rel)?;

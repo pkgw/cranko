@@ -3,8 +3,9 @@
 
 //! State of the backing version control repository.
 
+use anyhow::{anyhow, bail};
 use dynfmt::{Format, SimpleCurlyFormat};
-use log::info;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -12,8 +13,10 @@ use std::{
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
+use thiserror::Error as ThisError;
 
 use crate::{
+    config::RepoConfiguration,
     errors::{Error, Result},
     graph::ProjectGraph,
     project::Project,
@@ -27,6 +30,34 @@ pub struct CommitId(git2::Oid);
 impl std::fmt::Display for CommitId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+/// An empty error returned when the backing repository is "bare", without a
+/// working directory. Cranko cannot operate on such repositories.
+#[derive(Debug, ThisError)]
+#[error("cannot operate on a bare repository")]
+pub struct BareRepositoryError;
+
+/// An error returned when the backing repository is "dirty", i.e. there are
+/// modified files, and this has situation has been deemed unacceptable. The
+/// inner value is one of the culprit paths.
+#[derive(Debug, ThisError)]
+pub struct DirtyRepositoryError(pub RepoPathBuf);
+
+/// An error returned when some metadata references a commit in the repository,
+/// and that reference is bogus. The inner value is the text of the reference.
+#[derive(Debug, ThisError)]
+#[error("commit reference `{0}` is invalid or refers to a nonexistent commit")]
+pub struct InvalidCommitReferenceError(pub String);
+
+impl std::fmt::Display for DirtyRepositoryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "the file backing repository is dirty: file {} has been modified",
+            self.0.escaped()
+        )
     }
 }
 
@@ -59,57 +90,24 @@ impl Repository {
     /// repository and the necessary Git environment variables are missing, if
     /// the repository is "bare" (has no working directory), if there is some
     /// data corruption issue, etc.
+    ///
+    /// If the repository is "bare", an error downcastable into
+    /// BareRepositoryError will be returned.
     pub fn open_from_env() -> Result<Repository> {
         let repo = git2::Repository::open_from_env()?;
 
         if repo.is_bare() {
-            return Err(Error::BareRepository);
+            return Err(BareRepositoryError.into());
         }
 
-        // Guess the name of the upstream remote. If there's only one remote, we
-        // use it; if there are multiple and one is "origin", we use it.
-        // Otherwise, we error out. TODO: make this configurable, add more
-        // heuristics. Note that this config item should not be stored in the
-        // repo since it can be unique to each checkout. (What *could* be stored
-        // in the repo would be a list of URLs corresponding to the official
-        // upstream, and we could see if any of the remotes have one of those
-        // URLs.)
+        // Default configuration. This can/will be overridden later, after we've
+        // read the config file ... but we can't read that file until the repo
+        // is available.
 
-        let mut upstream_name = None;
-        let mut n_remotes = 0;
-
-        for remote_name in &repo.remotes()? {
-            // `None` happens if a remote name is not valid UTF8. At the moment
-            // I can't be bothered to properly handle that.
-            if let Some(remote_name) = remote_name {
-                n_remotes += 1;
-
-                if upstream_name.is_none() || remote_name == "origin" {
-                    upstream_name = Some(remote_name.to_owned());
-                }
-            }
-        }
-
-        if upstream_name.is_none() || (n_remotes > 1 && upstream_name.as_deref() != Some("origin"))
-        {
-            return Err(Error::NoUpstreamRemote);
-        }
-
-        let upstream_name = upstream_name.unwrap();
-
-        // Now that we've got that, check for the upstream `rc` and `release`
-        // branches. This could/should also be configurable. Note that this
-        // configuration could be stored in the repository since every checkout
-        // should be talking about the same upstream.
-
+        let upstream_name = "origin".to_owned();
         let upstream_rc_name = "rc".to_owned();
         let upstream_release_name = "release".to_owned();
-
-        // Release tag name format. Should also become configurable.
-
         let release_tag_name_format = "{project_slug}@{version}".to_owned();
-
-        // All set up.
 
         Ok(Repository {
             repo,
@@ -118,6 +116,79 @@ impl Repository {
             upstream_release_name,
             release_tag_name_format,
         })
+    }
+
+    /// Update the repository configuration with values read from the config file.
+    pub fn apply_config(&mut self, cfg: RepoConfiguration) -> Result<()> {
+        // Get the name of the upstream remote. If there's only one remote, we
+        // use it. If we're given a list of URLs and one matches, we use that.
+        // If no URLs match but there is a remote named "origin", use that.
+
+        let mut first_upstream_name = None;
+        let mut n_remotes = 0;
+        let mut url_matched = None;
+        let mut saw_origin = false;
+
+        for remote_name in &self.repo.remotes()? {
+            // `None` happens if a remote name is not valid UTF8. At the moment
+            // I can't be bothered to properly handle that.
+            if let Some(remote_name) = remote_name {
+                n_remotes += 1;
+
+                if first_upstream_name.is_none() {
+                    first_upstream_name = Some(remote_name.to_owned());
+                }
+
+                if remote_name == "origin" {
+                    saw_origin = true;
+                }
+
+                match self.repo.find_remote(remote_name) {
+                    Err(e) => {
+                        warn!("error querying Git remote `{}`: {}", remote_name, e);
+                    }
+
+                    Ok(remote) => {
+                        if let Some(remote_url) = remote.url() {
+                            for url in &cfg.upstream_urls {
+                                if remote_url == url {
+                                    url_matched = Some(remote_name.to_owned());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if url_matched.is_some() {
+                break;
+            }
+        }
+
+        self.upstream_name = if let Some(n) = url_matched {
+            n
+        } else if n_remotes == 1 {
+            first_upstream_name.unwrap()
+        } else if saw_origin {
+            "origin".to_owned()
+        } else {
+            bail!("cannot identify the upstream Git remote");
+        };
+
+        if let Some(n) = cfg.rc_name {
+            self.upstream_rc_name = n;
+        }
+
+        if let Some(n) = cfg.release_name {
+            self.upstream_release_name = n;
+        }
+
+        if let Some(n) = cfg.release_tag_name_format {
+            self.release_tag_name_format = n;
+        }
+
+        Ok(())
     }
 
     /// Get the name of the `rc`-type branch.
@@ -136,10 +207,10 @@ impl Repository {
         Ok(upstream
             .url()
             .ok_or_else(|| {
-                Error::Environment(format!(
+                anyhow!(
                     "URL of upstream remote {} not parseable as Unicode",
                     self.upstream_name
-                ))
+                )
             })?
             .to_owned())
     }
@@ -157,9 +228,7 @@ impl Repository {
             Some(
                 head_ref
                     .shorthand()
-                    .ok_or_else(|| {
-                        Error::Environment("current branch name not Unicode".to_owned())
-                    })?
+                    .ok_or_else(|| anyhow!("current branch name not Unicode"))?
                     .to_owned(),
             )
         })
@@ -176,7 +245,7 @@ impl Repository {
                 salt: text[11..].to_owned(),
             })
         } else {
-            Err(Error::InvalidCommitReference(text.to_owned()))
+            Err(InvalidCommitReferenceError(text.to_owned()).into())
         }
     }
 
@@ -216,11 +285,11 @@ impl Repository {
             }
 
             if !found_it {
-                return Err(Error::Environment(format!(
+                return Err(anyhow!(
                     "commit-ref key `{}` not found in contents of file {}",
                     salt,
                     ref_source_path.escaped(),
-                )));
+                ));
             }
 
             let blame = repo.repo.blame_file(ref_source_path.as_path(), None)?;
@@ -228,12 +297,12 @@ impl Repository {
                 // TODO: this happens if the line in question hasn't yet been
                 // committed. Need to figure out how to handle that
                 // circumstance.
-                Error::Environment(format!(
+                anyhow!(
                     "commit-ref key `{}` found in non-existent line {} of file {}??",
                     salt,
                     line_no,
                     ref_source_path.escaped()
-                ))
+                )
             })?;
 
             Ok(CommitId(hunk.final_commit_id()))
@@ -248,6 +317,11 @@ impl Repository {
         fullpath
     }
 
+    /// Resolve the path to the per-repository configuration directory.
+    pub fn resolve_config_dir(&self) -> PathBuf {
+        self.resolve_workdir(RepoPath::new(b".config/cranko"))
+    }
+
     /// Convert a filesystem path pointing inside the working directory into a
     /// RepoPathBuf.
     ///
@@ -256,9 +330,12 @@ impl Repository {
     pub fn convert_path<P: AsRef<Path>>(&self, p: P) -> Result<RepoPathBuf> {
         let c_root = self.repo.workdir().unwrap().canonicalize()?;
         let c_p = p.as_ref().canonicalize()?;
-        let rel = c_p
-            .strip_prefix(&c_root)
-            .map_err(|_| Error::OutsideOfRepository(c_p.display().to_string()))?;
+        let rel = c_p.strip_prefix(&c_root).map_err(|_| {
+            anyhow!(
+                "path `{}` lies outside of the working directory",
+                c_p.display()
+            )
+        })?;
         RepoPathBuf::from_path(rel)
     }
 
@@ -284,7 +361,7 @@ impl Repository {
     /// will be the first one encountered in the check, an essentially arbitrary
     /// selection.) Modifications to any of the paths matched by `ok_matchers`
     /// are allowed.
-    pub fn check_if_dirty(&self, ok_matchers: &[PathMatcher]) -> Result<Option<String>> {
+    pub fn check_if_dirty(&self, ok_matchers: &[PathMatcher]) -> Result<Option<RepoPathBuf>> {
         // Default options are what we want.
         let mut opts = git2::StatusOptions::new();
 
@@ -302,7 +379,7 @@ impl Repository {
                 }
 
                 if !is_ok {
-                    return Ok(Some(repo_path.escaped()));
+                    return Ok(Some(repo_path.to_owned()));
                 }
             }
         }
@@ -327,10 +404,10 @@ impl Repository {
         };
         let object = entry.to_object(&self.repo)?;
         let blob = object.as_blob().ok_or_else(|| {
-            Error::Environment(format!(
+            anyhow!(
                 "path `{}` should correspond to a Git blob but does not",
                 path.escaped(),
-            ))
+            )
         })?;
 
         Ok(Some(blob.content().to_owned()))
@@ -493,7 +570,9 @@ impl Repository {
 
     /// Get information about a release from the HEAD commit.
     fn parse_release_info_from_commit(&self, commit: &git2::Commit) -> Result<ReleaseCommitInfo> {
-        let msg = commit.message().ok_or_else(|| Error::NotUnicodeError)?;
+        let msg = commit
+            .message()
+            .ok_or_else(|| anyhow!("cannot parse release commit message: it is not Unicode"))?;
 
         let mut data = String::new();
         let mut in_body = false;
@@ -517,7 +596,7 @@ impl Repository {
         }
 
         if data.len() == 0 {
-            return Err(Error::InvalidCommitMessageFormat);
+            bail!("empty cranko-release-info body in release commit message");
         }
 
         let srci: SerializedReleaseCommitInfo = toml::from_str(&data)?;
@@ -709,7 +788,11 @@ impl Repository {
     /// Returns None if there's nothing wrong but this project doesn't seem to
     /// have been staged for release.
     ///
-    /// Modified changelog files are register with the *changes* listing.
+    /// If `dirty_allowed` is false and there are modified files *besides
+    /// changelogs* in the working tree, an error downcastable to
+    /// DirtyRepositoryError is returned.
+    ///
+    /// Modified changelog files are registered with the *changes* listing.
     pub fn scan_rc_info(
         &self,
         proj: &Project,
@@ -733,7 +816,7 @@ impl Repository {
 
             if changelog_matcher.repo_path_matches(path) {
                 if status.is_conflicted() {
-                    return Err(Error::DirtyRepository(path.escaped()));
+                    return Err(DirtyRepositoryError(path.to_owned()).into());
                 } else if status.is_index_new()
                     || status.is_index_modified()
                     || status.is_wt_new()
@@ -745,7 +828,7 @@ impl Repository {
             } else {
                 if status.is_ignored() || status.is_wt_new() || status == git2::Status::CURRENT {
                 } else if !dirty_allowed {
-                    return Err(Error::DirtyRepository(path.escaped()));
+                    return Err(DirtyRepositoryError(path.to_owned()).into());
                 }
             }
         }
@@ -836,7 +919,7 @@ impl Repository {
         let head_commit = head_ref.peel_to_commit()?;
         let msg = head_commit
             .message()
-            .ok_or_else(|| Error::NotUnicodeError)?;
+            .ok_or_else(|| anyhow!("cannot parse rc commit message: it is not Unicode"))?;
 
         let mut data = String::new();
         let mut in_body = false;
@@ -860,7 +943,7 @@ impl Repository {
         }
 
         if data.len() == 0 {
-            return Err(Error::InvalidCommitMessageFormat);
+            bail!("empty cranko-rc-info body in RC commit message");
         }
 
         let srci: SerializedRcCommitInfo = toml::from_str(&data)?;
@@ -901,7 +984,8 @@ impl Repository {
         tagname_args.insert("project_slug", proj.user_facing_name.to_owned());
         tagname_args.insert("version", rel.version.clone());
         Ok(SimpleCurlyFormat
-            .format(&self.release_tag_name_format, &tagname_args)?
+            .format(&self.release_tag_name_format, &tagname_args)
+            .map_err(|e| Error::msg(e.to_string()))?
             .to_string())
     }
 
@@ -1435,10 +1519,10 @@ impl RepoPathBuf {
             if let std::path::Component::Normal(c) = cmpt {
                 b.extend(c.to_str().unwrap().as_bytes());
             } else {
-                return Err(Error::OutsideOfRepository(format!(
-                    "path with unexpected components: {}",
+                bail!(
+                    "path with unexpected components: `{}`",
                     p.as_ref().display()
-                )));
+                );
             }
         }
 

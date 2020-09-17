@@ -15,9 +15,10 @@ use petgraph::{
     visit::EdgeRef,
 };
 use std::collections::{HashMap, HashSet};
+use thiserror::Error as ThisError;
 
 use crate::{
-    errors::{Error, Result},
+    errors::Result,
     project::{Project, ProjectBuilder, ProjectId},
     repository::{CommitAvailability, CommitId, ReleaseCommitInfo, RepoHistory, Repository},
 };
@@ -42,12 +43,26 @@ pub struct ProjectGraph {
     name_to_id: HashMap<String, ProjectId>,
 }
 
-impl ProjectGraph {
-    /// Get the number of projects in the graph.
-    pub fn len(&self) -> usize {
-        self.projects.len()
-    }
+/// An error returned when the internal project graph has a dependency cycle.
+/// The inner value is the user-facing name of a project involved in the cycle.
+#[derive(Debug, ThisError)]
+#[error("detected an internal dependency cycle associated with project {0}")]
+pub struct DependencyCycleError(pub String);
 
+/// An error returned when it is impossible to come up with distinct names for
+/// two projects. This "should never happen", but ... The inner value is the
+/// clashing name.
+#[derive(Debug, ThisError)]
+#[error("multiple projects with same name `{0}`")]
+pub struct NamingClashError(pub String);
+
+/// An error returned when an input has requested a project with a certain name,
+/// and it just doesn't exist.
+#[derive(Debug, ThisError)]
+#[error("no such project with the name `{0}`")]
+pub struct NoSuchProjectError(pub String);
+
+impl ProjectGraph {
     /// Start the process of adding a new project to the graph.
     pub fn add_project<'a>(&'a mut self) -> ProjectBuilder<'a> {
         if self.name_to_id.len() != 0 {
@@ -98,21 +113,27 @@ impl ProjectGraph {
         self.graph.add_edge(dependee_nix, depender_nix, min_version);
     }
 
+    fn base_toposort(&self) -> std::result::Result<Vec<OurNodeIndex>, DependencyCycleError> {
+        toposort(&self.graph, None).map_err(|cycle| {
+            let ident = self.graph[cycle.node_id()];
+            DependencyCycleError(self.projects[ident].user_facing_name.to_owned())
+        })
+    }
+
     /// Complete construction of the graph.
     ///
     /// In particular, this function calculates unique, user-facing names for
     /// every project in the graph. After this function is called, new projects
     /// may not be added to the graph.
+    ///
+    /// If the internal project graph turns out to have a dependecy cycle, an
+    /// error downcastable to DependencyCycleError.
     pub fn complete_loading(&mut self) -> Result<()> {
         // TODO: our algorithm for coming up with unambiguous names is totally
         // ad-hoc and probably crashes in various corner cases. There's probably
         // a much smarter way to approach this.
 
-        let node_ixs = toposort(&self.graph, None).map_err(|cycle| {
-            let ident = self.graph[cycle.node_id()];
-            Error::Cycle(self.projects[ident].user_facing_name.to_owned())
-        })?;
-
+        let node_ixs = self.base_toposort()?;
         let name_to_id = &mut self.name_to_id;
 
         // Each project has a vector of "qualified names" [n1, n2, ..., nN] that
@@ -205,7 +226,7 @@ impl ProjectGraph {
                     } else if n2 > n1 {
                         states[ident2].n_narrow = std::cmp::max(states[ident2].n_narrow, n1 + 1);
                     } else {
-                        return Err(Error::NamingClash(states[ident1].compute_name(proj1)));
+                        return Err(NamingClashError(states[ident1].compute_name(proj1)).into());
                     }
                 }
 
@@ -277,11 +298,8 @@ impl ProjectGraph {
     /// A and project A depends on project B. This shouldn't happen but isn't
     /// strictly impossible.
     pub fn toposort_idents(&self) -> Result<impl IntoIterator<Item = ProjectId>> {
-        let idents = toposort(&self.graph, None)
-            .map_err(|cycle| {
-                let ident = self.graph[cycle.node_id()];
-                Error::Cycle(self.projects[ident].user_facing_name.to_owned())
-            })?
+        let idents = self
+            .base_toposort()?
             .iter()
             .map(|ix| self.graph[*ix])
             .collect::<Vec<_>>();
@@ -300,10 +318,7 @@ impl ProjectGraph {
     /// A and project A depends on project B. This shouldn't happen but isn't
     /// strictly impossible.
     pub fn toposort(&self) -> Result<GraphIter> {
-        let node_idxs = toposort(&self.graph, None).map_err(|cycle| {
-            let ident = self.graph[cycle.node_id()];
-            Error::Cycle(self.projects[ident].user_facing_name.to_owned())
-        })?;
+        let node_idxs = self.base_toposort()?;
 
         Ok(GraphIter {
             graph: self,
@@ -316,10 +331,7 @@ impl ProjectGraph {
     ///
     /// See `toposort()` for details. This function is the mutable variant.
     pub fn toposort_mut(&mut self) -> Result<GraphIterMut> {
-        let node_idxs = toposort(&self.graph, None).map_err(|cycle| {
-            let ident = self.graph[cycle.node_id()];
-            Error::Cycle(self.projects[ident].user_facing_name.to_owned())
-        })?;
+        let node_idxs = self.base_toposort()?;
 
         Ok(GraphIterMut {
             graph: self,
@@ -327,7 +339,10 @@ impl ProjectGraph {
         })
     }
 
-    /// Process the query and return a vector of matched project IDs
+    /// Process the query and return a vector of matched project IDs.
+    ///
+    /// If one of the specified project names does not correspond to a project,
+    /// the returned error will be downcastable to a NoSuchProjectError.
     pub fn query(&self, query: GraphQueryBuilder) -> Result<Vec<ProjectId>> {
         // Note: while it generally feels "right" to not allow repeated visits
         // to the same project, this is especially important if a query is used
@@ -339,11 +354,7 @@ impl ProjectGraph {
         // Build up the list of input projids
 
         let root_idents = if query.no_names() {
-            toposort(&self.graph, None)
-                .map_err(|cycle| {
-                    let ident = self.graph[cycle.node_id()];
-                    Error::Cycle(self.projects[ident].user_facing_name.to_owned())
-                })?
+            self.base_toposort()?
                 .iter()
                 .map(|ix| self.graph[*ix])
                 .collect::<Vec<_>>()
@@ -354,7 +365,7 @@ impl ProjectGraph {
                 if let Some(id) = self.name_to_id.get(&name) {
                     root_idents.push(*id);
                 } else {
-                    return Err(Error::NoSuchProject(name));
+                    return Err(NoSuchProjectError(name).into());
                 }
             }
 

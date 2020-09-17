@@ -1,4 +1,4 @@
-[![Build Status](https://dev.azure.com/peter-bulk/Misc/_apis/build/status/pkgw.cranko?branchName=rc)](https://dev.azure.com/peter-bulk/Misc/_build/latest?definitionId=2&branchName=rc)
+[![Build Status](https://dev.azure.com/peter-bulk/Misc/_apis/build/status/pkgw.cranko?branchName=master)](https://dev.azure.com/peter-bulk/Misc/_build/latest?definitionId=2&branchName=master)
 [![](https://meritbadge.herokuapp.com/cranko)](https://crates.io/crates/cranko)
 
 # cranko
@@ -61,12 +61,12 @@ Here are some of the things on the radar:
   - [ ] NPM
   - [ ] Python
   - [ ] Visual Studio?
-- [ ] Per-repo config file
-  - [ ] Identify upstream remote from its URL
+- [x] Per-repo config file
+  - [x] Identify upstream remote from its URL
   - [ ] Customize project configuration
     - [ ] Custom per-project "rewriter" additions
   - [ ] Defined "unaffiliated" projects
-- [ ] Revamp error handling infrastructure
+- [x] Revamp error handling infrastructure
 - [ ] Split main implementation into multiple crates?
 - [ ] `cranko bootstrap` command to help people onboard
 - [ ] Figure out how we're going to make a test suite for this beast
