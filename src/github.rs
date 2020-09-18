@@ -233,7 +233,7 @@ pub struct GithubCommand {
 }
 
 impl Command for GithubCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         match self.command {
             GithubCommands::CreateCustomRelease(o) => o.execute(),
             GithubCommands::CreateReleases(o) => o.execute(),
@@ -272,7 +272,7 @@ pub struct CreateCustomReleaseCommand {
 }
 
 impl Command for CreateCustomReleaseCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         let sess = AppBuilder::new()?.populate_graph(false).initialize()?;
         let info = GitHubInformation::new(&sess)?;
         let mut client = info.make_blocking_client()?;
@@ -296,7 +296,7 @@ pub struct CreateReleasesCommand {
 }
 
 impl Command for CreateReleasesCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         let sess = AppSession::initialize_default()?;
         let info = GitHubInformation::new(&sess)?;
 
@@ -367,7 +367,7 @@ pub struct CredentialHelperCommand {
 }
 
 impl Command for CredentialHelperCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         if self.operation != "get" {
             info!("ignoring Git credential operation `{}`", self.operation);
         } else {
@@ -388,7 +388,7 @@ pub struct DeleteReleaseCommand {
 }
 
 impl Command for DeleteReleaseCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         let sess = AppSession::initialize_default()?;
         let info = GitHubInformation::new(&sess)?;
         let mut client = info.make_blocking_client()?;
@@ -406,7 +406,7 @@ impl Command for DeleteReleaseCommand {
 pub struct InstallCredentialHelperCommand {}
 
 impl Command for InstallCredentialHelperCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         // The path given to Git must be an absolute path.
         let this_exe = std::env::current_exe()?;
         let this_exe = this_exe.to_str().ok_or_else(|| {
@@ -448,7 +448,7 @@ pub struct UploadArtifactsCommand {
 }
 
 impl Command for UploadArtifactsCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         let sess = AppSession::initialize_default()?;
         let info = GitHubInformation::new(&sess)?;
         let mut client = info.make_blocking_client()?;

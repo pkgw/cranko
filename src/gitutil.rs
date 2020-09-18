@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use super::Command;
+use crate::errors::Result;
 
 /// Force-create an ancestor-less branch containing a directory tree.
 #[derive(Debug, PartialEq, StructOpt)]
@@ -28,7 +29,7 @@ pub struct RebootBranchCommand {
 }
 
 impl Command for RebootBranchCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         let repo = git2::Repository::open_from_env().context("couldn't open Git repository")?;
         let mut index = repo.index().context("couldn't open Git index")?;
 
@@ -82,7 +83,7 @@ pub struct GitUtilCommand {
 }
 
 impl Command for GitUtilCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         match self.command {
             GitUtilCommands::RebootBranch(o) => o.execute(),
         }

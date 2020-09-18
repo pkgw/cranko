@@ -307,7 +307,7 @@ pub struct CargoCommand {
 }
 
 impl Command for CargoCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         match self.command {
             CargoCommands::ForeachReleased(o) => o.execute(),
             CargoCommands::PackageReleasedBinaries(o) => o.execute(),
@@ -330,7 +330,7 @@ pub struct ForeachReleasedCommand {
 }
 
 impl Command for ForeachReleasedCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         let sess = AppSession::initialize_default()?;
 
         let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
@@ -416,7 +416,7 @@ pub struct PackageReleasedBinariesCommand {
 }
 
 impl Command for PackageReleasedBinariesCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         use cargo_metadata::Message;
 
         let sess = AppSession::initialize_default()?;
@@ -520,7 +520,7 @@ impl BinaryArchiveMode {
         dest_dir: &Path,
         binaries: &[PathBuf],
         target: &target_lexicon::Triple,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> Result<PathBuf> {
         match self {
             BinaryArchiveMode::Tarball => self.tarball(proj, dest_dir, binaries, target),
             BinaryArchiveMode::Zipball => self.zipball(proj, dest_dir, binaries, target),
@@ -533,7 +533,7 @@ impl BinaryArchiveMode {
         dest_dir: &Path,
         binaries: &[PathBuf],
         target: &target_lexicon::Triple,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> Result<PathBuf> {
         let mut path = dest_dir.to_path_buf();
         path.push(format!(
             "{}-{}-{}.zip",
@@ -590,7 +590,7 @@ impl BinaryArchiveMode {
         dest_dir: &Path,
         binaries: &[PathBuf],
         target: &target_lexicon::Triple,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> Result<PathBuf> {
         use flate2::write::GzEncoder;
         use flate2::Compression;
 

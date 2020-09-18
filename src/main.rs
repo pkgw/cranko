@@ -8,7 +8,7 @@
 //!
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Context};
 use log::{error, info, warn};
 use std::{
     collections::{BTreeSet, HashMap},
@@ -33,6 +33,8 @@ mod project;
 mod repository;
 mod rewriters;
 mod version;
+
+use errors::Result;
 
 #[derive(Debug, PartialEq, StructOpt)]
 #[structopt(about = "automate versioning and releasing")]
@@ -170,7 +172,7 @@ enum EnvDecodingMode {
 }
 
 impl std::str::FromStr for EnvDecodingMode {
-    type Err = anyhow::Error;
+    type Err = errors::Error;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
