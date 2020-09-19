@@ -116,7 +116,7 @@ impl Command for Commands {
     }
 }
 
-fn main() -> Result<()> {
+fn main() -> () {
     let opts = CrankoOptions::from_args();
 
     if let Err(e) = logger::Logger::init() {
@@ -125,18 +125,7 @@ fn main() -> Result<()> {
     }
     log::set_max_level(log::LevelFilter::Info);
 
-    let exitcode = match opts.command.execute() {
-        Ok(c) => c,
-        Err(e) => {
-            error!("{}", e);
-            e.chain()
-                .skip(1)
-                .for_each(|cause| logger::Logger::print_cause(cause));
-            1
-        }
-    };
-
-    std::process::exit(exitcode);
+    std::process::exit(errors::report(opts.command.execute()));
 }
 
 // ci-util
