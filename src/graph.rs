@@ -432,7 +432,7 @@ impl ProjectGraph {
             let availability = if let Some(cid) = maybe_cid {
                 repo.find_earliest_release_containing(dependee_proj, cid)?
             } else {
-                DepAvailability::NotAvailable
+                DepAvailability::UnavailableCommit
             };
 
             deps.push(ResolvedDependency {
@@ -460,24 +460,33 @@ impl RepoHistories {
     }
 }
 
-/// Describes the release availability of a particular commit in a project's
-/// history. Note that for the same commit, this information might vary
-/// depending on which project we're talking about.
+/// Describes how one project's dependency on another can be satisfied. Ideally,
+/// that dependency is expressed as a commit in the repo history, which we then
+/// resolve into a release based on the release history. (Note that for the same
+/// commit, this information might vary depending on which project we're talking
+/// about.) We also allow manual dependency specification to allow bootstrapping
+/// Cranko into preexisting repos.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DepAvailability {
-    /// The commit has already been released, and the earliest release
-    /// containing it has the given version.
+    /// The dep is expressed as a commit reference and the commit has already
+    /// been released. The earliest release containing it has the given version.
     ExistingRelease(Version),
 
-    /// The commit has not been released but is an ancestor of HEAD, so it would
-    /// be available if a new release of the target project were to be created.
-    /// We need to pay attention to this case to allow people to stage and
-    /// release multiple projects in one batch.
+    /// The dep is expressed as a commit reference and the commit has not been
+    /// released, but is an ancestor of HEAD. So it would be available if a new
+    /// release of the target project were to be created. We need to pay
+    /// attention to this case to allow people to stage and release multiple
+    /// projects in one batch.
     NewRelease,
 
-    /// None of the above.
-    NotAvailable,
+    /// The dep is expressed as a commit reference but neither of the above
+    /// applies.
+    UnavailableCommit,
+
+    /// The dep is expressed as a manually-specified requirement string.
+    ManuallySpecified(String),
 }
+
 /// Information about the version requirements of one project's dependency upon
 /// another project within the repo. If no version has yet been published
 /// satisying the dependency, min_version is None.

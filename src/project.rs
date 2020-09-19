@@ -170,5 +170,11 @@ impl<'a> ProjectBuilder<'a> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResolvedRequirement {
     pub ident: ProjectId,
-    pub min_version: Version,
+    pub value: ResolvedRequirementValue,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ResolvedRequirementValue {
+    MinVersion(Version),
+    ManuallySpecified(String),
 }

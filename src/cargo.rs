@@ -26,7 +26,7 @@ use crate::{
     app::{AppBuilder, AppSession},
     errors::Result,
     graph::GraphQueryBuilder,
-    project::{Project, ProjectId},
+    project::{Project, ProjectId, ResolvedRequirementValue},
     repository::{ChangeList, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::Version,
@@ -203,7 +203,7 @@ impl Rewriter for CargoRewriter {
         for req in &proj.internal_reqs[..] {
             internal_reqs.insert(
                 app.graph().lookup(req.ident).qualified_names()[0].clone(),
-                req.min_version.clone(),
+                req.value.clone(),
             );
         }
 
@@ -245,7 +245,7 @@ impl Rewriter for CargoRewriter {
         }
 
         fn rewrite_deptable(
-            internal_reqs: &HashMap<String, Version>,
+            internal_reqs: &HashMap<String, ResolvedRequirementValue>,
             tbl: &mut toml_edit::Table,
         ) -> Result<()> {
             let deps = tbl.iter().map(|(k, _v)| k.to_owned()).collect::<Vec<_>>();
@@ -254,15 +254,20 @@ impl Rewriter for CargoRewriter {
                 // ??? renamed internal deps? We could save rename informaion
                 // from cargo-metadata when we load everything.
 
-                if let Some(min_version) = internal_reqs.get(dep) {
+                if let Some(req) = internal_reqs.get(dep) {
+                    let req_text = match req {
+                        ResolvedRequirementValue::MinVersion(v) => format!("^{}", v),
+                        ResolvedRequirementValue::ManuallySpecified(t) => t.clone(),
+                    };
+
                     if let Some(dep_tbl) = tbl.entry(dep).as_table_mut() {
-                        dep_tbl["version"] = toml_edit::value(format!("^{}", min_version));
+                        dep_tbl["version"] = toml_edit::value(req_text);
                     } else if let Some(dep_tbl) = tbl.entry(dep).as_inline_table_mut() {
                         // Can't just index inline tables???
                         if let Some(val) = dep_tbl.get_mut("version") {
-                            *val = format!("^{}", min_version).into();
+                            *val = req_text.into();
                         } else {
-                            dep_tbl.get_or_insert("version", format!("^{}", min_version));
+                            dep_tbl.get_or_insert("version", req_text);
                         }
                     } else {
                         return Err(anyhow!(

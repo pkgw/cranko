@@ -326,8 +326,9 @@ impl Command for ConfirmCommand {
 
                 for dep in &deps[..] {
                     let available = match dep.availability {
-                        DepAvailability::NotAvailable => false,
+                        DepAvailability::UnavailableCommit => false,
                         DepAvailability::ExistingRelease(_) => true,
+                        DepAvailability::ManuallySpecified(_) => true,
                         DepAvailability::NewRelease => new_versions.contains_key(&dep.ident),
                     };
 
@@ -380,8 +381,9 @@ impl Command for ConfirmCommand {
 
                 for dep in &deps[..] {
                     let v = match dep.availability {
-                        DepAvailability::NotAvailable => unreachable!(),
+                        DepAvailability::UnavailableCommit => unreachable!(),
                         DepAvailability::ExistingRelease(ref v) => v.to_string(),
+                        DepAvailability::ManuallySpecified(ref t) => format!("{} (manual)", t),
                         DepAvailability::NewRelease => new_versions[&dep.ident].clone(),
                     };
 

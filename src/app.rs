@@ -12,7 +12,7 @@ use crate::{
     config::ConfigurationFile,
     errors::Result,
     graph::{DepAvailability, ProjectGraph, RepoHistories},
-    project::{ProjectId, ResolvedRequirement},
+    project::{ProjectId, ResolvedRequirement, ResolvedRequirementValue},
     repository::{
         ChangeList, PathMatcher, RcCommitInfo, RcProjectInfo, ReleaseCommitInfo, Repository,
     },
@@ -338,8 +338,8 @@ impl AppSession {
             let proj = self.graph.lookup_mut(ident);
 
             for dep in &deps[..] {
-                let min_version = match dep.availability {
-                    DepAvailability::NotAvailable => {
+                let value = match dep.availability {
+                    DepAvailability::UnavailableCommit => {
                         return Err(UnsatisfiedInternalRequirementError(
                             proj.user_facing_name.to_string(),
                             self.graph.lookup(dep.ident).user_facing_name.to_string(),
@@ -347,11 +347,13 @@ impl AppSession {
                         .into())
                     }
 
-                    DepAvailability::ExistingRelease(ref v) => v.clone(),
+                    DepAvailability::ExistingRelease(ref v) => {
+                        ResolvedRequirementValue::MinVersion(v.clone())
+                    }
 
                     DepAvailability::NewRelease => {
                         if let Some(v) = new_versions.get(&dep.ident) {
-                            v.clone()
+                            ResolvedRequirementValue::MinVersion(v.clone())
                         } else {
                             return Err(UnsatisfiedInternalRequirementError(
                                 proj.user_facing_name.to_string(),
@@ -360,11 +362,15 @@ impl AppSession {
                             .into());
                         }
                     }
+
+                    DepAvailability::ManuallySpecified(ref text) => {
+                        ResolvedRequirementValue::ManuallySpecified(text.clone())
+                    }
                 };
 
                 proj.internal_reqs.push(ResolvedRequirement {
                     ident: dep.ident,
-                    min_version,
+                    value,
                 });
             }
 

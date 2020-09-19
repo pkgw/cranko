@@ -1087,7 +1087,7 @@ impl Repository {
         if self.repo.graph_descendant_of(head_commit.id(), cid.0)? {
             Ok(DepAvailability::NewRelease)
         } else {
-            Ok(DepAvailability::NotAvailable)
+            Ok(DepAvailability::UnavailableCommit)
         }
     }
 
