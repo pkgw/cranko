@@ -37,11 +37,31 @@ pub struct ProjectGraph {
     node_ixs: Vec<OurNodeIndex>,
 
     /// The `petgraph` state expressing the project graph.
-    graph: DiGraph<ProjectId, Option<CommitId>>,
+    graph: DiGraph<ProjectId, Option<DepRequirement>>,
 
     /// Mapping from user-facing project name to project ID. This is calculated
     /// in the complete_loading() method.
     name_to_id: HashMap<String, ProjectId>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DepRequirement {
+    /// The depending project requires a version of the dependee project later
+    /// than the specified commit.
+    Commit(CommitId),
+
+    /// The depending project requires some version of the dependee project
+    /// that has been manually specified by the user.
+    Manual(String),
+}
+
+impl std::fmt::Display for DepRequirement {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DepRequirement::Commit(cid) => write!(f, "{} (commit)", cid),
+            DepRequirement::Manual(t) => write!(f, "{} (manual)", t),
+        }
+    }
 }
 
 /// An error returned when the internal project graph has a dependency cycle.
@@ -107,11 +127,11 @@ impl ProjectGraph {
         &mut self,
         depender_id: ProjectId,
         dependee_id: ProjectId,
-        min_version: Option<CommitId>,
+        req: Option<DepRequirement>,
     ) {
         let depender_nix = self.node_ixs[depender_id];
         let dependee_nix = self.node_ixs[dependee_id];
-        self.graph.add_edge(dependee_nix, depender_nix, min_version);
+        self.graph.add_edge(dependee_nix, depender_nix, req);
     }
 
     fn base_toposort(&self) -> std::result::Result<Vec<OurNodeIndex>, DependencyCycleError> {
@@ -427,17 +447,19 @@ impl ProjectGraph {
         {
             let dependee_id = self.graph[edge.source()];
             let dependee_proj = &self.projects[dependee_id];
-            let maybe_cid = edge.weight();
+            let maybe_req = edge.weight();
 
-            let availability = if let Some(cid) = maybe_cid {
-                repo.find_earliest_release_containing(dependee_proj, cid)?
-            } else {
-                DepAvailability::UnavailableCommit
+            let availability = match maybe_req {
+                Some(DepRequirement::Commit(cid)) => {
+                    repo.find_earliest_release_containing(dependee_proj, cid)?
+                }
+                Some(DepRequirement::Manual(_)) => DepAvailability::ExistingOther,
+                None => DepAvailability::NotAvailable,
             };
 
             deps.push(ResolvedDependency {
                 ident: dependee_id,
-                min_commit: maybe_cid.clone(),
+                requirement: maybe_req.clone(),
                 availability,
             });
         }
@@ -472,6 +494,11 @@ pub enum DepAvailability {
     /// been released. The earliest release containing it has the given version.
     ExistingRelease(Version),
 
+    /// The dep is known to be available, but the resolved version number is
+    /// unknown. This is what happens when the requirement is manually
+    /// specified.
+    ExistingOther,
+
     /// The dep is expressed as a commit reference and the commit has not been
     /// released, but is an ancestor of HEAD. So it would be available if a new
     /// release of the target project were to be created. We need to pay
@@ -481,10 +508,7 @@ pub enum DepAvailability {
 
     /// The dep is expressed as a commit reference but neither of the above
     /// applies.
-    UnavailableCommit,
-
-    /// The dep is expressed as a manually-specified requirement string.
-    ManuallySpecified(String),
+    NotAvailable,
 }
 
 /// Information about the version requirements of one project's dependency upon
@@ -493,7 +517,7 @@ pub enum DepAvailability {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResolvedDependency {
     pub ident: ProjectId,
-    pub min_commit: Option<CommitId>,
+    pub requirement: Option<DepRequirement>,
     pub availability: DepAvailability,
 }
 

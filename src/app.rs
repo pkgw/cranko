@@ -11,7 +11,7 @@ use thiserror::Error as ThisError;
 use crate::{
     config::ConfigurationFile,
     errors::Result,
-    graph::{DepAvailability, ProjectGraph, RepoHistories},
+    graph::{DepAvailability, DepRequirement, ProjectGraph, RepoHistories},
     project::{ProjectId, ResolvedRequirement, ResolvedRequirementValue},
     repository::{
         ChangeList, PathMatcher, RcCommitInfo, RcProjectInfo, ReleaseCommitInfo, Repository,
@@ -339,7 +339,7 @@ impl AppSession {
 
             for dep in &deps[..] {
                 let value = match dep.availability {
-                    DepAvailability::UnavailableCommit => {
+                    DepAvailability::NotAvailable => {
                         return Err(UnsatisfiedInternalRequirementError(
                             proj.user_facing_name.to_string(),
                             self.graph.lookup(dep.ident).user_facing_name.to_string(),
@@ -351,6 +351,13 @@ impl AppSession {
                         ResolvedRequirementValue::MinVersion(v.clone())
                     }
 
+                    DepAvailability::ExistingOther => match dep.requirement {
+                        Some(DepRequirement::Manual(ref text)) => {
+                            ResolvedRequirementValue::ManuallySpecified(text.clone())
+                        }
+                        _ => unreachable!(),
+                    },
+
                     DepAvailability::NewRelease => {
                         if let Some(v) = new_versions.get(&dep.ident) {
                             ResolvedRequirementValue::MinVersion(v.clone())
@@ -361,10 +368,6 @@ impl AppSession {
                             )
                             .into());
                         }
-                    }
-
-                    DepAvailability::ManuallySpecified(ref text) => {
-                        ResolvedRequirementValue::ManuallySpecified(text.clone())
                     }
                 };
 

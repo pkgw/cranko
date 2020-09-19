@@ -326,9 +326,9 @@ impl Command for ConfirmCommand {
 
                 for dep in &deps[..] {
                     let available = match dep.availability {
-                        DepAvailability::UnavailableCommit => false,
+                        DepAvailability::NotAvailable => false,
                         DepAvailability::ExistingRelease(_) => true,
-                        DepAvailability::ManuallySpecified(_) => true,
+                        DepAvailability::ExistingOther => true,
                         DepAvailability::NewRelease => new_versions.contains_key(&dep.ident),
                     };
 
@@ -343,10 +343,10 @@ impl Command for ConfirmCommand {
                             sess.graph().lookup(dep.ident).user_facing_name
                         );
 
-                        if let Some(cid) = dep.min_commit {
-                            error!("... the required commit is {}", cid);
+                        if let Some(ref req) = dep.requirement {
+                            error!("... the requirement is: {}", req);
                         } else {
-                            error!("... the required commit was unknown or unspecified");
+                            error!("... the requirement was unspecified or unresolveable");
                         }
 
                         bail!("cannot confirm release submission");
@@ -380,15 +380,17 @@ impl Command for ConfirmCommand {
                 new_versions.insert(proj.ident(), new_version);
 
                 for dep in &deps[..] {
-                    let v = match dep.availability {
-                        DepAvailability::UnavailableCommit => unreachable!(),
-                        DepAvailability::ExistingRelease(ref v) => v.to_string(),
-                        DepAvailability::ManuallySpecified(ref t) => format!("{} (manual)", t),
-                        DepAvailability::NewRelease => new_versions[&dep.ident].clone(),
+                    let desc = match dep.availability {
+                        DepAvailability::NotAvailable => unreachable!(),
+                        DepAvailability::ExistingRelease(ref v) => format!(">= {}", v),
+                        DepAvailability::ExistingOther => {
+                            dep.requirement.as_ref().unwrap().to_string()
+                        }
+                        DepAvailability::NewRelease => format!(">= {}", new_versions[&dep.ident]),
                     };
 
                     let dproj = sess.graph().lookup(dep.ident);
-                    info!("    internal dep: {} >= {}", dproj.user_facing_name, v);
+                    info!("    internal dep {}: {}", dproj.user_facing_name, desc);
                 }
             } else if history.n_commits() > 0 {
                 let proj = sess.graph().lookup(ident);

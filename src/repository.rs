@@ -19,7 +19,7 @@ use crate::{
     atry,
     config::RepoConfiguration,
     errors::{Error, Result},
-    graph::{DepAvailability, ProjectGraph},
+    graph::{DepAvailability, DepRequirement, ProjectGraph},
     project::Project,
     version::Version,
 };
@@ -50,7 +50,7 @@ pub struct DirtyRepositoryError(pub RepoPathBuf);
 /// and that reference is bogus. The inner value is the text of the reference.
 #[derive(Debug, ThisError)]
 #[error("commit reference `{0}` is invalid or refers to a nonexistent commit")]
-pub struct InvalidCommitReferenceError(pub String);
+pub struct InvalidHistoryReferenceError(pub String);
 
 impl std::fmt::Display for DirtyRepositoryError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -293,34 +293,35 @@ impl Repository {
     }
 
     /// Parse a textual reference to a commit within the repository.
-    pub fn parse_commit_ref<T: AsRef<str>>(&self, text: T) -> Result<CommitRef> {
+    pub fn parse_history_ref<T: AsRef<str>>(&self, text: T) -> Result<ParsedHistoryRef> {
         let text = text.as_ref();
 
         if let Ok(id) = text.parse() {
-            Ok(CommitRef::Id(CommitId(id)))
+            Ok(ParsedHistoryRef::Id(CommitId(id)))
         } else if text.starts_with("thiscommit:") {
-            Ok(CommitRef::ThisCommit {
+            Ok(ParsedHistoryRef::ThisCommit {
                 salt: text[11..].to_owned(),
             })
         } else {
-            Err(InvalidCommitReferenceError(text.to_owned()).into())
+            Err(InvalidHistoryReferenceError(text.to_owned()).into())
         }
     }
 
-    /// Resolve a commit reference to a specific commit ID
-    pub fn resolve_commit_ref(
+    /// Resolve a parsed history reference to its specific value.
+    pub fn resolve_history_ref(
         &self,
-        cref: &CommitRef,
+        href: &ParsedHistoryRef,
         ref_source_path: &RepoPath,
-    ) -> Result<CommitId> {
-        let cid = match cref {
-            CommitRef::Id(id) => id.clone(),
-            CommitRef::ThisCommit { ref salt } => lookup_this(self, salt, ref_source_path)?,
+    ) -> Result<DepRequirement> {
+        let cid = match href {
+            ParsedHistoryRef::Id(id) => id.clone(),
+            ParsedHistoryRef::ThisCommit { ref salt } => lookup_this(self, salt, ref_source_path)?,
+            ParsedHistoryRef::Manual(t) => return Ok(DepRequirement::Manual(t.clone())),
         };
 
         // Double-check that the ID actually resolves to a commit.
         self.repo.find_commit(cid.0)?;
-        return Ok(cid);
+        return Ok(DepRequirement::Commit(cid));
 
         fn lookup_this(
             repo: &Repository,
@@ -1087,7 +1088,7 @@ impl Repository {
         if self.repo.graph_descendant_of(head_commit.id(), cid.0)? {
             Ok(DepAvailability::NewRelease)
         } else {
-            Ok(DepAvailability::UnavailableCommit)
+            Ok(DepAvailability::NotAvailable)
         }
     }
 
@@ -1394,9 +1395,11 @@ enum PathMatcherTerm {
     Exclude(RepoPathBuf),
 }
 
-/// A reference to a commit in the repository. We have some special machinery to
-/// allow people to create commits that reference themselves.
-pub enum CommitRef {
+/// A reference to something in the repository history. Ideally this is to a
+/// specific commit, but to allow bootstrapping internal dependencies on old
+/// versions we also have an escape-hatch mode. We also have some special
+/// machinery to allow people to create commits that reference themselves.
+pub enum ParsedHistoryRef {
     /// A reference to a specific commit ID
     Id(CommitId),
 
@@ -1405,6 +1408,10 @@ pub enum CommitRef {
     /// this-commit references to be distinguished and to ease identification of
     /// the relevant commit through "blame" tracing of the repository history.
     ThisCommit { salt: String },
+
+    /// A ref that is manually specified, which we're unable to resolve into a
+    /// specific commit.
+    Manual(String),
 }
 
 // Below we have helpers for trying to deal with git's paths properly, on the

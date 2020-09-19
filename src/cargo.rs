@@ -138,15 +138,15 @@ impl CargoLoader {
 
                 for dep in &node.deps {
                     if let Some(dependee_id) = cargo_to_graph.get(&dep.pkg) {
-                        let min_version = maybe_versions
+                        let req = maybe_versions
                             .and_then(|table| table.get(&dep.name))
                             .and_then(|nameval| nameval.as_str())
-                            .map(|text| app.repo.parse_commit_ref(text))
+                            .map(|text| app.repo.parse_history_ref(text))
                             .transpose()?
-                            .map(|cref| app.repo.resolve_commit_ref(&cref, &manifest_repopath))
+                            .map(|cref| app.repo.resolve_history_ref(&cref, &manifest_repopath))
                             .transpose()?;
 
-                        if min_version.is_none() {
+                        if req.is_none() {
                             warn!(
                                 "missing or invalid key `internal_dep_versions.{}` in `{}`",
                                 &dep.name,
@@ -156,8 +156,7 @@ impl CargoLoader {
                                 &dep.name, &pkg.name);
                         }
 
-                        app.graph
-                            .add_dependency(*depender_id, *dependee_id, min_version);
+                        app.graph.add_dependency(*depender_id, *dependee_id, req);
                     }
                 }
             }
