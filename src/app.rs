@@ -11,11 +11,10 @@ use thiserror::Error as ThisError;
 use crate::{
     config::ConfigurationFile,
     errors::Result,
-    graph::{ProjectGraph, RepoHistories},
+    graph::{DepAvailability, ProjectGraph, RepoHistories},
     project::{ProjectId, ResolvedRequirement},
     repository::{
-        ChangeList, CommitAvailability, PathMatcher, RcCommitInfo, RcProjectInfo,
-        ReleaseCommitInfo, Repository,
+        ChangeList, PathMatcher, RcCommitInfo, RcProjectInfo, ReleaseCommitInfo, Repository,
     },
     version::Version,
 };
@@ -340,7 +339,7 @@ impl AppSession {
 
             for dep in &deps[..] {
                 let min_version = match dep.availability {
-                    CommitAvailability::NotAvailable => {
+                    DepAvailability::NotAvailable => {
                         return Err(UnsatisfiedInternalRequirementError(
                             proj.user_facing_name.to_string(),
                             self.graph.lookup(dep.ident).user_facing_name.to_string(),
@@ -348,9 +347,9 @@ impl AppSession {
                         .into())
                     }
 
-                    CommitAvailability::ExistingRelease(ref v) => v.clone(),
+                    DepAvailability::ExistingRelease(ref v) => v.clone(),
 
-                    CommitAvailability::NewRelease => {
+                    DepAvailability::NewRelease => {
                         if let Some(v) = new_versions.get(&dep.ident) {
                             v.clone()
                         } else {

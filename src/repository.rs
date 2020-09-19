@@ -19,7 +19,7 @@ use crate::{
     atry,
     config::RepoConfiguration,
     errors::{Error, Result},
-    graph::ProjectGraph,
+    graph::{DepAvailability, ProjectGraph},
     project::Project,
     version::Version,
 };
@@ -1073,21 +1073,21 @@ impl Repository {
         &self,
         proj: &Project,
         cid: &CommitId,
-    ) -> Result<CommitAvailability> {
+    ) -> Result<DepAvailability> {
         let maybe_rpi = self.find_published_release_containing(proj, cid)?;
 
         if let Some(rpi) = maybe_rpi {
             let v = Version::parse_like(&proj.version, rpi.version)?;
-            return Ok(CommitAvailability::ExistingRelease(v));
+            return Ok(DepAvailability::ExistingRelease(v));
         }
 
         let head_ref = self.repo.head()?;
         let head_commit = head_ref.peel_to_commit()?;
 
         if self.repo.graph_descendant_of(head_commit.id(), cid.0)? {
-            Ok(CommitAvailability::NewRelease)
+            Ok(DepAvailability::NewRelease)
         } else {
-            Ok(CommitAvailability::NotAvailable)
+            Ok(DepAvailability::NotAvailable)
         }
     }
 
@@ -1257,25 +1257,6 @@ pub struct RcProjectInfo {
 
     /// The kind of version bump requested by the user.
     pub bump_spec: String,
-}
-
-/// Describes the release availability of a particular commit in a project's
-/// history. Note that for the same commit, this information might vary
-/// depending on which project we're talking about.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CommitAvailability {
-    /// The commit has already been released, and the earliest release
-    /// containing it has the given version.
-    ExistingRelease(Version),
-
-    /// The commit has not been released but is an ancestor of HEAD, so it would
-    /// be available if a new release of the target project were to be created.
-    /// We need to pay attention to this case to allow people to stage and
-    /// release multiple projects in one batch.
-    NewRelease,
-
-    /// None of the above.
-    NotAvailable,
 }
 
 /// A data structure recording changes made when rewriting files

@@ -322,13 +322,13 @@ impl Command for ConfirmCommand {
                     .graph()
                     .resolve_direct_dependencies(&sess.repo, ident)?;
 
-                use repository::CommitAvailability;
+                use graph::DepAvailability;
 
                 for dep in &deps[..] {
                     let available = match dep.availability {
-                        CommitAvailability::NotAvailable => false,
-                        CommitAvailability::ExistingRelease(_) => true,
-                        CommitAvailability::NewRelease => new_versions.contains_key(&dep.ident),
+                        DepAvailability::NotAvailable => false,
+                        DepAvailability::ExistingRelease(_) => true,
+                        DepAvailability::NewRelease => new_versions.contains_key(&dep.ident),
                     };
 
                     if !available {
@@ -380,9 +380,9 @@ impl Command for ConfirmCommand {
 
                 for dep in &deps[..] {
                     let v = match dep.availability {
-                        CommitAvailability::NotAvailable => unreachable!(),
-                        CommitAvailability::ExistingRelease(ref v) => v.to_string(),
-                        CommitAvailability::NewRelease => new_versions[&dep.ident].clone(),
+                        DepAvailability::NotAvailable => unreachable!(),
+                        DepAvailability::ExistingRelease(ref v) => v.to_string(),
+                        DepAvailability::NewRelease => new_versions[&dep.ident].clone(),
                     };
 
                     let dproj = sess.graph().lookup(dep.ident);

@@ -20,7 +20,8 @@ use thiserror::Error as ThisError;
 use crate::{
     errors::Result,
     project::{Project, ProjectBuilder, ProjectId},
-    repository::{CommitAvailability, CommitId, ReleaseCommitInfo, RepoHistory, Repository},
+    repository::{CommitId, ReleaseCommitInfo, RepoHistory, Repository},
+    version::Version,
 };
 
 type OurNodeIndex = NodeIndex<DefaultIx>;
@@ -431,7 +432,7 @@ impl ProjectGraph {
             let availability = if let Some(cid) = maybe_cid {
                 repo.find_earliest_release_containing(dependee_proj, cid)?
             } else {
-                CommitAvailability::NotAvailable
+                DepAvailability::NotAvailable
             };
 
             deps.push(ResolvedDependency {
@@ -459,6 +460,24 @@ impl RepoHistories {
     }
 }
 
+/// Describes the release availability of a particular commit in a project's
+/// history. Note that for the same commit, this information might vary
+/// depending on which project we're talking about.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DepAvailability {
+    /// The commit has already been released, and the earliest release
+    /// containing it has the given version.
+    ExistingRelease(Version),
+
+    /// The commit has not been released but is an ancestor of HEAD, so it would
+    /// be available if a new release of the target project were to be created.
+    /// We need to pay attention to this case to allow people to stage and
+    /// release multiple projects in one batch.
+    NewRelease,
+
+    /// None of the above.
+    NotAvailable,
+}
 /// Information about the version requirements of one project's dependency upon
 /// another project within the repo. If no version has yet been published
 /// satisying the dependency, min_version is None.
@@ -466,7 +485,7 @@ impl RepoHistories {
 pub struct ResolvedDependency {
     pub ident: ProjectId,
     pub min_commit: Option<CommitId>,
-    pub availability: CommitAvailability,
+    pub availability: DepAvailability,
 }
 
 /// Builder structure for querying projects in the graph.
