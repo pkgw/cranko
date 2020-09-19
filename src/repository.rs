@@ -302,6 +302,8 @@ impl Repository {
             Ok(ParsedHistoryRef::ThisCommit {
                 salt: text[11..].to_owned(),
             })
+        } else if text.starts_with("manual:") {
+            Ok(ParsedHistoryRef::Manual(text[7..].to_owned()))
         } else {
             Err(InvalidHistoryReferenceError(text.to_owned()).into())
         }
