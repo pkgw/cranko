@@ -71,16 +71,18 @@ impl AppBuilder {
 
         // Now auto-detect everything in the repo index.
 
-        let mut cargo = crate::cargo::CargoLoader::default();
+        if self.populate_graph {
+            let mut cargo = crate::cargo::CargoLoader::default();
 
-        self.repo.scan_paths(|p| {
-            let (dirname, basename) = p.split_basename();
-            cargo.process_index_item(dirname, basename);
-        })?;
+            self.repo.scan_paths(|p| {
+                let (dirname, basename) = p.split_basename();
+                cargo.process_index_item(dirname, basename);
+            })?;
 
-        cargo.finalize(&mut self)?;
+            cargo.finalize(&mut self)?;
 
-        self.graph.complete_loading()?;
+            self.graph.complete_loading()?;
+        }
 
         // TODO: tweak auto-detected state based on relevant configuration.
 
