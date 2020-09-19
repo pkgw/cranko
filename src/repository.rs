@@ -16,6 +16,7 @@ use std::{
 use thiserror::Error as ThisError;
 
 use crate::{
+    atry,
     config::RepoConfiguration,
     errors::{Error, Result},
     graph::ProjectGraph,
@@ -116,6 +117,63 @@ impl Repository {
             upstream_release_name,
             release_tag_name_format,
         })
+    }
+
+    /// Set up the upstream info in when bootstrapping.
+    pub fn bootstrap_upstream(&mut self, name: Option<&str>) -> Result<String> {
+        // Figure out the upstream URL.
+
+        let upstream_url = if let Some(name) = name {
+            let remote = atry!(
+                self.repo.find_remote(name);
+                ["cannot look up the Git remote named `{}`", name]
+            );
+
+            remote
+                .url()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "the URL of Git remote `{}` cannot be interpreted as UTF8",
+                        name
+                    )
+                })?
+                .to_owned()
+        } else {
+            let mut info = None;
+            let mut n_remotes = 0;
+
+            for remote_name in &self.repo.remotes()? {
+                // `None` happens if a remote name is not valid UTF8. At the moment
+                // I can't be bothered to properly handle that.
+                if let Some(remote_name) = remote_name {
+                    n_remotes += 1;
+                    match self.repo.find_remote(remote_name) {
+                        Err(e) => {
+                            warn!("error querying Git remote `{}`: {}", remote_name, e);
+                        }
+
+                        Ok(remote) => {
+                            if let Some(remote_url) = remote.url() {
+                                if info.is_none() || remote_name == "origin" {
+                                    info = Some((remote_name.to_owned(), remote_url.to_owned()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let (name, url) = info.ok_or_else(|| anyhow!("no usable remotes in the Git repo"))?;
+
+            if n_remotes > 1 && name != "origin" {
+                bail!("no way to choose among multiple Git remotes");
+            }
+
+            info!("using Git remote `{}` as the upstream", name);
+            url
+        };
+
+        Ok(upstream_url)
     }
 
     /// Update the repository configuration with values read from the config file.
@@ -1231,6 +1289,11 @@ impl ChangeList {
     /// Mark the file at this path as having been updated.
     pub fn add_path(&mut self, p: &RepoPath) {
         self.paths.push(p.to_owned());
+    }
+
+    /// Get the paths in this changelist.
+    pub fn paths(&self) -> impl Iterator<Item = &RepoPath> {
+        self.paths[..].iter().map(|p| p.as_ref())
     }
 }
 

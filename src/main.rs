@@ -21,6 +21,7 @@ use std::{
 use structopt::StructOpt;
 
 mod app;
+mod bootstrap;
 mod cargo;
 mod changelog;
 mod config;
@@ -49,6 +50,10 @@ trait Command {
 
 #[derive(Debug, PartialEq, StructOpt)]
 enum Commands {
+    #[structopt(name = "bootstrap")]
+    /// Bootstrap Cranko in a preexisting repository
+    Bootstrap(bootstrap::BootstrapCommand),
+
     #[structopt(name = "cargo")]
     /// Commands specific to the Rust/Cargo packaging system.
     Cargo(cargo::CargoCommand),
@@ -100,6 +105,7 @@ enum Commands {
 impl Command for Commands {
     fn execute(self) -> Result<i32> {
         match self {
+            Commands::Bootstrap(o) => o.execute(),
             Commands::Cargo(o) => o.execute(),
             Commands::CiUtil(o) => o.execute(),
             Commands::Confirm(o) => o.execute(),
@@ -885,6 +891,7 @@ fn list_commands() -> BTreeSet<String> {
         }
     }
 
+    commands.insert("bootstrap".to_owned());
     commands.insert("cargo".to_owned());
     commands.insert("ci-util".to_owned());
     commands.insert("confirm".to_owned());
