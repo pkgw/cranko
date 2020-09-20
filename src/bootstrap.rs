@@ -5,12 +5,12 @@
 
 use log::{error, info};
 use serde::{Deserialize, Serialize};
-use std::{fs, io::Write};
+use std::{collections::HashMap, fs, io::Write};
 use structopt::StructOpt;
 use toml;
 
 use super::Command;
-use crate::{atry, errors::Result};
+use crate::{atry, errors::Result, project::DepRequirement};
 
 /// The toplevel bootstrap state structure.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -162,26 +162,29 @@ impl Command for BeginCommand {
             return Ok(1);
         }
 
-        // Save existing versions to the bootstrap file
+        // Reset internal version specifications. Bit hacky: first, zero out all
+        // versions and rewrite metafiles with exact dev-mode interdependencies.
 
         let mut bs_cfg = BootstrapConfiguration::default();
+        let mut versions = HashMap::new();
 
-        let projects = atry!(
-            sess.graph_mut().toposort_mut();
-            ["could not resolve the project internal dependency graph"]
-            (note "this means that there is a cycle in the internal dependencies")
-        );
-
-        for proj in projects {
+        for proj in sess.graph_mut().toposort_mut()? {
             bs_cfg.project.push(BootstrapProjectInfo {
                 qnames: proj.qualified_names().to_owned(),
                 version: proj.version.to_string(),
                 release_commit: None,
             });
-            proj.version.set_to_dev_value();
 
-            // TODO: SET internal_reqs
+            proj.version.set_to_dev_value();
+            versions.insert(proj.ident(), proj.version.clone());
+
+            for dep in &mut proj.internal_deps[..] {
+                // By definition of the toposort, the version will always be avilable.
+                dep.cranko_requirement = DepRequirement::Manual(versions[&dep.ident].to_string());
+            }
         }
+
+        // Save the old versions to the bootstrap file.
 
         let bs_text = atry!(
             toml::to_string_pretty(&bs_cfg);
