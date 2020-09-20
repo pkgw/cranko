@@ -12,16 +12,14 @@
 use petgraph::{
     algo::toposort,
     graph::{DefaultIx, DiGraph, NodeIndex},
-    visit::EdgeRef,
 };
 use std::collections::{HashMap, HashSet};
 use thiserror::Error as ThisError;
 
 use crate::{
     errors::Result,
-    project::{Project, ProjectBuilder, ProjectId},
-    repository::{CommitId, ReleaseCommitInfo, RepoHistory, Repository},
-    version::Version,
+    project::{DepRequirement, Dependency, Project, ProjectBuilder, ProjectId},
+    repository::{ReleaseCommitInfo, RepoHistory, Repository},
 };
 
 type OurNodeIndex = NodeIndex<DefaultIx>;
@@ -37,31 +35,11 @@ pub struct ProjectGraph {
     node_ixs: Vec<OurNodeIndex>,
 
     /// The `petgraph` state expressing the project graph.
-    graph: DiGraph<ProjectId, Option<DepRequirement>>,
+    graph: DiGraph<ProjectId, ()>,
 
     /// Mapping from user-facing project name to project ID. This is calculated
     /// in the complete_loading() method.
     name_to_id: HashMap<String, ProjectId>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DepRequirement {
-    /// The depending project requires a version of the dependee project later
-    /// than the specified commit.
-    Commit(CommitId),
-
-    /// The depending project requires some version of the dependee project
-    /// that has been manually specified by the user.
-    Manual(String),
-}
-
-impl std::fmt::Display for DepRequirement {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            DepRequirement::Commit(cid) => write!(f, "{} (commit)", cid),
-            DepRequirement::Manual(t) => write!(f, "{} (manual)", t),
-        }
-    }
 }
 
 /// An error returned when the internal project graph has a dependency cycle.
@@ -127,11 +105,19 @@ impl ProjectGraph {
         &mut self,
         depender_id: ProjectId,
         dependee_id: ProjectId,
-        req: Option<DepRequirement>,
+        literal: String,
+        req: DepRequirement,
     ) {
         let depender_nix = self.node_ixs[depender_id];
         let dependee_nix = self.node_ixs[dependee_id];
-        self.graph.add_edge(dependee_nix, depender_nix, req);
+        self.graph.add_edge(dependee_nix, depender_nix, ());
+
+        self.projects[depender_id].internal_deps.push(Dependency {
+            ident: dependee_id,
+            literal,
+            cranko_requirement: req,
+            resolved_version: None,
+        });
     }
 
     fn base_toposort(&self) -> std::result::Result<Vec<OurNodeIndex>, DependencyCycleError> {
@@ -433,39 +419,6 @@ impl ProjectGraph {
             histories: repo.analyze_histories(&self.projects[..])?,
         })
     }
-
-    pub fn resolve_direct_dependencies(
-        &self,
-        repo: &Repository,
-        ident: ProjectId,
-    ) -> Result<Vec<ResolvedDependency>> {
-        let mut deps = Vec::new();
-
-        for edge in self
-            .graph
-            .edges_directed(self.node_ixs[ident], petgraph::Direction::Incoming)
-        {
-            let dependee_id = self.graph[edge.source()];
-            let dependee_proj = &self.projects[dependee_id];
-            let maybe_req = edge.weight();
-
-            let availability = match maybe_req {
-                Some(DepRequirement::Commit(cid)) => {
-                    repo.find_earliest_release_containing(dependee_proj, cid)?
-                }
-                Some(DepRequirement::Manual(_)) => DepAvailability::ExistingOther,
-                None => DepAvailability::NotAvailable,
-            };
-
-            deps.push(ResolvedDependency {
-                ident: dependee_id,
-                requirement: maybe_req.clone(),
-                availability,
-            });
-        }
-
-        Ok(deps)
-    }
 }
 
 /// This type is how we "launder" the knowledge that the vector that
@@ -480,45 +433,6 @@ impl RepoHistories {
     pub fn lookup(&self, projid: ProjectId) -> &RepoHistory {
         &self.histories[projid]
     }
-}
-
-/// Describes how one project's dependency on another can be satisfied. Ideally,
-/// that dependency is expressed as a commit in the repo history, which we then
-/// resolve into a release based on the release history. (Note that for the same
-/// commit, this information might vary depending on which project we're talking
-/// about.) We also allow manual dependency specification to allow bootstrapping
-/// Cranko into preexisting repos.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DepAvailability {
-    /// The dep is expressed as a commit reference and the commit has already
-    /// been released. The earliest release containing it has the given version.
-    ExistingRelease(Version),
-
-    /// The dep is known to be available, but the resolved version number is
-    /// unknown. This is what happens when the requirement is manually
-    /// specified.
-    ExistingOther,
-
-    /// The dep is expressed as a commit reference and the commit has not been
-    /// released, but is an ancestor of HEAD. So it would be available if a new
-    /// release of the target project were to be created. We need to pay
-    /// attention to this case to allow people to stage and release multiple
-    /// projects in one batch.
-    NewRelease,
-
-    /// The dep is expressed as a commit reference but neither of the above
-    /// applies.
-    NotAvailable,
-}
-
-/// Information about the version requirements of one project's dependency upon
-/// another project within the repo. If no version has yet been published
-/// satisying the dependency, min_version is None.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ResolvedDependency {
-    pub ident: ProjectId,
-    pub requirement: Option<DepRequirement>,
-    pub availability: DepAvailability,
 }
 
 /// Builder structure for querying projects in the graph.

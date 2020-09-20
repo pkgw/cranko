@@ -26,7 +26,7 @@ use crate::{
     app::{AppBuilder, AppSession},
     errors::Result,
     graph::GraphQueryBuilder,
-    project::{Project, ProjectId, ResolvedRequirementValue},
+    project::{DepRequirement, Project, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::Version,
@@ -156,7 +156,14 @@ impl CargoLoader {
                                 &dep.name, &pkg.name);
                         }
 
-                        app.graph.add_dependency(*depender_id, *dependee_id, req);
+                        let req = req.unwrap_or(DepRequirement::Unavailable);
+
+                        app.graph.add_dependency(
+                            *depender_id,
+                            *dependee_id,
+                            "FIXME".to_owned(),
+                            req,
+                        );
                     }
                 }
             }
@@ -199,10 +206,24 @@ impl Rewriter for CargoRewriter {
         let proj = app.graph().lookup(self.proj_id);
         let mut internal_reqs = HashMap::new();
 
-        for req in &proj.resolved_internal_reqs[..] {
+        for dep in &proj.internal_deps[..] {
+            let req_text = match dep.cranko_requirement {
+                DepRequirement::Manual(ref t) => t.clone(),
+
+                DepRequirement::Commit(_) => {
+                    if let Some(ref v) = dep.resolved_version {
+                        format!("^{}", v)
+                    } else {
+                        continue;
+                    }
+                }
+
+                DepRequirement::Unavailable => continue,
+            };
+
             internal_reqs.insert(
-                app.graph().lookup(req.ident).qualified_names()[0].clone(),
-                req.value.clone(),
+                app.graph().lookup(dep.ident).qualified_names()[0].clone(),
+                req_text,
             );
         }
 
@@ -244,7 +265,7 @@ impl Rewriter for CargoRewriter {
         }
 
         fn rewrite_deptable(
-            internal_reqs: &HashMap<String, ResolvedRequirementValue>,
+            internal_reqs: &HashMap<String, String>,
             tbl: &mut toml_edit::Table,
         ) -> Result<()> {
             let deps = tbl.iter().map(|(k, _v)| k.to_owned()).collect::<Vec<_>>();
@@ -253,20 +274,15 @@ impl Rewriter for CargoRewriter {
                 // ??? renamed internal deps? We could save rename informaion
                 // from cargo-metadata when we load everything.
 
-                if let Some(req) = internal_reqs.get(dep) {
-                    let req_text = match req {
-                        ResolvedRequirementValue::MinVersion(v) => format!("^{}", v),
-                        ResolvedRequirementValue::ManuallySpecified(t) => t.clone(),
-                    };
-
+                if let Some(req_text) = internal_reqs.get(dep) {
                     if let Some(dep_tbl) = tbl.entry(dep).as_table_mut() {
-                        dep_tbl["version"] = toml_edit::value(req_text);
+                        dep_tbl["version"] = toml_edit::value(req_text.clone());
                     } else if let Some(dep_tbl) = tbl.entry(dep).as_inline_table_mut() {
                         // Can't just index inline tables???
                         if let Some(val) = dep_tbl.get_mut("version") {
-                            *val = req_text.into();
+                            *val = req_text.clone().into();
                         } else {
-                            dep_tbl.get_or_insert("version", req_text);
+                            dep_tbl.get_or_insert("version", req_text.clone());
                         }
                     } else {
                         return Err(anyhow!(

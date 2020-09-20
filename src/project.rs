@@ -12,7 +12,7 @@
 use crate::{
     changelog::{self, Changelog},
     graph::ProjectGraph,
-    repository::{PathMatcher, RepoPath, RepoPathBuf},
+    repository::{CommitId, PathMatcher, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::Version,
 };
@@ -67,10 +67,8 @@ pub struct Project {
     /// How this project's changelog is formatted and updated.
     pub changelog: Box<dyn Changelog>,
 
-    /// The version requirements of this project's dependencies on other
-    /// projects within the repo. This is empty until
-    /// `AppSession.apply_versions()` is called.
-    pub resolved_internal_reqs: Vec<ResolvedRequirement>,
+    /// This project's internal dependencies.
+    pub internal_deps: Vec<Dependency>,
 }
 
 impl Project {
@@ -94,6 +92,64 @@ impl Project {
     /// subdirectorie relative to this project.
     pub fn prefix(&self) -> &RepoPath {
         &self.prefix
+    }
+}
+
+/// Metadata about internal interdependencies between projects.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Dependency {
+    /// The project that is depended upon
+    pub ident: ProjectId,
+
+    /// The current expression of the requirement in the project metadata files.
+    /// In normal operations this should be an explicit requirement on version
+    /// "0.0.0-dev.0", or the equivalent, so that the project can be built on
+    /// the main branch.
+    pub literal: String,
+
+    /// The logical expression of the requirement in Cranko's framework. Cranko
+    /// prefers to express version dependencies in terms of commit IDs. Since
+    /// this concept is (properly) not integrated into package manager metadata
+    /// files, the information expressing the requirement must be recorded in
+    /// Cranko-specific metadata that are different than the literal expression.
+    pub cranko_requirement: DepRequirement,
+
+    /// If the requirement is expressed as a DepRequirement::Commit, *and* we
+    /// have resolved that requirement to a specific version of the dependee
+    /// project, that version is stored here. None values could be found if the
+    /// requirement is not a commit or if the resolution process hasn't
+    /// occurred, or if resolution failed.
+    pub resolved_version: Option<Version>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DepRequirement {
+    /// The depending project requires a version of the dependee project later
+    /// than the specified commit.
+    Commit(CommitId),
+
+    /// The depending project requires some version of the dependee project that
+    /// has been manually specified by the user. This is discouraged, but
+    /// necessary to support to enable bootstrapping. Note that the value of
+    /// this manual specification is not redundant with `Dependency::literal`:
+    /// in steady-state, the former will be something like `0.0.0-dev.0` so that
+    /// everyday builds can work, while this might be `^0.1` if the project
+    /// requires that version of its dependency and 0.1 was released before
+    /// Cranko was introduced.
+    Manual(String),
+
+    /// Cranko metadata are missing, so we can't process this dependency in the
+    /// Cranko framework.
+    Unavailable,
+}
+
+impl std::fmt::Display for DepRequirement {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DepRequirement::Commit(cid) => write!(f, "{} (commit)", cid),
+            DepRequirement::Manual(t) => write!(f, "{} (manual)", t),
+            DepRequirement::Unavailable => write!(f, "(unavailable)"),
+        }
     }
 }
 
@@ -162,19 +218,7 @@ impl<'a> ProjectBuilder<'a> {
             prefix: prefix.clone(),
             repo_paths: PathMatcher::new_include(prefix),
             changelog: changelog::default(),
-            resolved_internal_reqs: Vec::new(),
+            internal_deps: Vec::new(),
         })
     }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ResolvedRequirement {
-    pub ident: ProjectId,
-    pub value: ResolvedRequirementValue,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ResolvedRequirementValue {
-    MinVersion(Version),
-    ManuallySpecified(String),
 }

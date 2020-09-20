@@ -19,8 +19,8 @@ use crate::{
     atry,
     config::RepoConfiguration,
     errors::{Error, Result},
-    graph::{DepAvailability, DepRequirement, ProjectGraph},
-    project::Project,
+    graph::ProjectGraph,
+    project::{DepRequirement, Project},
     version::Version,
 };
 
@@ -1068,7 +1068,29 @@ impl Repository {
 
         Ok(())
     }
+}
 
+/// Describes the availability of a given commit in the release of a project.
+/// Note that because different projects are released at different times, the
+/// availability for the same commit might vary depending on which project we're
+/// considering.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReleaseAvailability {
+    /// The commit has already been released. The earliest release containing it
+    /// has the given version.
+    ExistingRelease(Version),
+
+    /// The commit has not been released, but is an ancestor of HEAD, so it
+    /// would be available if a new release of the target project were to be
+    /// created. We need to pay attention to this case to allow people to stage
+    /// and release multiple projects in one batch.
+    NewRelease,
+
+    /// Neither of the above applies.
+    NotAvailable,
+}
+
+impl Repository {
     /// Find the earliest release of the specified project that contains
     /// the specified commit. If that commit has not yet been released,
     /// None is returned.
@@ -1076,12 +1098,12 @@ impl Repository {
         &self,
         proj: &Project,
         cid: &CommitId,
-    ) -> Result<DepAvailability> {
+    ) -> Result<ReleaseAvailability> {
         let maybe_rpi = self.find_published_release_containing(proj, cid)?;
 
         if let Some(rpi) = maybe_rpi {
             let v = Version::parse_like(&proj.version, rpi.version)?;
-            return Ok(DepAvailability::ExistingRelease(v));
+            return Ok(ReleaseAvailability::ExistingRelease(v));
         }
 
         let head_ref = self.repo.head()?;
