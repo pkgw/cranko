@@ -233,6 +233,22 @@ impl Command for BeginCommand {
             info!("... no files modified. This might be OK.")
         }
 
+        // Now, re-rewrite the internal dependency specifications to contain
+        // whatever requirements were listed before, and rewrite only those
+        // portions of the metafiles. Note that our processing above will not
+        // have altered `dep.literal`.
+
+        for proj in sess.graph_mut().toposort_mut()? {
+            for dep in &mut proj.internal_deps[..] {
+                dep.cranko_requirement = DepRequirement::Manual(dep.literal.clone());
+            }
+        }
+
+        atry!(
+            sess.rewrite_cranko_requirements();
+            ["there was a problem adding Cranko dependency metadata to the project files"]
+        );
+
         // All done.
         Ok(0)
     }

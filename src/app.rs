@@ -499,6 +499,22 @@ impl AppSession {
         Ok(changes)
     }
 
+    /// Like rewrite(), but only for the special Cranko requirements metadata.
+    /// This is convenience functionality not needed for the main workflows.
+    pub fn rewrite_cranko_requirements(&self) -> Result<ChangeList> {
+        let mut changes = ChangeList::default();
+
+        for ident in self.graph.toposort_idents()? {
+            let proj = self.graph.lookup(ident);
+
+            for rw in &proj.rewriters {
+                rw.rewrite_cranko_requirements(self, &mut changes)?;
+            }
+        }
+
+        Ok(changes)
+    }
+
     pub fn make_release_commit(&mut self) -> Result<()> {
         self.repo.make_release_commit(&self.graph)
     }

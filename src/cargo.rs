@@ -18,7 +18,7 @@ use std::{
     process,
 };
 use structopt::StructOpt;
-use toml_edit::Document;
+use toml_edit::{Document, Item, Table};
 
 use super::Command;
 
@@ -321,6 +321,86 @@ impl Rewriter for CargoRewriter {
             }
 
             Ok(())
+        }
+
+        // Rewrite.
+
+        {
+            let mut f = File::create(&toml_path)?;
+            write!(f, "{}", doc.to_string_in_original_order())?;
+            changes.add_path(&self.toml_path);
+        }
+
+        Ok(())
+    }
+
+    /// Rewriting just the special Cranko requirement metadata.
+    fn rewrite_cranko_requirements(
+        &self,
+        app: &AppSession,
+        changes: &mut ChangeList,
+    ) -> Result<()> {
+        // Short-circuit if no deps. Note that we can only do this if,
+        // as done below, we don't clear unexpected entries in the
+        // internal_dep_versions block. Should we do that?
+
+        if app.graph().lookup(self.proj_id).internal_deps.is_empty() {
+            return Ok(());
+        }
+
+        // Load
+
+        let toml_path = app.repo.resolve_workdir(&self.toml_path);
+        let mut s = String::new();
+        {
+            let mut f = File::open(&toml_path)?;
+            f.read_to_string(&mut s)?;
+        }
+        let mut doc: Document = s.parse()?;
+
+        // Modify.
+
+        {
+            let ct_root = doc.as_table_mut();
+            let ct_package = ct_root
+                .entry("package")
+                .as_table_mut()
+                .ok_or_else(|| anyhow!("no [package] section in {}?!", self.toml_path.escaped()))?;
+
+            let tbl = ct_package.entry("metadata");
+            let tbl = match tbl.as_table_mut() {
+                Some(t) => t,
+
+                None => {
+                    *tbl = Item::Table(Table::new());
+                    tbl.as_table_mut().unwrap()
+                }
+            };
+
+            let tbl = tbl.entry("internal_dep_versions");
+            let tbl = match tbl.as_table_mut() {
+                Some(t) => t,
+
+                None => {
+                    *tbl = Item::Table(Table::new());
+                    tbl.as_table_mut().unwrap()
+                }
+            };
+
+            let graph = app.graph();
+            let proj = graph.lookup(self.proj_id);
+
+            for dep in &proj.internal_deps {
+                let target = &graph.lookup(dep.ident).qualified_names()[0];
+
+                let spec = match &dep.cranko_requirement {
+                    DepRequirement::Commit(cid) => cid.to_string(),
+                    DepRequirement::Manual(t) => format!("manual:{}", t),
+                    DepRequirement::Unavailable => continue,
+                };
+
+                tbl[target] = toml_edit::value(spec);
+            }
         }
 
         // Rewrite.
