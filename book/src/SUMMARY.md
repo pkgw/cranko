@@ -4,8 +4,10 @@
 - [Getting Started](getting-started/index.md)
 - [Just-in-Time Versioning](jit-versioning/index.md)
 - [Cranko Concepts](concepts/index.md)
-- [Developer Workflows](workflows-dev/index.md)
-- [CI/CD Workflows](workflows-cicd/index.md)
+- [Workflows]()
+  - [Bootstrapping](workflows-bootstrap/index.md)
+  - [Everyday Development](workflows-dev/index.md)
+  - [CI/CD](workflows-cicd/index.md)
 
 # Reference Material
 
@@ -14,6 +16,7 @@
 # CLI Commands
 
 - [Developer Commands]()
+  - [cranko bootstrap](commands/dev/bootstrap.md)
   - [cranko confirm](commands/dev/confirm.md)
   - [cranko stage](commands/dev/stage.md)
   - [cranko status](commands/dev/status.md)
