@@ -10,16 +10,18 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
 };
 use thiserror::Error as ThisError;
 
 use crate::{
+    atry,
+    bootstrap::BootstrapConfiguration,
     config::RepoConfiguration,
     errors::{Error, Result},
     graph::ProjectGraph,
-    project::Project,
+    project::{DepRequirement, Project},
     version::Version,
 };
 
@@ -49,7 +51,7 @@ pub struct DirtyRepositoryError(pub RepoPathBuf);
 /// and that reference is bogus. The inner value is the text of the reference.
 #[derive(Debug, ThisError)]
 #[error("commit reference `{0}` is invalid or refers to a nonexistent commit")]
-pub struct InvalidCommitReferenceError(pub String);
+pub struct InvalidHistoryReferenceError(pub String);
 
 impl std::fmt::Display for DirtyRepositoryError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -81,6 +83,10 @@ pub struct Repository {
     /// The format specification to use for release tag names, as understood by
     /// the `SimpleCurlyFormat` of the `dynfmt` crate.
     release_tag_name_format: String,
+
+    /// "Bootstrap" versioning information used to tell us where versions were at
+    /// before the first Cranko release commit.
+    bootstrap_info: BootstrapConfiguration,
 }
 
 impl Repository {
@@ -115,7 +121,65 @@ impl Repository {
             upstream_rc_name,
             upstream_release_name,
             release_tag_name_format,
+            bootstrap_info: BootstrapConfiguration::default(),
         })
+    }
+
+    /// Set up the upstream info in when bootstrapping.
+    pub fn bootstrap_upstream(&mut self, name: Option<&str>) -> Result<String> {
+        // Figure out the upstream URL.
+
+        let upstream_url = if let Some(name) = name {
+            let remote = atry!(
+                self.repo.find_remote(name);
+                ["cannot look up the Git remote named `{}`", name]
+            );
+
+            remote
+                .url()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "the URL of Git remote `{}` cannot be interpreted as UTF8",
+                        name
+                    )
+                })?
+                .to_owned()
+        } else {
+            let mut info = None;
+            let mut n_remotes = 0;
+
+            for remote_name in &self.repo.remotes()? {
+                // `None` happens if a remote name is not valid UTF8. At the moment
+                // I can't be bothered to properly handle that.
+                if let Some(remote_name) = remote_name {
+                    n_remotes += 1;
+                    match self.repo.find_remote(remote_name) {
+                        Err(e) => {
+                            warn!("error querying Git remote `{}`: {}", remote_name, e);
+                        }
+
+                        Ok(remote) => {
+                            if let Some(remote_url) = remote.url() {
+                                if info.is_none() || remote_name == "origin" {
+                                    info = Some((remote_name.to_owned(), remote_url.to_owned()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let (name, url) = info.ok_or_else(|| anyhow!("no usable remotes in the Git repo"))?;
+
+            if n_remotes > 1 && name != "origin" {
+                bail!("no way to choose among multiple Git remotes");
+            }
+
+            info!("using Git remote `{}` as the upstream", name);
+            url
+        };
+
+        Ok(upstream_url)
     }
 
     /// Update the repository configuration with values read from the config file.
@@ -188,6 +252,41 @@ impl Repository {
             self.release_tag_name_format = n;
         }
 
+        // While we're here, let's also read in the versioning bootstrap
+        // information, if it's available.
+
+        let mut bs_path = self.resolve_config_dir();
+        bs_path.push("bootstrap.toml");
+
+        let maybe_file = match File::open(&bs_path) {
+            Ok(f) => Some(f),
+
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    None
+                } else {
+                    return Err(Error::new(e).context(format!(
+                        "failed to open config file `{}`",
+                        bs_path.display()
+                    )));
+                }
+            }
+        };
+
+        if let Some(mut f) = maybe_file {
+            let mut text = String::new();
+            atry!(
+                f.read_to_string(&mut text);
+                ["failed to read bootstrap file `{}`", bs_path.display()]
+            );
+
+            self.bootstrap_info = atry!(
+                toml::from_str(&text);
+                ["could not parse bootstrap file `{}` as TOML", bs_path.display()]
+            );
+        }
+
+        // All done.
         Ok(())
     }
 
@@ -235,34 +334,37 @@ impl Repository {
     }
 
     /// Parse a textual reference to a commit within the repository.
-    pub fn parse_commit_ref<T: AsRef<str>>(&self, text: T) -> Result<CommitRef> {
+    pub fn parse_history_ref<T: AsRef<str>>(&self, text: T) -> Result<ParsedHistoryRef> {
         let text = text.as_ref();
 
         if let Ok(id) = text.parse() {
-            Ok(CommitRef::Id(CommitId(id)))
+            Ok(ParsedHistoryRef::Id(CommitId(id)))
         } else if text.starts_with("thiscommit:") {
-            Ok(CommitRef::ThisCommit {
+            Ok(ParsedHistoryRef::ThisCommit {
                 salt: text[11..].to_owned(),
             })
+        } else if text.starts_with("manual:") {
+            Ok(ParsedHistoryRef::Manual(text[7..].to_owned()))
         } else {
-            Err(InvalidCommitReferenceError(text.to_owned()).into())
+            Err(InvalidHistoryReferenceError(text.to_owned()).into())
         }
     }
 
-    /// Resolve a commit reference to a specific commit ID
-    pub fn resolve_commit_ref(
+    /// Resolve a parsed history reference to its specific value.
+    pub fn resolve_history_ref(
         &self,
-        cref: &CommitRef,
+        href: &ParsedHistoryRef,
         ref_source_path: &RepoPath,
-    ) -> Result<CommitId> {
-        let cid = match cref {
-            CommitRef::Id(id) => id.clone(),
-            CommitRef::ThisCommit { ref salt } => lookup_this(self, salt, ref_source_path)?,
+    ) -> Result<DepRequirement> {
+        let cid = match href {
+            ParsedHistoryRef::Id(id) => id.clone(),
+            ParsedHistoryRef::ThisCommit { ref salt } => lookup_this(self, salt, ref_source_path)?,
+            ParsedHistoryRef::Manual(t) => return Ok(DepRequirement::Manual(t.clone())),
         };
 
         // Double-check that the ID actually resolves to a commit.
         self.repo.find_commit(cid.0)?;
-        return Ok(cid);
+        return Ok(DepRequirement::Commit(cid));
 
         fn lookup_this(
             repo: &Repository,
@@ -413,14 +515,30 @@ impl Repository {
         Ok(Some(blob.content().to_owned()))
     }
 
+    /// Get a ReleaseCommitInfo corresponding to the project's history before
+    /// Cranko.
+    fn get_bootstrap_release_info(&self) -> ReleaseCommitInfo {
+        let mut rel_info = ReleaseCommitInfo::default();
+
+        for bs_info in &self.bootstrap_info.project[..] {
+            rel_info.projects.push(ReleasedProjectInfo {
+                qnames: bs_info.qnames.clone(),
+                version: bs_info.version.clone(),
+                age: 999,
+            })
+        }
+
+        rel_info
+    }
+
     /// Get information about the state of the projects in the repository as
     /// of the latest release commit.
     pub fn get_latest_release_info(&self) -> Result<ReleaseCommitInfo> {
-        if let Some(c) = self.try_get_release_commit()? {
-            Ok(self.parse_release_info_from_commit(&c)?)
+        Ok(if let Some(c) = self.try_get_release_commit()? {
+            self.parse_release_info_from_commit(&c)?
         } else {
-            Ok(ReleaseCommitInfo::default())
-        }
+            self.get_bootstrap_release_info()
+        })
     }
 
     fn get_signature(&self) -> Result<git2::Signature> {
@@ -1007,7 +1125,29 @@ impl Repository {
 
         Ok(())
     }
+}
 
+/// Describes the availability of a given commit in the release of a project.
+/// Note that because different projects are released at different times, the
+/// availability for the same commit might vary depending on which project we're
+/// considering.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReleaseAvailability {
+    /// The commit has already been released. The earliest release containing it
+    /// has the given version.
+    ExistingRelease(Version),
+
+    /// The commit has not been released, but is an ancestor of HEAD, so it
+    /// would be available if a new release of the target project were to be
+    /// created. We need to pay attention to this case to allow people to stage
+    /// and release multiple projects in one batch.
+    NewRelease,
+
+    /// Neither of the above applies.
+    NotAvailable,
+}
+
+impl Repository {
     /// Find the earliest release of the specified project that contains
     /// the specified commit. If that commit has not yet been released,
     /// None is returned.
@@ -1015,21 +1155,22 @@ impl Repository {
         &self,
         proj: &Project,
         cid: &CommitId,
-    ) -> Result<CommitAvailability> {
+    ) -> Result<ReleaseAvailability> {
         let maybe_rpi = self.find_published_release_containing(proj, cid)?;
 
         if let Some(rpi) = maybe_rpi {
             let v = Version::parse_like(&proj.version, rpi.version)?;
-            return Ok(CommitAvailability::ExistingRelease(v));
+            return Ok(ReleaseAvailability::ExistingRelease(v));
         }
 
         let head_ref = self.repo.head()?;
         let head_commit = head_ref.peel_to_commit()?;
+        let head_id = head_commit.id();
 
-        if self.repo.graph_descendant_of(head_commit.id(), cid.0)? {
-            Ok(CommitAvailability::NewRelease)
+        if head_id == cid.0 || self.repo.graph_descendant_of(head_id, cid.0)? {
+            Ok(ReleaseAvailability::NewRelease)
         } else {
-            Ok(CommitAvailability::NotAvailable)
+            Ok(ReleaseAvailability::NotAvailable)
         }
     }
 
@@ -1201,25 +1342,6 @@ pub struct RcProjectInfo {
     pub bump_spec: String,
 }
 
-/// Describes the release availability of a particular commit in a project's
-/// history. Note that for the same commit, this information might vary
-/// depending on which project we're talking about.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CommitAvailability {
-    /// The commit has already been released, and the earliest release
-    /// containing it has the given version.
-    ExistingRelease(Version),
-
-    /// The commit has not been released but is an ancestor of HEAD, so it would
-    /// be available if a new release of the target project were to be created.
-    /// We need to pay attention to this case to allow people to stage and
-    /// release multiple projects in one batch.
-    NewRelease,
-
-    /// None of the above.
-    NotAvailable,
-}
-
 /// A data structure recording changes made when rewriting files
 /// in the repository.
 #[derive(Debug, Default)]
@@ -1231,6 +1353,11 @@ impl ChangeList {
     /// Mark the file at this path as having been updated.
     pub fn add_path(&mut self, p: &RepoPath) {
         self.paths.push(p.to_owned());
+    }
+
+    /// Get the paths in this changelist.
+    pub fn paths(&self) -> impl Iterator<Item = &RepoPath> {
+        self.paths[..].iter().map(|p| p.as_ref())
     }
 }
 
@@ -1250,16 +1377,14 @@ impl RepoHistory {
     }
 
     /// Get the release information corresponding to this item's release commit.
-    /// If this history item was computed for certain project, this info is
-    /// guaranteed to contain an age=0 release for that project (if it is not
-    /// None).
-    pub fn release_info(&self, repo: &Repository) -> Result<Option<ReleaseCommitInfo>> {
-        if let Some(cid) = self.release_commit() {
+    /// This might be "bootstrap" information without any age=0 releases.
+    pub fn release_info(&self, repo: &Repository) -> Result<ReleaseCommitInfo> {
+        Ok(if let Some(cid) = self.release_commit() {
             let commit = repo.repo.find_commit(cid.0)?;
-            Ok(Some(repo.parse_release_info_from_commit(&commit)?))
+            repo.parse_release_info_from_commit(&commit)?
         } else {
-            Ok(None)
-        }
+            repo.get_bootstrap_release_info()
+        })
     }
 
     /// Get the number of commits in this chunk of history.
@@ -1350,9 +1475,11 @@ enum PathMatcherTerm {
     Exclude(RepoPathBuf),
 }
 
-/// A reference to a commit in the repository. We have some special machinery to
-/// allow people to create commits that reference themselves.
-pub enum CommitRef {
+/// A reference to something in the repository history. Ideally this is to a
+/// specific commit, but to allow bootstrapping internal dependencies on old
+/// versions we also have an escape-hatch mode. We also have some special
+/// machinery to allow people to create commits that reference themselves.
+pub enum ParsedHistoryRef {
     /// A reference to a specific commit ID
     Id(CommitId),
 
@@ -1361,6 +1488,10 @@ pub enum CommitRef {
     /// this-commit references to be distinguished and to ease identification of
     /// the relevant commit through "blame" tracing of the repository history.
     ThisCommit { salt: String },
+
+    /// A ref that is manually specified, which we're unable to resolve into a
+    /// specific commit.
+    Manual(String),
 }
 
 // Below we have helpers for trying to deal with git's paths properly, on the

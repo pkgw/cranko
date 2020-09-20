@@ -67,12 +67,12 @@ Here are some of the things on the radar:
     - [ ] Custom per-project "rewriter" additions
   - [ ] Defined "unaffiliated" projects
 - [x] Revamp error handling infrastructure
-- [ ] Split main implementation into multiple crates?
-- [ ] `cranko bootstrap` command to help people onboard
+- [x] `cranko bootstrap` command to help people onboard
 - [ ] Figure out how we're going to make a test suite for this beast
 
 Here are some larger projects that would be cool:
 
+- Split the main implementation into multiple crates
 - Pluggable framework for auto-generating release notes (e.g., taking advantage
   of Conventional Commit formats, auto-linking to GitHub pull requests)
 - Pluggable framework for knowing when releases should be made and/or
