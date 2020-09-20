@@ -199,7 +199,7 @@ impl Rewriter for CargoRewriter {
         let proj = app.graph().lookup(self.proj_id);
         let mut internal_reqs = HashMap::new();
 
-        for req in &proj.internal_reqs[..] {
+        for req in &proj.resolved_internal_reqs[..] {
             internal_reqs.insert(
                 app.graph().lookup(req.ident).qualified_names()[0].clone(),
                 req.value.clone(),

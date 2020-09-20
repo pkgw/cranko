@@ -371,7 +371,7 @@ impl AppSession {
                     }
                 };
 
-                proj.internal_reqs.push(ResolvedRequirement {
+                proj.resolved_internal_reqs.push(ResolvedRequirement {
                     ident: dep.ident,
                     value,
                 });

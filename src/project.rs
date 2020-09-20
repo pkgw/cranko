@@ -70,7 +70,7 @@ pub struct Project {
     /// The version requirements of this project's dependencies on other
     /// projects within the repo. This is empty until
     /// `AppSession.apply_versions()` is called.
-    pub internal_reqs: Vec<ResolvedRequirement>,
+    pub resolved_internal_reqs: Vec<ResolvedRequirement>,
 }
 
 impl Project {
@@ -162,7 +162,7 @@ impl<'a> ProjectBuilder<'a> {
             prefix: prefix.clone(),
             repo_paths: PathMatcher::new_include(prefix),
             changelog: changelog::default(),
-            internal_reqs: Vec::new(),
+            resolved_internal_reqs: Vec::new(),
         })
     }
 }
