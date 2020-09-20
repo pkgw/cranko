@@ -1086,11 +1086,12 @@ impl Repository {
 
         let head_ref = self.repo.head()?;
         let head_commit = head_ref.peel_to_commit()?;
+        let head_id = head_commit.id();
 
-        if self.repo.graph_descendant_of(head_commit.id(), cid.0)? {
-            Ok(DepAvailability::NewRelease)
+        if head_id == cid.0 || self.repo.graph_descendant_of(head_id, cid.0)? {
+            Ok(ReleaseAvailability::NewRelease)
         } else {
-            Ok(DepAvailability::NotAvailable)
+            Ok(ReleaseAvailability::NotAvailable)
         }
     }
 
