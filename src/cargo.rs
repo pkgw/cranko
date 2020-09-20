@@ -138,6 +138,37 @@ impl CargoLoader {
 
                 for dep in &node.deps {
                     if let Some(dependee_id) = cargo_to_graph.get(&dep.pkg) {
+                        // Find the literal dependency info that Cargo sees. In
+                        // typical cases this should be "0.0.0-dev.0" or its
+                        // equivalent, but during bootstrap it might be a "real"
+                        // version.
+                        //
+                        // XXX: Repeated linear search is lame.
+
+                        let mut literal = None;
+
+                        for cargo_dep in &pkg.dependencies[..] {
+                            let cmp_name =
+                                cargo_dep.rename.as_ref().unwrap_or_else(|| &cargo_dep.name);
+
+                            if cmp_name == &dep.name {
+                                literal = Some(cargo_dep.req.to_string());
+                                break;
+                            }
+                        }
+
+                        let literal = literal.unwrap_or_else(|| {
+                            // We only rarely actually use this information, so
+                            // I think it's resonable to warn here and hope for
+                            // the best, rather than hard-erroring out, since
+                            // I'm not 100% sure that our analysis above will
+                            // always be reliable.
+                            warn!("cannot find Cargo version requirement for dependency of `{}` on `{}`", &pkg.name, &dep.name);
+                            "UNDEFINED".to_owned()
+                        });
+
+                        // Find the Cranko-augmented dependency info.
+
                         let req = maybe_versions
                             .and_then(|table| table.get(&dep.name))
                             .and_then(|nameval| nameval.as_str())
@@ -158,12 +189,8 @@ impl CargoLoader {
 
                         let req = req.unwrap_or(DepRequirement::Unavailable);
 
-                        app.graph.add_dependency(
-                            *depender_id,
-                            *dependee_id,
-                            "FIXME".to_owned(),
-                            req,
-                        );
+                        app.graph
+                            .add_dependency(*depender_id, *dependee_id, literal, req);
                     }
                 }
             }
