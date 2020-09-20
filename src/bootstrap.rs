@@ -26,31 +26,9 @@ pub struct BootstrapProjectInfo {
     pub release_commit: Option<String>,
 }
 
-/// The `bootstrap` subcommands.
-#[derive(Debug, PartialEq, StructOpt)]
-pub enum BootstrapCommands {
-    #[structopt(name = "begin")]
-    /// Begin the boostrapping process.
-    Begin(BeginCommand),
-}
-
+/// The `bootstrap` commands.
 #[derive(Debug, PartialEq, StructOpt)]
 pub struct BootstrapCommand {
-    #[structopt(subcommand)]
-    command: BootstrapCommands,
-}
-
-impl Command for BootstrapCommand {
-    fn execute(self) -> Result<i32> {
-        match self.command {
-            BootstrapCommands::Begin(o) => o.execute(),
-        }
-    }
-}
-
-/// Begin the bootstrapping process
-#[derive(Debug, PartialEq, StructOpt)]
-pub struct BeginCommand {
     #[structopt(
         short = "u",
         long = "upstream",
@@ -59,7 +37,7 @@ pub struct BeginCommand {
     upstream_name: Option<String>,
 }
 
-impl Command for BeginCommand {
+impl Command for BootstrapCommand {
     fn execute(self) -> Result<i32> {
         info!(
             "bootstrapping with Cranko version {}",
@@ -250,6 +228,12 @@ impl Command for BeginCommand {
         );
 
         // All done.
+        info!("modifications complete!");
+        println!();
+        info!("Review changes, add `.config/cranko/` to the repository, and commit.");
+        info!("Then try `cranko status` for a history summary");
+        info!("   (its results will be imprecise because Cranko cannot trace into pre-Cranko history)");
+        info!("Then begin modifying your CI/CD pipeline to use the `cranko release-workflow` commands");
         Ok(0)
     }
 }
