@@ -18,7 +18,7 @@ use std::{
     process,
 };
 use structopt::StructOpt;
-use toml_edit::Document;
+use toml_edit::{Document, Item, Table};
 
 use super::Command;
 
@@ -26,7 +26,7 @@ use crate::{
     app::{AppBuilder, AppSession},
     errors::Result,
     graph::GraphQueryBuilder,
-    project::{Project, ProjectId},
+    project::{DepRequirement, Project, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::Version,
@@ -138,15 +138,46 @@ impl CargoLoader {
 
                 for dep in &node.deps {
                     if let Some(dependee_id) = cargo_to_graph.get(&dep.pkg) {
-                        let min_version = maybe_versions
+                        // Find the literal dependency info that Cargo sees. In
+                        // typical cases this should be "0.0.0-dev.0" or its
+                        // equivalent, but during bootstrap it might be a "real"
+                        // version.
+                        //
+                        // XXX: Repeated linear search is lame.
+
+                        let mut literal = None;
+
+                        for cargo_dep in &pkg.dependencies[..] {
+                            let cmp_name =
+                                cargo_dep.rename.as_ref().unwrap_or_else(|| &cargo_dep.name);
+
+                            if cmp_name == &dep.name {
+                                literal = Some(cargo_dep.req.to_string());
+                                break;
+                            }
+                        }
+
+                        let literal = literal.unwrap_or_else(|| {
+                            // We only rarely actually use this information, so
+                            // I think it's resonable to warn here and hope for
+                            // the best, rather than hard-erroring out, since
+                            // I'm not 100% sure that our analysis above will
+                            // always be reliable.
+                            warn!("cannot find Cargo version requirement for dependency of `{}` on `{}`", &pkg.name, &dep.name);
+                            "UNDEFINED".to_owned()
+                        });
+
+                        // Find the Cranko-augmented dependency info.
+
+                        let req = maybe_versions
                             .and_then(|table| table.get(&dep.name))
                             .and_then(|nameval| nameval.as_str())
-                            .map(|text| app.repo.parse_commit_ref(text))
+                            .map(|text| app.repo.parse_history_ref(text))
                             .transpose()?
-                            .map(|cref| app.repo.resolve_commit_ref(&cref, &manifest_repopath))
+                            .map(|cref| app.repo.resolve_history_ref(&cref, &manifest_repopath))
                             .transpose()?;
 
-                        if min_version.is_none() {
+                        if req.is_none() {
                             warn!(
                                 "missing or invalid key `internal_dep_versions.{}` in `{}`",
                                 &dep.name,
@@ -156,8 +187,10 @@ impl CargoLoader {
                                 &dep.name, &pkg.name);
                         }
 
+                        let req = req.unwrap_or(DepRequirement::Unavailable);
+
                         app.graph
-                            .add_dependency(*depender_id, *dependee_id, min_version);
+                            .add_dependency(*depender_id, *dependee_id, literal, req);
                     }
                 }
             }
@@ -200,10 +233,24 @@ impl Rewriter for CargoRewriter {
         let proj = app.graph().lookup(self.proj_id);
         let mut internal_reqs = HashMap::new();
 
-        for req in &proj.internal_reqs[..] {
+        for dep in &proj.internal_deps[..] {
+            let req_text = match dep.cranko_requirement {
+                DepRequirement::Manual(ref t) => t.clone(),
+
+                DepRequirement::Commit(_) => {
+                    if let Some(ref v) = dep.resolved_version {
+                        format!("^{}", v)
+                    } else {
+                        continue;
+                    }
+                }
+
+                DepRequirement::Unavailable => continue,
+            };
+
             internal_reqs.insert(
-                app.graph().lookup(req.ident).qualified_names()[0].clone(),
-                req.min_version.clone(),
+                app.graph().lookup(dep.ident).qualified_names()[0].clone(),
+                req_text,
             );
         }
 
@@ -245,7 +292,7 @@ impl Rewriter for CargoRewriter {
         }
 
         fn rewrite_deptable(
-            internal_reqs: &HashMap<String, Version>,
+            internal_reqs: &HashMap<String, String>,
             tbl: &mut toml_edit::Table,
         ) -> Result<()> {
             let deps = tbl.iter().map(|(k, _v)| k.to_owned()).collect::<Vec<_>>();
@@ -254,15 +301,15 @@ impl Rewriter for CargoRewriter {
                 // ??? renamed internal deps? We could save rename informaion
                 // from cargo-metadata when we load everything.
 
-                if let Some(min_version) = internal_reqs.get(dep) {
+                if let Some(req_text) = internal_reqs.get(dep) {
                     if let Some(dep_tbl) = tbl.entry(dep).as_table_mut() {
-                        dep_tbl["version"] = toml_edit::value(format!("^{}", min_version));
+                        dep_tbl["version"] = toml_edit::value(req_text.clone());
                     } else if let Some(dep_tbl) = tbl.entry(dep).as_inline_table_mut() {
                         // Can't just index inline tables???
                         if let Some(val) = dep_tbl.get_mut("version") {
-                            *val = format!("^{}", min_version).into();
+                            *val = req_text.clone().into();
                         } else {
-                            dep_tbl.get_or_insert("version", format!("^{}", min_version));
+                            dep_tbl.get_or_insert("version", req_text.clone());
                         }
                     } else {
                         return Err(anyhow!(
@@ -274,6 +321,86 @@ impl Rewriter for CargoRewriter {
             }
 
             Ok(())
+        }
+
+        // Rewrite.
+
+        {
+            let mut f = File::create(&toml_path)?;
+            write!(f, "{}", doc.to_string_in_original_order())?;
+            changes.add_path(&self.toml_path);
+        }
+
+        Ok(())
+    }
+
+    /// Rewriting just the special Cranko requirement metadata.
+    fn rewrite_cranko_requirements(
+        &self,
+        app: &AppSession,
+        changes: &mut ChangeList,
+    ) -> Result<()> {
+        // Short-circuit if no deps. Note that we can only do this if,
+        // as done below, we don't clear unexpected entries in the
+        // internal_dep_versions block. Should we do that?
+
+        if app.graph().lookup(self.proj_id).internal_deps.is_empty() {
+            return Ok(());
+        }
+
+        // Load
+
+        let toml_path = app.repo.resolve_workdir(&self.toml_path);
+        let mut s = String::new();
+        {
+            let mut f = File::open(&toml_path)?;
+            f.read_to_string(&mut s)?;
+        }
+        let mut doc: Document = s.parse()?;
+
+        // Modify.
+
+        {
+            let ct_root = doc.as_table_mut();
+            let ct_package = ct_root
+                .entry("package")
+                .as_table_mut()
+                .ok_or_else(|| anyhow!("no [package] section in {}?!", self.toml_path.escaped()))?;
+
+            let tbl = ct_package.entry("metadata");
+            let tbl = match tbl.as_table_mut() {
+                Some(t) => t,
+
+                None => {
+                    *tbl = Item::Table(Table::new());
+                    tbl.as_table_mut().unwrap()
+                }
+            };
+
+            let tbl = tbl.entry("internal_dep_versions");
+            let tbl = match tbl.as_table_mut() {
+                Some(t) => t,
+
+                None => {
+                    *tbl = Item::Table(Table::new());
+                    tbl.as_table_mut().unwrap()
+                }
+            };
+
+            let graph = app.graph();
+            let proj = graph.lookup(self.proj_id);
+
+            for dep in &proj.internal_deps {
+                let target = &graph.lookup(dep.ident).qualified_names()[0];
+
+                let spec = match &dep.cranko_requirement {
+                    DepRequirement::Commit(cid) => cid.to_string(),
+                    DepRequirement::Manual(t) => format!("manual:{}", t),
+                    DepRequirement::Unavailable => continue,
+                };
+
+                tbl[target] = toml_edit::value(spec);
+            }
         }
 
         // Rewrite.
@@ -307,7 +434,7 @@ pub struct CargoCommand {
 }
 
 impl Command for CargoCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         match self.command {
             CargoCommands::ForeachReleased(o) => o.execute(),
             CargoCommands::PackageReleasedBinaries(o) => o.execute(),
@@ -330,7 +457,7 @@ pub struct ForeachReleasedCommand {
 }
 
 impl Command for ForeachReleasedCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         let sess = AppSession::initialize_default()?;
 
         let (dev_mode, rel_info) = sess.ensure_ci_release_mode()?;
@@ -416,7 +543,7 @@ pub struct PackageReleasedBinariesCommand {
 }
 
 impl Command for PackageReleasedBinariesCommand {
-    fn execute(self) -> anyhow::Result<i32> {
+    fn execute(self) -> Result<i32> {
         use cargo_metadata::Message;
 
         let sess = AppSession::initialize_default()?;
@@ -520,7 +647,7 @@ impl BinaryArchiveMode {
         dest_dir: &Path,
         binaries: &[PathBuf],
         target: &target_lexicon::Triple,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> Result<PathBuf> {
         match self {
             BinaryArchiveMode::Tarball => self.tarball(proj, dest_dir, binaries, target),
             BinaryArchiveMode::Zipball => self.zipball(proj, dest_dir, binaries, target),
@@ -533,7 +660,7 @@ impl BinaryArchiveMode {
         dest_dir: &Path,
         binaries: &[PathBuf],
         target: &target_lexicon::Triple,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> Result<PathBuf> {
         let mut path = dest_dir.to_path_buf();
         path.push(format!(
             "{}-{}-{}.zip",
@@ -590,7 +717,7 @@ impl BinaryArchiveMode {
         dest_dir: &Path,
         binaries: &[PathBuf],
         target: &target_lexicon::Triple,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> Result<PathBuf> {
         use flate2::write::GzEncoder;
         use flate2::Compression;
 

@@ -9,12 +9,13 @@ use std::collections::HashMap;
 use thiserror::Error as ThisError;
 
 use crate::{
+    atry,
     config::ConfigurationFile,
     errors::Result,
     graph::{ProjectGraph, RepoHistories},
-    project::{ProjectId, ResolvedRequirement},
+    project::{DepRequirement, ProjectId},
     repository::{
-        ChangeList, CommitAvailability, PathMatcher, RcCommitInfo, RcProjectInfo,
+        ChangeList, PathMatcher, RcCommitInfo, RcProjectInfo, ReleaseAvailability,
         ReleaseCommitInfo, Repository,
     },
     version::Version,
@@ -71,16 +72,18 @@ impl AppBuilder {
 
         // Now auto-detect everything in the repo index.
 
-        let mut cargo = crate::cargo::CargoLoader::default();
+        if self.populate_graph {
+            let mut cargo = crate::cargo::CargoLoader::default();
 
-        self.repo.scan_paths(|p| {
-            let (dirname, basename) = p.split_basename();
-            cargo.process_index_item(dirname, basename);
-        })?;
+            self.repo.scan_paths(|p| {
+                let (dirname, basename) = p.split_basename();
+                cargo.process_index_item(dirname, basename);
+            })?;
 
-        cargo.finalize(&mut self)?;
+            cargo.finalize(&mut self)?;
 
-        self.graph.complete_loading()?;
+            self.graph.complete_loading()?;
+        }
 
         // TODO: tweak auto-detected state based on relevant configuration.
 
@@ -319,6 +322,121 @@ impl AppSession {
         &mut self.graph
     }
 
+    /// Walk the project graph and solve internal dependencies.
+    ///
+    /// This method walks the graph in topologically-sorted order. For each
+    /// project, the callback `process` is called, which should return true if a
+    /// new release of the project is being scheduled. By the time the callback
+    /// is called, the project's internal dependency information will have been
+    /// updated:
+    ///
+    /// - No deps will be classified as DepRequirement::Unavailable, because the
+    ///   solver will abort if it encounters one of these.
+    /// - If the dep is DepRequirement::Commit, `resolved_version` will be a
+    ///   Some value containing the required version. It is possible that this
+    ///   version will be being released "right now".
+    ///
+    /// By the time the callback returns, the project's `version` field should
+    /// have been updated with its reference version for this release process --
+    /// which should be a new value, if the callback returns true.
+    pub fn solve_internal_deps<F>(&mut self, mut process: F) -> Result<()>
+    where
+        F: FnMut(&mut Repository, &mut ProjectGraph, ProjectId) -> Result<bool>,
+    {
+        let mut new_versions: HashMap<ProjectId, Version> = HashMap::new();
+
+        for ident in self.graph.toposort_idents()? {
+            // We can't conveniently navigate the deps while holding a mutable
+            // ref to depending project, so do some lifetime futzing and buffer
+            // up modifications to its dep info.
+
+            let mut resolved_versions = {
+                let proj = self.graph.lookup(ident);
+                let mut resolved_versions = Vec::new();
+
+                for (idx, dep) in proj.internal_deps.iter().enumerate() {
+                    match dep.cranko_requirement {
+                        // If the requirement is of a specific commit, we need
+                        // to resolve its corresponding release and/or make sure
+                        // that the dependee project is also being released in
+                        // this batch.
+                        DepRequirement::Commit(ref cid) => {
+                            let dependee_proj = self.graph.lookup(dep.ident);
+                            let avail = self
+                                .repo
+                                .find_earliest_release_containing(dependee_proj, cid)?;
+
+                            let resolved = match avail {
+                                ReleaseAvailability::NotAvailable => {
+                                    return Err(UnsatisfiedInternalRequirementError(
+                                        proj.user_facing_name.to_string(),
+                                        dependee_proj.user_facing_name.to_string(),
+                                    )
+                                    .into())
+                                }
+
+                                ReleaseAvailability::ExistingRelease(ref v) => v.clone(),
+
+                                ReleaseAvailability::NewRelease => {
+                                    if let Some(v) = new_versions.get(&dep.ident) {
+                                        v.clone()
+                                    } else {
+                                        return Err(UnsatisfiedInternalRequirementError(
+                                            proj.user_facing_name.to_string(),
+                                            self.graph
+                                                .lookup(dep.ident)
+                                                .user_facing_name
+                                                .to_string(),
+                                        )
+                                        .into());
+                                    }
+                                }
+                            };
+
+                            resolved_versions.push((idx, resolved));
+                        }
+
+                        DepRequirement::Manual(_) => {}
+
+                        DepRequirement::Unavailable => {
+                            let dependee_proj = self.graph.lookup(dep.ident);
+                            return Err(UnsatisfiedInternalRequirementError(
+                                proj.user_facing_name.to_string(),
+                                dependee_proj.user_facing_name.to_string(),
+                            )
+                            .into());
+                        }
+                    }
+                }
+
+                resolved_versions
+            };
+
+            {
+                let proj = self.graph.lookup_mut(ident);
+
+                for (idx, resolved) in resolved_versions.drain(..) {
+                    proj.internal_deps[idx].resolved_version = Some(resolved);
+                }
+            }
+
+            // Now, let the callback do its thing with the project, and tell us
+            // if it gets a new release.
+
+            let updated_version = atry!(
+                process(&mut self.repo, &mut self.graph, ident);
+                ["failed to solve internal dependencies of project `{}`", self.graph.lookup(ident).user_facing_name]
+            );
+
+            if updated_version {
+                let proj = self.graph.lookup(ident);
+                new_versions.insert(ident, proj.version.clone());
+            }
+        }
+
+        Ok(())
+    }
+
     /// Apply version numbers given the current repository state and bump
     /// specifications.
     ///
@@ -326,48 +444,12 @@ impl AppSession {
     /// dependencies. If an internal dependency is unsatisfiable, the returned
     /// error will be downcastable to an UnsatisfiedInternalRequirementError.
     pub fn apply_versions(&mut self, rc_info: &RcCommitInfo) -> Result<()> {
-        let mut new_versions: HashMap<ProjectId, Version> = HashMap::new();
         let latest_info = self.repo.get_latest_release_info()?;
 
-        for ident in self.graph.toposort_idents()? {
-            // First, make sure that we can satisfy this project's internal
-            // dependencies. By definition of the toposort, any of its
-            // dependencies will have already been visited.
-            let deps = self.graph.resolve_direct_dependencies(&self.repo, ident)?;
-            let proj = self.graph.lookup_mut(ident);
+        self.solve_internal_deps(|_repo, graph, ident| {
+            let mut proj = graph.lookup_mut(ident);
 
-            for dep in &deps[..] {
-                let min_version = match dep.availability {
-                    CommitAvailability::NotAvailable => {
-                        return Err(UnsatisfiedInternalRequirementError(
-                            proj.user_facing_name.to_string(),
-                            self.graph.lookup(dep.ident).user_facing_name.to_string(),
-                        )
-                        .into())
-                    }
-
-                    CommitAvailability::ExistingRelease(ref v) => v.clone(),
-
-                    CommitAvailability::NewRelease => {
-                        if let Some(v) = new_versions.get(&dep.ident) {
-                            v.clone()
-                        } else {
-                            return Err(UnsatisfiedInternalRequirementError(
-                                proj.user_facing_name.to_string(),
-                                self.graph.lookup(dep.ident).user_facing_name.to_string(),
-                            )
-                            .into());
-                        }
-                    }
-                };
-
-                proj.internal_reqs.push(ResolvedRequirement {
-                    ident: dep.ident,
-                    min_version,
-                });
-            }
-
-            // Now, set the baseline version to the last release.
+            // Set the baseline version to the last release.
 
             let latest_release = latest_info.lookup_project(proj);
 
@@ -381,21 +463,23 @@ impl AppSession {
 
             // If there's a bump, apply it.
 
-            if let Some(rc) = rc_info.lookup_project(proj) {
+            Ok(if let Some(rc) = rc_info.lookup_project(proj) {
                 let scheme = proj.version.parse_bump_scheme(&rc.bump_spec)?;
                 scheme.apply(&mut proj.version)?;
-                new_versions.insert(proj.ident(), proj.version.clone());
                 info!(
                     "{}: {} => {}",
                     proj.user_facing_name, baseline_version, proj.version
                 );
+                true
             } else {
                 info!(
                     "{}: unchanged from {}",
                     proj.user_facing_name, baseline_version
                 );
-            }
-        }
+                false
+            })
+        })
+        .with_context(|| format!("failed to solve internal dependencies"))?;
 
         Ok(())
     }
@@ -409,6 +493,22 @@ impl AppSession {
 
             for rw in &proj.rewriters {
                 rw.rewrite(self, &mut changes)?;
+            }
+        }
+
+        Ok(changes)
+    }
+
+    /// Like rewrite(), but only for the special Cranko requirements metadata.
+    /// This is convenience functionality not needed for the main workflows.
+    pub fn rewrite_cranko_requirements(&self) -> Result<ChangeList> {
+        let mut changes = ChangeList::default();
+
+        for ident in self.graph.toposort_idents()? {
+            let proj = self.graph.lookup(ident);
+
+            for rw in &proj.rewriters {
+                rw.rewrite_cranko_requirements(self, &mut changes)?;
             }
         }
 

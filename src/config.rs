@@ -10,7 +10,10 @@
 use anyhow::Context;
 use std::{fs::File, io::Read, path::Path};
 
-use crate::errors::{Error, Result};
+use crate::{
+    atry,
+    errors::{Error, Result},
+};
 
 /// The configuration file structures as explicitly serialized into the TOML
 /// format.
@@ -89,5 +92,13 @@ impl ConfigurationFile {
         })?;
 
         Ok(ConfigurationFile { repo: sercfg.repo })
+    }
+
+    pub fn into_toml(self) -> Result<String> {
+        let syn_cfg = syntax::SerializedConfiguration { repo: self.repo };
+        Ok(atry!(
+            toml::to_string_pretty(&syn_cfg);
+            ["could not serialize configuration into TOML format"]
+        ))
     }
 }

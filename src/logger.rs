@@ -71,6 +71,15 @@ impl Logger {
             let _r = writeln!(&mut inner.stderr, " {}", err);
         }
     }
+
+    pub fn print_err_note<T: std::fmt::Display>(msg: T) {
+        if let Ok(mut inner) = LOGGER.inner.write() {
+            let _r = inner.stderr.set_color(&LOGGER.error_cspec);
+            let _r = write!(&mut inner.stderr, "note:");
+            let _r = inner.stderr.reset();
+            let _r = writeln!(&mut inner.stderr, " {}", msg);
+        }
+    }
 }
 
 impl Log for Logger {

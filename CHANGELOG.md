@@ -1,4 +1,13 @@
-# rc: micro bump
+# rc: minor bump
+
+- Add `cranko bootstrap` to help people bootstrap Cranko usage in pre-existing
+  repositories. I think it should work? In order to give people sensible
+  behavior, we add a `bootstrap.toml` file that lets us record "prehistory"
+  versions, and also implement a "manual" mode for specifying version
+  requirements of internal dependencies so that we can grandfather in whateve
+  folks had before.
+
+# cranko 0.0.27 (2020-09-17)
 
 - Start working on the configuration framework, with a per-repository file at
   `.config/cranko/config.toml`. Only a few demonstration options are available

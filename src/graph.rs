@@ -12,15 +12,14 @@
 use petgraph::{
     algo::toposort,
     graph::{DefaultIx, DiGraph, NodeIndex},
-    visit::EdgeRef,
 };
 use std::collections::{HashMap, HashSet};
 use thiserror::Error as ThisError;
 
 use crate::{
     errors::Result,
-    project::{Project, ProjectBuilder, ProjectId},
-    repository::{CommitAvailability, CommitId, ReleaseCommitInfo, RepoHistory, Repository},
+    project::{DepRequirement, Dependency, Project, ProjectBuilder, ProjectId},
+    repository::{ReleaseCommitInfo, RepoHistory, Repository},
 };
 
 type OurNodeIndex = NodeIndex<DefaultIx>;
@@ -36,7 +35,7 @@ pub struct ProjectGraph {
     node_ixs: Vec<OurNodeIndex>,
 
     /// The `petgraph` state expressing the project graph.
-    graph: DiGraph<ProjectId, Option<CommitId>>,
+    graph: DiGraph<ProjectId, ()>,
 
     /// Mapping from user-facing project name to project ID. This is calculated
     /// in the complete_loading() method.
@@ -106,11 +105,19 @@ impl ProjectGraph {
         &mut self,
         depender_id: ProjectId,
         dependee_id: ProjectId,
-        min_version: Option<CommitId>,
+        literal: String,
+        req: DepRequirement,
     ) {
         let depender_nix = self.node_ixs[depender_id];
         let dependee_nix = self.node_ixs[dependee_id];
-        self.graph.add_edge(dependee_nix, depender_nix, min_version);
+        self.graph.add_edge(dependee_nix, depender_nix, ());
+
+        self.projects[depender_id].internal_deps.push(Dependency {
+            ident: dependee_id,
+            literal,
+            cranko_requirement: req,
+            resolved_version: None,
+        });
     }
 
     fn base_toposort(&self) -> std::result::Result<Vec<OurNodeIndex>, DependencyCycleError> {
@@ -412,37 +419,6 @@ impl ProjectGraph {
             histories: repo.analyze_histories(&self.projects[..])?,
         })
     }
-
-    pub fn resolve_direct_dependencies(
-        &self,
-        repo: &Repository,
-        ident: ProjectId,
-    ) -> Result<Vec<ResolvedDependency>> {
-        let mut deps = Vec::new();
-
-        for edge in self
-            .graph
-            .edges_directed(self.node_ixs[ident], petgraph::Direction::Incoming)
-        {
-            let dependee_id = self.graph[edge.source()];
-            let dependee_proj = &self.projects[dependee_id];
-            let maybe_cid = edge.weight();
-
-            let availability = if let Some(cid) = maybe_cid {
-                repo.find_earliest_release_containing(dependee_proj, cid)?
-            } else {
-                CommitAvailability::NotAvailable
-            };
-
-            deps.push(ResolvedDependency {
-                ident: dependee_id,
-                min_commit: maybe_cid.clone(),
-                availability,
-            });
-        }
-
-        Ok(deps)
-    }
 }
 
 /// This type is how we "launder" the knowledge that the vector that
@@ -457,16 +433,6 @@ impl RepoHistories {
     pub fn lookup(&self, projid: ProjectId) -> &RepoHistory {
         &self.histories[projid]
     }
-}
-
-/// Information about the version requirements of one project's dependency upon
-/// another project within the repo. If no version has yet been published
-/// satisying the dependency, min_version is None.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ResolvedDependency {
-    pub ident: ProjectId,
-    pub min_commit: Option<CommitId>,
-    pub availability: CommitAvailability,
 }
 
 /// Builder structure for querying projects in the graph.

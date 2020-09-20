@@ -8,10 +8,10 @@
 //!
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
-use anyhow::{anyhow, bail, Context, Result};
-use log::{error, info, warn};
+use anyhow::{anyhow, bail, Context};
+use log::{info, warn};
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::BTreeSet,
     env,
     ffi::OsString,
     fs,
@@ -21,6 +21,7 @@ use std::{
 use structopt::StructOpt;
 
 mod app;
+mod bootstrap;
 mod cargo;
 mod changelog;
 mod config;
@@ -33,6 +34,8 @@ mod project;
 mod repository;
 mod rewriters;
 mod version;
+
+use errors::Result;
 
 #[derive(Debug, PartialEq, StructOpt)]
 #[structopt(about = "automate versioning and releasing")]
@@ -47,6 +50,10 @@ trait Command {
 
 #[derive(Debug, PartialEq, StructOpt)]
 enum Commands {
+    #[structopt(name = "bootstrap")]
+    /// Bootstrap Cranko in a preexisting repository
+    Bootstrap(bootstrap::BootstrapCommand),
+
     #[structopt(name = "cargo")]
     /// Commands specific to the Rust/Cargo packaging system.
     Cargo(cargo::CargoCommand),
@@ -98,6 +105,7 @@ enum Commands {
 impl Command for Commands {
     fn execute(self) -> Result<i32> {
         match self {
+            Commands::Bootstrap(o) => o.execute(),
             Commands::Cargo(o) => o.execute(),
             Commands::CiUtil(o) => o.execute(),
             Commands::Confirm(o) => o.execute(),
@@ -114,7 +122,7 @@ impl Command for Commands {
     }
 }
 
-fn main() -> Result<()> {
+fn main() -> () {
     let opts = CrankoOptions::from_args();
 
     if let Err(e) = logger::Logger::init() {
@@ -123,18 +131,7 @@ fn main() -> Result<()> {
     }
     log::set_max_level(log::LevelFilter::Info);
 
-    let exitcode = match opts.command.execute() {
-        Ok(c) => c,
-        Err(e) => {
-            error!("{}", e);
-            e.chain()
-                .skip(1)
-                .for_each(|cause| logger::Logger::print_cause(cause));
-            1
-        }
-    };
-
-    std::process::exit(exitcode);
+    std::process::exit(errors::report(opts.command.execute()));
 }
 
 // ci-util
@@ -170,7 +167,7 @@ enum EnvDecodingMode {
 }
 
 impl std::str::FromStr for EnvDecodingMode {
-    type Err = anyhow::Error;
+    type Err = errors::Error;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
@@ -279,6 +276,8 @@ struct ConfirmCommand {
 
 impl Command for ConfirmCommand {
     fn execute(self) -> Result<i32> {
+        use project::DepRequirement;
+
         let mut sess = app::AppSession::initialize_default()?;
         sess.ensure_not_ci(self.force)?;
 
@@ -296,21 +295,37 @@ impl Command for ConfirmCommand {
         // report whether there are projects that ought to be released but
         // aren't.
         let histories = sess.analyze_histories()?;
-
-        let mut new_versions = HashMap::new();
         let mut changes = repository::ChangeList::default();
         let mut rc_info = Vec::new();
 
-        for ident in sess.graph().toposort_idents()? {
+        sess.solve_internal_deps(|repo, graph, ident| {
             let history = histories.lookup(ident);
             let dirty_allowed = self.force;
+            let mut updated_version = false;
 
             if let Some(info) =
-                sess.repo
-                    .scan_rc_info(sess.graph().lookup(ident), &mut changes, dirty_allowed)?
+                repo.scan_rc_info(graph.lookup(ident), &mut changes, dirty_allowed)?
             {
+                // Analyze the version bump and apply it (in-memory only).
+
+                let (old_version_text, new_version) = {
+                    let proj = graph.lookup_mut(ident);
+                    let last_rel_info = history.release_info(&repo)?;
+                    let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
+
+                    if let Some(last_release) = last_rel_info.lookup_project(proj) {
+                        proj.version = proj.version.parse_like(&last_release.version)?;
+                        scheme.apply(&mut proj.version)?;
+                        (last_release.version.clone(), proj.version.clone())
+                    } else {
+                        scheme.apply(&mut proj.version)?;
+                        ("[no previous releases]".to_owned(), proj.version.clone())
+                    }
+                };
+
+                let proj = graph.lookup(ident);
+
                 if history.n_commits() == 0 {
-                    let proj = sess.graph().lookup(ident);
                     warn!(
                         "project `{}` is being staged for release, but does not \
                         seem to have been modified since its last release",
@@ -318,88 +333,35 @@ impl Command for ConfirmCommand {
                     );
                 }
 
-                // Check whether all of this project's internal dependencies are in
-                // order.
-
-                let deps = sess
-                    .graph()
-                    .resolve_direct_dependencies(&sess.repo, ident)?;
-
-                use repository::CommitAvailability;
-
-                for dep in &deps[..] {
-                    let available = match dep.availability {
-                        CommitAvailability::NotAvailable => false,
-                        CommitAvailability::ExistingRelease(_) => true,
-                        CommitAvailability::NewRelease => new_versions.contains_key(&dep.ident),
-                    };
-
-                    if !available {
-                        error!(
-                            "cannot release `{}`",
-                            sess.graph().lookup(ident).user_facing_name
-                        );
-                        error!(
-                            "... no sufficiently new release of its internal dependency `{}` \
-                                is available or staged",
-                            sess.graph().lookup(dep.ident).user_facing_name
-                        );
-
-                        if let Some(cid) = dep.min_commit {
-                            error!("... the required commit is {}", cid);
-                        } else {
-                            error!("... the required commit was unknown or unspecified");
-                        }
-
-                        bail!("cannot confirm release submission");
-                    }
-                }
-
-                // OK. Analyze the version bump.
-                let maybe_last_release = history.release_info(&sess.repo)?;
-                let proj = sess.graph_mut().lookup_mut(ident);
-                let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
-
-                let (old_version, new_version) = if let Some(last_release) = maybe_last_release {
-                    // By definition, this project is will be present in the table:
-                    let last_release = last_release.lookup_project(proj).unwrap();
-                    proj.version = proj.version.parse_like(&last_release.version)?;
-                    scheme.apply(&mut proj.version)?;
-                    (last_release.version.clone(), proj.version.to_string())
-                } else {
-                    scheme.apply(&mut proj.version)?;
-                    (
-                        "[no previous releases]".to_owned(),
-                        proj.version.to_string(),
-                    )
-                };
-
                 info!(
                     "{}: {} (expected: {} => {})",
-                    proj.user_facing_name, info.bump_spec, old_version, new_version
+                    proj.user_facing_name, info.bump_spec, old_version_text, new_version
                 );
                 rc_info.push(info);
-                new_versions.insert(proj.ident(), new_version);
+                updated_version = true;
 
-                for dep in &deps[..] {
-                    let v = match dep.availability {
-                        CommitAvailability::NotAvailable => unreachable!(),
-                        CommitAvailability::ExistingRelease(ref v) => v.to_string(),
-                        CommitAvailability::NewRelease => new_versions[&dep.ident].clone(),
+                for dep in &proj.internal_deps[..] {
+                    let dproj = graph.lookup(dep.ident);
+                    let req_text = match &dep.cranko_requirement {
+                        DepRequirement::Commit(_) => {
+                            format!(">= {}", dep.resolved_version.as_ref().unwrap())
+                        }
+                        DepRequirement::Manual(t) => format!("{} (manual)", t),
+                        DepRequirement::Unavailable => unreachable!(),
                     };
 
-                    let dproj = sess.graph().lookup(dep.ident);
-                    info!("    internal dep: {} >= {}", dproj.user_facing_name, v);
+                    info!("    internal dep {}: {}", dproj.user_facing_name, req_text);
                 }
             } else if history.n_commits() > 0 {
-                let proj = sess.graph().lookup(ident);
                 warn!(
                     "project `{}` has been changed since its last release, \
                     but is not part of the rc submission",
-                    proj.user_facing_name
+                    graph.lookup(ident).user_facing_name
                 );
             }
-        }
+
+            Ok(updated_version)
+        })?;
 
         if rc_info.len() < 1 {
             warn!("no releases seem to have been staged; use \"cranko stage\"?");
@@ -805,15 +767,20 @@ impl Command for StatusCommand {
             let proj = sess.graph().lookup(ident);
             let history = histories.lookup(ident);
             let n = history.n_commits();
+            let rel_info = history.release_info(&sess.repo)?;
 
-            if let Some(rel_info) = history.release_info(&sess.repo)? {
-                // By definition, rel_info must contain a record for this project.
-                let this_info = rel_info.lookup_project(proj).unwrap();
-
-                println!(
-                    "{}: {} relevant commit(s) since {}",
-                    proj.user_facing_name, n, this_info.version
-                );
+            if let Some(this_info) = rel_info.lookup_project(proj) {
+                if this_info.age == 0 {
+                    println!(
+                        "{}: {} relevant commit(s) since {}",
+                        proj.user_facing_name, n, this_info.version
+                    );
+                } else {
+                    println!(
+                        "{}: no more than {} relevant commit(s) since {} (unable to track in detail)",
+                        proj.user_facing_name, n, this_info.version
+                    );
+                }
             } else {
                 println!(
                     "{}: {} relevant commit(s) since start of history (no releases on record)",
@@ -894,6 +861,7 @@ fn list_commands() -> BTreeSet<String> {
         }
     }
 
+    commands.insert("bootstrap".to_owned());
     commands.insert("cargo".to_owned());
     commands.insert("ci-util".to_owned());
     commands.insert("confirm".to_owned());

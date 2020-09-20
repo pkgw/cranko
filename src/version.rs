@@ -41,6 +41,22 @@ impl Version {
         }
     }
 
+    /// Mutate this version to be Cranko's default "development mode" value.
+    pub fn set_to_dev_value(&mut self) {
+        match self {
+            Version::Semver(v) => {
+                v.major = 0;
+                v.minor = 0;
+                v.patch = 0;
+                v.pre.clear();
+                v.pre
+                    .push(semver::Identifier::AlphaNumeric("dev".to_string()));
+                v.pre.push(semver::Identifier::Numeric(0));
+                v.build.clear();
+            }
+        }
+    }
+
     /// Given a template version, parse a "bump scheme" from a textual
     /// description.
     ///
