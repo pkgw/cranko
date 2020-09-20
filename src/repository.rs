@@ -10,13 +10,14 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
 };
 use thiserror::Error as ThisError;
 
 use crate::{
     atry,
+    bootstrap::BootstrapConfiguration,
     config::RepoConfiguration,
     errors::{Error, Result},
     graph::ProjectGraph,
@@ -82,6 +83,10 @@ pub struct Repository {
     /// The format specification to use for release tag names, as understood by
     /// the `SimpleCurlyFormat` of the `dynfmt` crate.
     release_tag_name_format: String,
+
+    /// "Bootstrap" versioning information used to tell us where versions were at
+    /// before the first Cranko release commit.
+    bootstrap_info: BootstrapConfiguration,
 }
 
 impl Repository {
@@ -116,6 +121,7 @@ impl Repository {
             upstream_rc_name,
             upstream_release_name,
             release_tag_name_format,
+            bootstrap_info: BootstrapConfiguration::default(),
         })
     }
 
@@ -246,6 +252,41 @@ impl Repository {
             self.release_tag_name_format = n;
         }
 
+        // While we're here, let's also read in the versioning bootstrap
+        // information, if it's available.
+
+        let mut bs_path = self.resolve_config_dir();
+        bs_path.push("bootstrap.toml");
+
+        let maybe_file = match File::open(&bs_path) {
+            Ok(f) => Some(f),
+
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    None
+                } else {
+                    return Err(Error::new(e).context(format!(
+                        "failed to open config file `{}`",
+                        bs_path.display()
+                    )));
+                }
+            }
+        };
+
+        if let Some(mut f) = maybe_file {
+            let mut text = String::new();
+            atry!(
+                f.read_to_string(&mut text);
+                ["failed to read bootstrap file `{}`", bs_path.display()]
+            );
+
+            self.bootstrap_info = atry!(
+                toml::from_str(&text);
+                ["could not parse bootstrap file `{}` as TOML", bs_path.display()]
+            );
+        }
+
+        // All done.
         Ok(())
     }
 
@@ -474,14 +515,30 @@ impl Repository {
         Ok(Some(blob.content().to_owned()))
     }
 
+    /// Get a ReleaseCommitInfo corresponding to the project's history before
+    /// Cranko.
+    fn get_bootstrap_release_info(&self) -> ReleaseCommitInfo {
+        let mut rel_info = ReleaseCommitInfo::default();
+
+        for bs_info in &self.bootstrap_info.project[..] {
+            rel_info.projects.push(ReleasedProjectInfo {
+                qnames: bs_info.qnames.clone(),
+                version: bs_info.version.clone(),
+                age: 999,
+            })
+        }
+
+        rel_info
+    }
+
     /// Get information about the state of the projects in the repository as
     /// of the latest release commit.
     pub fn get_latest_release_info(&self) -> Result<ReleaseCommitInfo> {
-        if let Some(c) = self.try_get_release_commit()? {
-            Ok(self.parse_release_info_from_commit(&c)?)
+        Ok(if let Some(c) = self.try_get_release_commit()? {
+            self.parse_release_info_from_commit(&c)?
         } else {
-            Ok(ReleaseCommitInfo::default())
-        }
+            self.get_bootstrap_release_info()
+        })
     }
 
     fn get_signature(&self) -> Result<git2::Signature> {
@@ -1320,16 +1377,14 @@ impl RepoHistory {
     }
 
     /// Get the release information corresponding to this item's release commit.
-    /// If this history item was computed for certain project, this info is
-    /// guaranteed to contain an age=0 release for that project (if it is not
-    /// None).
-    pub fn release_info(&self, repo: &Repository) -> Result<Option<ReleaseCommitInfo>> {
-        if let Some(cid) = self.release_commit() {
+    /// This might be "bootstrap" information without any age=0 releases.
+    pub fn release_info(&self, repo: &Repository) -> Result<ReleaseCommitInfo> {
+        Ok(if let Some(cid) = self.release_commit() {
             let commit = repo.repo.find_commit(cid.0)?;
-            Ok(Some(repo.parse_release_info_from_commit(&commit)?))
+            repo.parse_release_info_from_commit(&commit)?
         } else {
-            Ok(None)
-        }
+            repo.get_bootstrap_release_info()
+        })
     }
 
     /// Get the number of commits in this chunk of history.

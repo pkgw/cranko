@@ -310,12 +310,10 @@ impl Command for ConfirmCommand {
 
                 let (old_version_text, new_version) = {
                     let proj = graph.lookup_mut(ident);
-                    let maybe_last_release = history.release_info(&repo)?;
+                    let last_rel_info = history.release_info(&repo)?;
                     let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
 
-                    if let Some(last_release) = maybe_last_release {
-                        // By definition, this project is present in the table:
-                        let last_release = last_release.lookup_project(proj).unwrap();
+                    if let Some(last_release) = last_rel_info.lookup_project(proj) {
                         proj.version = proj.version.parse_like(&last_release.version)?;
                         scheme.apply(&mut proj.version)?;
                         (last_release.version.clone(), proj.version.clone())
@@ -769,15 +767,20 @@ impl Command for StatusCommand {
             let proj = sess.graph().lookup(ident);
             let history = histories.lookup(ident);
             let n = history.n_commits();
+            let rel_info = history.release_info(&sess.repo)?;
 
-            if let Some(rel_info) = history.release_info(&sess.repo)? {
-                // By definition, rel_info must contain a record for this project.
-                let this_info = rel_info.lookup_project(proj).unwrap();
-
-                println!(
-                    "{}: {} relevant commit(s) since {}",
-                    proj.user_facing_name, n, this_info.version
-                );
+            if let Some(this_info) = rel_info.lookup_project(proj) {
+                if this_info.age == 0 {
+                    println!(
+                        "{}: {} relevant commit(s) since {}",
+                        proj.user_facing_name, n, this_info.version
+                    );
+                } else {
+                    println!(
+                        "{}: no more than {} relevant commit(s) since {} (unable to track in detail)",
+                        proj.user_facing_name, n, this_info.version
+                    );
+                }
             } else {
                 println!(
                     "{}: {} relevant commit(s) since start of history (no releases on record)",
