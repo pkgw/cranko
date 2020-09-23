@@ -58,7 +58,7 @@ Here are some of the things on the radar:
 
 - Built-in support for more languages / frameworks:
   - [x] Rust
-  - [ ] NPM
+  - [x] NPM
   - [ ] Python
   - [ ] Visual Studio?
 - [x] Per-repo config file
