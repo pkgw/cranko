@@ -1,3 +1,9 @@
+# cranko 0.2.0 (2020-09-23)
+
+- Add a first cut at NPM support.
+- Not yet documented or really well tested, but let's put out a release so that
+  we can see how it works in CI/CD.
+
 # cranko 0.1.0 (2020-09-20)
 
 - Add `cranko bootstrap` to help people bootstrap Cranko usage in pre-existing

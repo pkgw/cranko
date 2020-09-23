@@ -444,7 +444,7 @@ impl Repository {
     /// Scan the paths in the repository index.
     pub fn scan_paths<F>(&self, mut f: F) -> Result<()>
     where
-        F: FnMut(&RepoPath) -> (),
+        F: FnMut(&RepoPath) -> Result<()>,
     {
         // We have to use a callback here since the IndexEntries iter holds a
         // ref to the index, which therefore has to be immovable (pinned) during
@@ -452,7 +452,11 @@ impl Repository {
         let index = self.repo.index()?;
 
         for entry in index.iter() {
-            f(RepoPath::new(&entry.path));
+            let p = RepoPath::new(&entry.path);
+            atry!(
+                f(p);
+                ["encountered a problem while scanning repository entry `{}`", p.escaped()]
+            );
         }
 
         Ok(())
