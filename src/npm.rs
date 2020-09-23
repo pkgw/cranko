@@ -10,7 +10,14 @@
 
 use anyhow::{anyhow, Context};
 use log::warn;
-use std::{collections::HashMap, ffi::OsString, fs::File, process};
+use std::{
+    collections::HashMap,
+    env,
+    ffi::OsString,
+    fs::{File, OpenOptions},
+    io::Write,
+    process,
+};
 use structopt::StructOpt;
 
 use super::Command;
@@ -345,6 +352,10 @@ pub enum NpmCommands {
     #[structopt(name = "foreach-released")]
     /// Run a command for each released NPM project.
     ForeachReleased(ForeachReleasedCommand),
+
+    #[structopt(name = "install-token")]
+    /// Install $NPM_TOKEN in the user's .npmrc
+    InstallToken(InstallTokenCommand),
 }
 
 #[derive(Debug, PartialEq, StructOpt)]
@@ -357,6 +368,7 @@ impl Command for NpmCommand {
     fn execute(self) -> Result<i32> {
         match self.command {
             NpmCommands::ForeachReleased(o) => o.execute(),
+            NpmCommands::InstallToken(o) => o.execute(),
         }
     }
 }
@@ -418,6 +430,42 @@ impl Command for ForeachReleasedCommand {
                 ));
             }
         }
+
+        Ok(0)
+    }
+}
+
+/// `cranko npm install-token`
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct InstallTokenCommand {
+    #[structopt(
+        long = "registry",
+        default_value = "//registry.npmjs.org/",
+        help = "The registry base URL."
+    )]
+    registry: String,
+}
+
+impl Command for InstallTokenCommand {
+    fn execute(self) -> Result<i32> {
+        let token = atry!(
+            env::var("NPM_TOKEN");
+            ["missing or non-textual environment variable NPM_TOKEN"]
+        );
+
+        let mut p =
+            dirs::home_dir().ok_or_else(|| anyhow!("cannot determine user's home directory"))?;
+        p.push(".npmrc");
+
+        let mut file = atry!(
+            OpenOptions::new().write(true).create(true).append(true).open(&p);
+            ["failed to open file `{}` for appending", p.display()]
+        );
+
+        atry!(
+            writeln!(file, "{}:_authToken={}", self.registry, token);
+            ["failed to write token data to file `{}`", p.display()]
+        );
 
         Ok(0)
     }
