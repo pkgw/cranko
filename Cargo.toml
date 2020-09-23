@@ -1,6 +1,6 @@
 [package]
 name = "cranko"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Peter Williams <peter@newton.cx>"]
 edition = "2018"
 license = "MIT"
@@ -24,6 +24,7 @@ base64 = "^0.12"
 cargo_metadata = "^0.10"
 chrono = "^0.4"
 ci_info = "^0.10"
+dirs = "^3"
 dynfmt = { version = "^0.1", default-features = false, features = ["curly"] }
 flate2 = "^1.0"
 git-url-parse = "^0.2"
