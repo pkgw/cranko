@@ -1,5 +1,9 @@
 # rc: micro bump
 
+- No code changes, but update the documentation for the NPM support.
+
+# cranko 0.2.1 (2020-09-23)
+
 - Add `npm install-token` (still not yet documented).
 
 # cranko 0.2.0 (2020-09-23)
