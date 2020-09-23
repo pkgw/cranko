@@ -74,13 +74,26 @@ impl AppBuilder {
 
         if self.populate_graph {
             let mut cargo = crate::cargo::CargoLoader::default();
+            let mut npm = crate::npm::NpmLoader::default();
 
-            self.repo.scan_paths(|p| {
+            // Dumb hack around the borrowchecker to allow mutable reference to
+            // the graph while iterating over the repo:
+            let repo = self.repo;
+            let mut graph = self.graph;
+
+            repo.scan_paths(|p| {
                 let (dirname, basename) = p.split_basename();
                 cargo.process_index_item(dirname, basename);
+                npm.process_index_item(&repo, &mut graph, p, dirname, basename)?;
+                Ok(())
             })?;
 
+            self.repo = repo;
+            self.graph = graph;
+            // End dumb hack.
+
             cargo.finalize(&mut self)?;
+            npm.finalize(&mut self)?;
 
             self.graph.complete_loading()?;
         }
