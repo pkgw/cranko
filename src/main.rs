@@ -30,6 +30,7 @@ mod github;
 mod gitutil;
 mod graph;
 mod logger;
+mod npm;
 mod project;
 mod repository;
 mod rewriters;
@@ -82,6 +83,10 @@ enum Commands {
     /// List available subcommands
     ListCommands(ListCommandsCommand),
 
+    #[structopt(name = "npm")]
+    /// Commands specific to the NPM packaging system.
+    Npm(npm::NpmCommand),
+
     #[structopt(name = "release-workflow")]
     /// Specialized operations for releases in the just-in-time versioning workflow
     ReleaseWorkflow(ReleaseWorkflowCommand),
@@ -113,6 +118,7 @@ impl Command for Commands {
             Commands::GitUtil(o) => o.execute(),
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
+            Commands::Npm(o) => o.execute(),
             Commands::ReleaseWorkflow(o) => o.execute(),
             Commands::Show(o) => o.execute(),
             Commands::Stage(o) => o.execute(),
@@ -869,6 +875,7 @@ fn list_commands() -> BTreeSet<String> {
     commands.insert("github".to_owned());
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
+    commands.insert("npm".to_owned());
     commands.insert("release-workflow".to_owned());
     commands.insert("show".to_owned());
     commands.insert("stage".to_owned());

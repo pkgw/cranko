@@ -213,6 +213,7 @@ dependencies = [
  "reqwest",
  "semver",
  "serde",
+ "serde_json",
  "structopt",
  "tar",
  "target-lexicon",
