@@ -1,3 +1,7 @@
+# cranko 0.2.2 (2020-09-23)
+
+- No code changes, but update the documentation for the NPM support.
+
 # cranko 0.2.1 (2020-09-23)
 
 - Add `npm install-token` (still not yet documented).
