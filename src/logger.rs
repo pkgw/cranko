@@ -12,6 +12,7 @@
 use lazy_static::lazy_static;
 use log::{Level, Log};
 use std::{
+    fmt::Display,
     io::{self, Write},
     sync::RwLock,
 };
@@ -25,6 +26,7 @@ pub struct Logger {
     info_cspec: ColorSpec,
     warn_cspec: ColorSpec,
     error_cspec: ColorSpec,
+    highlight_cspec: ColorSpec,
 }
 
 pub struct InnerLogger {
@@ -41,10 +43,12 @@ lazy_static! {
         let mut info_cspec = ColorSpec::new();
         let mut warn_cspec = ColorSpec::new();
         let mut error_cspec = ColorSpec::new();
+        let mut highlight_cspec = ColorSpec::new();
 
         warn_cspec.set_fg(Some(Color::Yellow)).set_bold(true);
         info_cspec.set_fg(Some(Color::Green)).set_bold(true);
         error_cspec.set_fg(Some(Color::Red)).set_bold(true);
+        highlight_cspec.set_fg(Some(Color::Cyan)).set_bold(true);
 
         Logger {
             inner: RwLock::new(InnerLogger { stdout, stderr }),
@@ -53,6 +57,7 @@ lazy_static! {
             info_cspec,
             warn_cspec,
             error_cspec,
+            highlight_cspec,
         }
     };
 }
@@ -69,15 +74,35 @@ impl Logger {
             let _r = write!(&mut inner.stderr, "caused by:");
             let _r = inner.stderr.reset();
             let _r = writeln!(&mut inner.stderr, " {}", err);
+        } else {
+            eprintln!("caused by: {}", err);
         }
     }
 
-    pub fn print_err_note<T: std::fmt::Display>(msg: T) {
+    pub fn print_err_note<T: Display>(msg: T) {
         if let Ok(mut inner) = LOGGER.inner.write() {
             let _r = inner.stderr.set_color(&LOGGER.error_cspec);
             let _r = write!(&mut inner.stderr, "note:");
             let _r = inner.stderr.reset();
             let _r = writeln!(&mut inner.stderr, " {}", msg);
+        } else {
+            eprintln!("note: {}", msg);
+        }
+    }
+
+    pub fn println_highlighted<T1: Display, T2: Display, T3: Display>(
+        before: T1,
+        highlight: T2,
+        after: T3,
+    ) {
+        if let Ok(mut inner) = LOGGER.inner.write() {
+            let _r = write!(&mut inner.stdout, "{}", before);
+            let _r = inner.stdout.set_color(&LOGGER.highlight_cspec);
+            let _r = write!(&mut inner.stdout, "{}", highlight);
+            let _r = inner.stdout.reset();
+            let _r = writeln!(&mut inner.stdout, "{}", after);
+        } else {
+            println!("{}{}{}", before, highlight, after);
         }
     }
 }
@@ -124,6 +149,28 @@ impl Log for Logger {
                     let _r = write!(&mut inner.stderr, "error:");
                     let _r = inner.stderr.reset();
                     let _r = writeln!(&mut inner.stderr, " {}", record.args());
+                }
+            }
+        } else {
+            match record.level() {
+                Level::Trace => {
+                    eprintln!("trace: {}", record.args());
+                }
+
+                Level::Debug => {
+                    eprintln!("debug: {}", record.args());
+                }
+
+                Level::Info => {
+                    println!("info: {}", record.args());
+                }
+
+                Level::Warn => {
+                    eprintln!("warning: {}", record.args());
+                }
+
+                Level::Error => {
+                    eprintln!("error: {}", record.args());
                 }
             }
         }

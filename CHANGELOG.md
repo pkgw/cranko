@@ -1,3 +1,10 @@
+# cranko 0.2.3 (2020-09-24)
+
+- Add some colorful highlighting for `cranko status`
+- Add a Concepts reference section and Azure Pipelines integration
+  recommendations to the book.
+- Have logging fall back to basic stdio if the color-logger doesn't work
+
 # cranko 0.2.2 (2020-09-23)
 
 - No code changes, but update the documentation for the NPM support.
