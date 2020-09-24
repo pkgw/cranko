@@ -7,6 +7,8 @@
   - [Bootstrapping](workflows-bootstrap/index.md)
   - [Everyday Development](workflows-dev/index.md)
   - [CI/CD](workflows-cicd/index.md)
+- [Integrations]()
+  - [Azure Pipelines](integrations/azure-pipelines.md)
 
 # Reference Material
 
