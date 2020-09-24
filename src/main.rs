@@ -777,14 +777,26 @@ impl Command for StatusCommand {
 
             if let Some(this_info) = rel_info.lookup_project(proj) {
                 if this_info.age == 0 {
-                    println!(
-                        "{}: {} relevant commit(s) since {}",
-                        proj.user_facing_name, n, this_info.version
-                    );
+                    if n == 0 {
+                        println!(
+                            "{}: no relevant commits since {}",
+                            proj.user_facing_name, this_info.version
+                        );
+                    } else {
+                        logger::Logger::println_highlighted(
+                            format!("{}: ", proj.user_facing_name),
+                            n,
+                            format!(" relevant commit(s) since {}", this_info.version),
+                        );
+                    }
                 } else {
-                    println!(
-                        "{}: no more than {} relevant commit(s) since {} (unable to track in detail)",
-                        proj.user_facing_name, n, this_info.version
+                    logger::Logger::println_highlighted(
+                        format!("{}: no more than ", proj.user_facing_name),
+                        n,
+                        format!(
+                            " relevant commit(s) since {} (unable to track in detail)",
+                            this_info.version
+                        ),
                     );
                 }
             } else {
