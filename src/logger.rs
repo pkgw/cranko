@@ -69,6 +69,8 @@ impl Logger {
             let _r = write!(&mut inner.stderr, "caused by:");
             let _r = inner.stderr.reset();
             let _r = writeln!(&mut inner.stderr, " {}", err);
+        } else {
+            eprintln!("caused by: {}", err);
         }
     }
 
@@ -78,6 +80,8 @@ impl Logger {
             let _r = write!(&mut inner.stderr, "note:");
             let _r = inner.stderr.reset();
             let _r = writeln!(&mut inner.stderr, " {}", msg);
+        } else {
+            eprintln!("note: {}", msg);
         }
     }
 }
@@ -124,6 +128,28 @@ impl Log for Logger {
                     let _r = write!(&mut inner.stderr, "error:");
                     let _r = inner.stderr.reset();
                     let _r = writeln!(&mut inner.stderr, " {}", record.args());
+                }
+            }
+        } else {
+            match record.level() {
+                Level::Trace => {
+                    eprintln!("trace: {}", record.args());
+                }
+
+                Level::Debug => {
+                    eprintln!("debug: {}", record.args());
+                }
+
+                Level::Info => {
+                    println!("info: {}", record.args());
+                }
+
+                Level::Warn => {
+                    eprintln!("warning: {}", record.args());
+                }
+
+                Level::Error => {
+                    eprintln!("error: {}", record.args());
                 }
             }
         }
