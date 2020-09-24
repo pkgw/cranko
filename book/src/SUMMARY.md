@@ -3,7 +3,6 @@
 - [Installation](installation/index.md)
 - [Getting Started](getting-started/index.md)
 - [Just-in-Time Versioning](jit-versioning/index.md)
-- [Cranko Concepts](concepts/index.md)
 - [Workflows]()
   - [Bootstrapping](workflows-bootstrap/index.md)
   - [Everyday Development](workflows-dev/index.md)
@@ -11,6 +10,10 @@
 
 # Reference Material
 
+- [Concepts]()
+  - [Projects](concepts/projects.md)
+  - [Releases](concepts/releases.md)
+  - [Versions](concepts/versions.md)
 - [Configuration](configuration/index.md)
 
 # CLI Commands
