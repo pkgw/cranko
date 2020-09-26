@@ -42,19 +42,6 @@ pub struct ProjectGraph {
     name_to_id: HashMap<String, ProjectId>,
 }
 
-/// An error returned when the internal project graph has a dependency cycle.
-/// The inner value is the user-facing name of a project involved in the cycle.
-#[derive(Debug, ThisError)]
-#[error("detected an internal dependency cycle associated with project {0}")]
-pub struct DependencyCycleError(pub String);
-
-/// An error returned when it is impossible to come up with distinct names for
-/// two projects. This "should never happen", but ... The inner value is the
-/// clashing name.
-#[derive(Debug, ThisError)]
-#[error("multiple projects with same name `{0}`")]
-pub struct NamingClashError(pub String);
-
 /// An error returned when an input has requested a project with a certain name,
 /// and it just doesn't exist.
 #[derive(Debug, ThisError)]
@@ -62,27 +49,6 @@ pub struct NamingClashError(pub String);
 pub struct NoSuchProjectError(pub String);
 
 impl ProjectGraph {
-    /// Start the process of adding a new project to the graph.
-    pub fn add_project<'a>(&'a mut self) -> ProjectBuilder<'a> {
-        if self.name_to_id.len() != 0 {
-            panic!("cannot add projects after finalizing initialization");
-        }
-
-        ProjectBuilder::new(self)
-    }
-
-    // Undocumented helper for ProjectBuilder to finish off its work.
-    #[doc(hidden)]
-    pub fn finalize_project_addition<F>(&mut self, f: F) -> ProjectId
-    where
-        F: FnOnce(ProjectId) -> Project,
-    {
-        let id = self.projects.len();
-        self.projects.push(f(id));
-        self.node_ixs.push(self.graph.add_node(id));
-        id
-    }
-
     /// Get a reference to a project in the graph from its ID.
     pub fn lookup(&self, ident: ProjectId) -> &Project {
         &self.projects[ident]
@@ -100,185 +66,11 @@ impl ProjectGraph {
         self.name_to_id.get(name.as_ref()).map(|id| *id)
     }
 
-    /// Add a dependency between two projects in the graph.
-    pub fn add_dependency(
-        &mut self,
-        depender_id: ProjectId,
-        dependee_id: ProjectId,
-        literal: String,
-        req: DepRequirement,
-    ) {
-        let depender_nix = self.node_ixs[depender_id];
-        let dependee_nix = self.node_ixs[dependee_id];
-        self.graph.add_edge(dependee_nix, depender_nix, ());
-
-        self.projects[depender_id].internal_deps.push(Dependency {
-            ident: dependee_id,
-            literal,
-            cranko_requirement: req,
-            resolved_version: None,
-        });
-    }
-
     fn base_toposort(&self) -> std::result::Result<Vec<OurNodeIndex>, DependencyCycleError> {
         toposort(&self.graph, None).map_err(|cycle| {
             let ident = self.graph[cycle.node_id()];
             DependencyCycleError(self.projects[ident].user_facing_name.to_owned())
         })
-    }
-
-    /// Complete construction of the graph.
-    ///
-    /// In particular, this function calculates unique, user-facing names for
-    /// every project in the graph. After this function is called, new projects
-    /// may not be added to the graph.
-    ///
-    /// If the internal project graph turns out to have a dependecy cycle, an
-    /// error downcastable to DependencyCycleError.
-    pub fn complete_loading(&mut self) -> Result<()> {
-        // TODO: our algorithm for coming up with unambiguous names is totally
-        // ad-hoc and probably crashes in various corner cases. There's probably
-        // a much smarter way to approach this.
-
-        let node_ixs = self.base_toposort()?;
-        let name_to_id = &mut self.name_to_id;
-
-        // Each project has a vector of "qualified names" [n1, n2, ..., nN] that
-        // should be unique. Here n1 is the "narrowest" name and probably
-        // corresponds to what the user naively thinks of as the project names.
-        // Farther-out names help us disambiguate, e.g. in a monorepo containing
-        // a Python project and an NPM project with the same name. Our
-        // disambiguation simply strings together n_narrow items from the narrow
-        // end of the list. If qnames is [foo, bar, bax, quux] and n_narrow is
-        // 2, the rendered name is "bar:foo".
-        #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-        struct NamingState {
-            pub n_narrow: usize,
-        }
-
-        impl Default for NamingState {
-            fn default() -> Self {
-                NamingState { n_narrow: 1 }
-            }
-        }
-
-        impl NamingState {
-            fn compute_name(&self, proj: &Project) -> String {
-                let mut s = String::new();
-                let qnames = proj.qualified_names();
-                const SEP: char = ':';
-
-                for i in 0..self.n_narrow {
-                    if i != 0 {
-                        s.push(SEP);
-                    }
-
-                    s.push_str(&qnames[self.n_narrow - 1 - i]);
-                }
-
-                s
-            }
-        }
-
-        let mut states = vec![NamingState::default(); self.projects.len()];
-        let mut need_another_pass = true;
-
-        while need_another_pass {
-            name_to_id.clear();
-            need_another_pass = false;
-
-            for node_ix in &node_ixs {
-                use std::collections::hash_map::Entry;
-                let ident1 = self.graph[*node_ix];
-                let proj1 = &self.projects[ident1];
-                let candidate_name = states[ident1].compute_name(proj1);
-
-                let ident2: ProjectId = match name_to_id.entry(candidate_name) {
-                    Entry::Vacant(o) => {
-                        // Great. No conflict.
-                        o.insert(ident1);
-                        continue;
-                    }
-
-                    Entry::Occupied(o) => o.remove(),
-                };
-
-                // If we're still here, we have a name conflict that needs
-                // solving. We've removed the conflicting project from the map.
-                //
-                // We'd like to disambiguate both of the conflicting entries
-                // equally. I.e., if the qnames are [pywwt, npm] and [pywwt,
-                // python] we want to end up with "python:pywwt" and
-                // "npm:pywwt", not "python:pywwt" and "pywwt".
-
-                let proj2 = &self.projects[ident2];
-                let qn1 = proj1.qualified_names();
-                let qn2 = proj2.qualified_names();
-                let n1 = qn1.len();
-                let n2 = qn2.len();
-                let mut success = false;
-
-                for i in 0..std::cmp::min(n1, n2) {
-                    if qn1[i] != qn2[i] {
-                        success = true;
-                        states[ident1].n_narrow = std::cmp::max(states[ident1].n_narrow, i + 1);
-                        states[ident2].n_narrow = std::cmp::max(states[ident2].n_narrow, i + 1);
-                        break;
-                    }
-                }
-
-                if !success {
-                    if n1 > n2 {
-                        states[ident1].n_narrow = std::cmp::max(states[ident1].n_narrow, n2 + 1);
-                    } else if n2 > n1 {
-                        states[ident2].n_narrow = std::cmp::max(states[ident2].n_narrow, n1 + 1);
-                    } else {
-                        return Err(NamingClashError(states[ident1].compute_name(proj1)).into());
-                    }
-                }
-
-                if name_to_id
-                    .insert(states[ident1].compute_name(proj1), ident1)
-                    .is_some()
-                {
-                    need_another_pass = true; // this name clashes too!
-                }
-
-                if name_to_id
-                    .insert(states[ident2].compute_name(proj2), ident2)
-                    .is_some()
-                {
-                    need_another_pass = true; // this name clashes too!
-                }
-            }
-        }
-
-        for (name, ident) in name_to_id {
-            self.projects[*ident].user_facing_name = name.clone();
-        }
-
-        // Another bit of housekeeping: by default we set things up so that
-        // project's path matchers are partially disjoint. In particular, if
-        // there is a project rooted in prefix "a/" and a project rooted in
-        // prefix "a/b/", we make it so that paths in "a/b/" are not flagged as
-        // belonging to the project in "a/".
-        //
-        // The algorithm here (and in make_disjoint()) is not efficient, but it
-        // shouldn't matter unless you have an unrealistically large number of
-        // projects. We have to use split_at_mut() to get simultaneous
-        // mutability of two pieces of the vec.
-
-        for index1 in 1..self.projects.len() {
-            let (left, right) = self.projects.split_at_mut(index1);
-            let litem = &mut left[index1 - 1];
-
-            for ritem in right {
-                litem.repo_paths.make_disjoint(&ritem.repo_paths);
-                ritem.repo_paths.make_disjoint(&litem.repo_paths);
-            }
-        }
-
-        Ok(())
     }
 
     /// Iterate over all projects in the graph, in no particular order.
@@ -485,6 +277,252 @@ impl GraphQueryBuilder {
     }
 }
 
+/// A builder for the project graph upon app startup.
+///
+/// We do not impl Default even though we could, because the only way to
+/// create one of these should be via the AppBuilder.
+#[derive(Debug)]
+pub struct ProjectGraphBuilder {
+    /// The projects. Projects are uniquely identified by their index into this
+    /// vector.
+    projects: Vec<ProjectBuilder>,
+
+    /// NodeIndex values for each project based on its identifier.
+    node_ixs: Vec<OurNodeIndex>,
+
+    /// The `petgraph` state expressing the project graph.
+    graph: DiGraph<ProjectId, ()>,
+}
+
+/// An error returned when the internal project graph has a dependency cycle.
+/// The inner value is the user-facing name of a project involved in the cycle.
+#[derive(Debug, ThisError)]
+#[error("detected an internal dependency cycle associated with project {0}")]
+pub struct DependencyCycleError(pub String);
+
+/// An error returned when it is impossible to come up with distinct names for
+/// two projects. This "should never happen", but ... The inner value is the
+/// clashing name.
+#[derive(Debug, ThisError)]
+#[error("multiple projects with same name `{0}`")]
+pub struct NamingClashError(pub String);
+
+impl ProjectGraphBuilder {
+    pub(crate) fn new() -> ProjectGraphBuilder {
+        ProjectGraphBuilder {
+            projects: Vec::new(),
+            node_ixs: Vec::new(),
+            graph: DiGraph::default(),
+        }
+    }
+
+    /// Register a new project with the graph.
+    pub fn add_project(&mut self) -> ProjectId {
+        let id = self.projects.len();
+        self.projects.push(ProjectBuilder::new());
+        self.node_ixs.push(self.graph.add_node(id));
+        id
+    }
+
+    /// Get a mutable reference to a project buider from its ID.
+    pub fn lookup_mut(&mut self, ident: ProjectId) -> &mut ProjectBuilder {
+        &mut self.projects[ident]
+    }
+
+    /// Add a dependency between two projects in the graph.
+    pub fn add_dependency(
+        &mut self,
+        depender_id: ProjectId,
+        dependee_id: ProjectId,
+        literal: String,
+        req: DepRequirement,
+    ) {
+        let depender_nix = self.node_ixs[depender_id];
+        let dependee_nix = self.node_ixs[dependee_id];
+        self.graph.add_edge(dependee_nix, depender_nix, ());
+
+        self.projects[depender_id].internal_deps.push(Dependency {
+            ident: dependee_id,
+            literal,
+            cranko_requirement: req,
+            resolved_version: None,
+        });
+    }
+
+    /// Complete construction of the graph.
+    ///
+    /// In particular, this function calculates unique, user-facing names for
+    /// every project in the graph. After this function is called, new projects
+    /// may not be added to the graph.
+    ///
+    /// If the internal project graph turns out to have a dependecy cycle, an
+    /// error downcastable to DependencyCycleError.
+    pub fn complete_loading(mut self) -> Result<ProjectGraph> {
+        // The first order of business is to determine every project's
+        // user-facing name. TODO: our algorithm for this is totally ad-hoc and
+        // probably crashes in various corner cases. There's probably a much
+        // smarter way to approach this.
+
+        let mut name_to_id = HashMap::new();
+
+        // Each project has a vector of "qualified names" [n1, n2, ..., nN] that
+        // should be unique. Here n1 is the "narrowest" name and probably
+        // corresponds to what the user naively thinks of as the project names.
+        // Farther-out names help us disambiguate, e.g. in a monorepo containing
+        // a Python project and an NPM project with the same name. Our
+        // disambiguation simply strings together n_narrow items from the narrow
+        // end of the list. If qnames is [foo, bar, bax, quux] and n_narrow is
+        // 2, the rendered name is "bar:foo".
+        #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+        struct NamingState {
+            pub n_narrow: usize,
+        }
+
+        impl Default for NamingState {
+            fn default() -> Self {
+                NamingState { n_narrow: 1 }
+            }
+        }
+
+        impl NamingState {
+            fn compute_name(&self, proj: &ProjectBuilder) -> String {
+                let mut s = String::new();
+                const SEP: char = ':';
+
+                for i in 0..self.n_narrow {
+                    if i != 0 {
+                        s.push(SEP);
+                    }
+
+                    s.push_str(&proj.qnames[self.n_narrow - 1 - i]);
+                }
+
+                s
+            }
+        }
+
+        let mut states = vec![NamingState::default(); self.projects.len()];
+        let mut need_another_pass = true;
+
+        while need_another_pass {
+            name_to_id.clear();
+            need_another_pass = false;
+
+            for node_ix in &self.node_ixs {
+                use std::collections::hash_map::Entry;
+                let ident1 = self.graph[*node_ix];
+                let proj1 = &self.projects[ident1];
+                let candidate_name = states[ident1].compute_name(proj1);
+
+                let ident2: ProjectId = match name_to_id.entry(candidate_name) {
+                    Entry::Vacant(o) => {
+                        // Great. No conflict.
+                        o.insert(ident1);
+                        continue;
+                    }
+
+                    Entry::Occupied(o) => o.remove(),
+                };
+
+                // If we're still here, we have a name conflict that needs
+                // solving. We've removed the conflicting project from the map.
+                //
+                // We'd like to disambiguate both of the conflicting entries
+                // equally. I.e., if the qnames are [pywwt, npm] and [pywwt,
+                // python] we want to end up with "python:pywwt" and
+                // "npm:pywwt", not "python:pywwt" and "pywwt".
+
+                let proj2 = &self.projects[ident2];
+                let qn1 = &proj1.qnames;
+                let qn2 = &proj2.qnames;
+                let n1 = qn1.len();
+                let n2 = qn2.len();
+                let mut success = false;
+
+                for i in 0..std::cmp::min(n1, n2) {
+                    if qn1[i] != qn2[i] {
+                        success = true;
+                        states[ident1].n_narrow = std::cmp::max(states[ident1].n_narrow, i + 1);
+                        states[ident2].n_narrow = std::cmp::max(states[ident2].n_narrow, i + 1);
+                        break;
+                    }
+                }
+
+                if !success {
+                    if n1 > n2 {
+                        states[ident1].n_narrow = std::cmp::max(states[ident1].n_narrow, n2 + 1);
+                    } else if n2 > n1 {
+                        states[ident2].n_narrow = std::cmp::max(states[ident2].n_narrow, n1 + 1);
+                    } else {
+                        return Err(NamingClashError(states[ident1].compute_name(proj1)).into());
+                    }
+                }
+
+                if name_to_id
+                    .insert(states[ident1].compute_name(proj1), ident1)
+                    .is_some()
+                {
+                    need_another_pass = true; // this name clashes too!
+                }
+
+                if name_to_id
+                    .insert(states[ident2].compute_name(proj2), ident2)
+                    .is_some()
+                {
+                    need_another_pass = true; // this name clashes too!
+                }
+            }
+        }
+
+        // Convert the ProjectBuilders into projects.
+        //
+        // TODO: more lame linear indexing.
+
+        let mut projects = Vec::with_capacity(self.projects.len());
+
+        for (ident, proj_builder) in self.projects.drain(..).enumerate() {
+            for (name, i_ident) in &name_to_id {
+                if *i_ident == ident {
+                    // finalize() reports the project name in the context
+                    let proj = proj_builder.finalize(ident, name.clone())?;
+                    projects.push(proj);
+                    break;
+                }
+            }
+        }
+
+        // Another bit of housekeeping: by default we set things up so that
+        // project's path matchers are partially disjoint. In particular, if
+        // there is a project rooted in prefix "a/" and a project rooted in
+        // prefix "a/b/", we make it so that paths in "a/b/" are not flagged as
+        // belonging to the project in "a/".
+        //
+        // The algorithm here (and in make_disjoint()) is not efficient, but it
+        // shouldn't matter unless you have an unrealistically large number of
+        // projects. We have to use split_at_mut() to get simultaneous
+        // mutability of two pieces of the vec.
+
+        for index1 in 1..projects.len() {
+            let (left, right) = projects.split_at_mut(index1);
+            let litem = &mut left[index1 - 1];
+
+            for ritem in right {
+                litem.repo_paths.make_disjoint(&ritem.repo_paths);
+                ritem.repo_paths.make_disjoint(&litem.repo_paths);
+            }
+        }
+
+        // All done
+
+        Ok(ProjectGraph {
+            projects,
+            name_to_id: name_to_id,
+            graph: self.graph,
+            node_ixs: self.node_ixs,
+        })
+    }
+}
+
 /// An iterator for visiting the projects in the graph.
 pub struct GraphIter<'a> {
     graph: &'a ProjectGraph,
@@ -533,19 +571,19 @@ mod tests {
     use crate::{repository::RepoPathBuf, version::Version};
 
     fn do_name_assignment_test(spec: &[(&[&str], &str)]) -> Result<()> {
-        let mut graph = ProjectGraph::default();
+        let mut graph = ProjectGraphBuilder::new();
         let mut ids = HashMap::new();
 
         for (qnames, user_facing) in spec {
-            let mut b = graph.add_project();
-            b.qnames(*qnames);
-            b.version(Version::Semver(semver::Version::new(0, 0, 0)));
-            b.prefix(RepoPathBuf::new(b""));
-            let projid = b.finish_init();
+            let projid = graph.add_project();
+            let mut b = graph.lookup_mut(projid);
+            b.qnames = qnames.iter().map(|s| (*s).to_owned()).collect();
+            b.version = Some(Version::Semver(semver::Version::new(0, 0, 0)));
+            b.prefix = Some(RepoPathBuf::new(b""));
             ids.insert(projid, user_facing);
         }
 
-        graph.complete_loading()?;
+        let graph = graph.complete_loading()?;
 
         for (projid, user_facing) in ids {
             assert_eq!(graph.lookup(projid).user_facing_name, *user_facing);

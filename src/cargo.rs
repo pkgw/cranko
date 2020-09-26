@@ -103,22 +103,18 @@ impl CargoLoader {
             let manifest_repopath = app.repo.convert_path(&pkg.manifest_path)?;
             let (prefix, _) = manifest_repopath.split_basename();
 
-            let mut pb = app.graph.add_project();
+            let ident = app.graph.add_project();
+            let mut proj = app.graph.lookup_mut(ident);
 
             // Q: should we include a registry name as a qualifier?
-            pb.qnames(&[&pkg.name, "cargo"])
-                .version(Version::Semver(pkg.version.clone()));
-            pb.prefix(prefix.to_owned());
-
-            let ident = pb.finish_init();
+            proj.qnames = vec![pkg.name.to_owned(), "cargo".to_owned()];
+            proj.version = Some(Version::Semver(pkg.version.clone()));
+            proj.prefix = Some(prefix.to_owned());
             cargo_to_graph.insert(pkg.id.clone(), ident);
 
             // Auto-register a rewriter to update this package's Cargo.toml.
             let cargo_rewrite = CargoRewriter::new(ident, manifest_repopath);
-            app.graph
-                .lookup_mut(ident)
-                .rewriters
-                .push(Box::new(cargo_rewrite));
+            proj.rewriters.push(Box::new(cargo_rewrite));
         }
 
         // Now establish the interdependencies.
