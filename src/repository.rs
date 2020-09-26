@@ -1506,7 +1506,7 @@ pub enum ParsedHistoryRef {
 /// In git, such a path is a byte array. The directory separator is always "/".
 /// The bytes are often convertible to UTF-8, but not always. (These are the
 /// same semantics as Unix paths.)
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 #[repr(transparent)]
 pub struct RepoPath([u8]);
 
@@ -1606,7 +1606,7 @@ fn bytes2path(b: &[u8]) -> &Path {
 }
 
 /// An owned reference to a pathname as understood by the backing repository.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[repr(transparent)]
 pub struct RepoPathBuf(Vec<u8>);
 
