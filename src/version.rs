@@ -9,6 +9,8 @@ use thiserror::Error as ThisError;
 
 use crate::errors::Result;
 
+pub use pep440::Pep440Version;
+
 /// A version number associated with a project.
 ///
 /// This is an enumeration because different kinds of projects may subscribe to
@@ -17,12 +19,16 @@ use crate::errors::Result;
 pub enum Version {
     /// A version compatible with the semantic versioning specification.
     Semver(semver::Version),
+
+    // A version compatible with the Python PEP-440 specification.
+    Pep440(Pep440Version),
 }
 
 impl Display for Version {
     fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
         match self {
             Version::Semver(ref v) => write!(f, "{}", v),
+            Version::Pep440(ref v) => write!(f, "{}", v),
         }
     }
 }
@@ -32,6 +38,7 @@ impl Version {
     pub fn parse_like<T: AsRef<str>>(&self, text: T) -> Result<Version> {
         Ok(match self {
             Version::Semver(_) => Version::Semver(semver::Version::parse(text.as_ref())?),
+            Version::Pep440(_) => Version::Pep440(text.as_ref().parse()?),
         })
     }
 
@@ -39,6 +46,7 @@ impl Version {
     pub fn zero_like(&self) -> Version {
         match self {
             Version::Semver(_) => Version::Semver(semver::Version::new(0, 0, 0)),
+            Version::Pep440(_) => Version::Pep440(Pep440Version::default()),
         }
     }
 
@@ -54,6 +62,16 @@ impl Version {
                     .push(semver::Identifier::AlphaNumeric("dev".to_string()));
                 v.pre.push(semver::Identifier::Numeric(0));
                 v.build.clear();
+            }
+
+            Version::Pep440(v) => {
+                v.epoch = 0;
+                v.segments.clear();
+                v.segments.push(0);
+                v.pre_release = None;
+                v.post_release = None;
+                v.dev_release = Some(0);
+                v.local_identifier = None;
             }
         }
     }
@@ -131,6 +149,10 @@ impl VersionBumpScheme {
                 Version::Semver(v) => {
                     v.build.push(semver::Identifier::AlphaNumeric(code));
                 }
+
+                Version::Pep440(v) => {
+                    v.local_identifier = Some(code);
+                }
             }
 
             Ok(())
@@ -142,6 +164,20 @@ impl VersionBumpScheme {
                     v.pre.clear();
                     v.build.clear();
                     v.patch += 1;
+                }
+
+                Version::Pep440(v) => {
+                    while v.segments.len() < 3 {
+                        v.segments.push(0);
+                    }
+
+                    v.pre_release = None;
+                    v.post_release = None;
+                    v.dev_release = None;
+                    v.local_identifier = None;
+
+                    v.segments[2] += 1;
+                    v.segments.truncate(3);
                 }
             }
 
@@ -156,6 +192,21 @@ impl VersionBumpScheme {
                     v.patch = 0;
                     v.minor += 1;
                 }
+
+                Version::Pep440(v) => {
+                    while v.segments.len() < 3 {
+                        v.segments.push(0);
+                    }
+
+                    v.pre_release = None;
+                    v.post_release = None;
+                    v.dev_release = None;
+                    v.local_identifier = None;
+
+                    v.segments[1] += 1;
+                    v.segments[2] = 0;
+                    v.segments.truncate(3);
+                }
             }
 
             Ok(())
@@ -169,6 +220,22 @@ impl VersionBumpScheme {
                     v.patch = 0;
                     v.minor = 0;
                     v.major += 1;
+                }
+
+                Version::Pep440(v) => {
+                    while v.segments.len() < 3 {
+                        v.segments.push(0);
+                    }
+
+                    v.pre_release = None;
+                    v.post_release = None;
+                    v.dev_release = None;
+                    v.local_identifier = None;
+
+                    v.segments[0] += 1;
+                    v.segments[1] = 0;
+                    v.segments[2] = 0;
+                    v.segments.truncate(3);
                 }
             }
 
@@ -215,6 +282,19 @@ mod pep440 {
         Alpha(usize),
         Beta(usize),
         Rc(usize),
+    }
+
+    impl Default for Pep440Version {
+        fn default() -> Self {
+            Pep440Version {
+                epoch: 0,
+                segments: vec![0; 1],
+                pre_release: None,
+                post_release: None,
+                dev_release: None,
+                local_identifier: None,
+            }
+        }
     }
 
     impl Display for Pep440Version {
