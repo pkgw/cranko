@@ -182,9 +182,13 @@ impl VersionBumpScheme {
     }
 }
 
+/// Python PEP-440 versions.
 mod pep440 {
     use anyhow::bail;
-    use std::fmt::{Display, Formatter};
+    use std::{
+        cmp::Ordering,
+        fmt::{Display, Formatter},
+    };
 
     use crate::errors::{Error, Result};
 
@@ -265,6 +269,86 @@ mod pep440 {
                 Ok((_, v)) => Ok(v),
                 Err(e) => bail!("failed to parse `{}` as a PEP-440 version: {}", s, e),
             }
+        }
+    }
+
+    impl std::cmp::Ord for Pep440Version {
+        fn cmp(&self, other: &Self) -> Ordering {
+            let o = self.epoch.cmp(&other.epoch);
+            if o != Ordering::Equal {
+                return o;
+            }
+
+            // There's probably a cleaner way to deal with differing-length lists ..
+            let ns = self.segments.len();
+            let no = other.segments.len();
+
+            for i in 0..std::cmp::max(ns, no) {
+                let vs = if i < ns { self.segments[i] } else { 0 };
+                let vo = if i < no { other.segments[i] } else { 0 };
+                let o = vs.cmp(&vo);
+                if o != Ordering::Equal {
+                    return o;
+                }
+            }
+
+            let pss = within_release_score(self);
+            let pso = within_release_score(other);
+            return pss.cmp(&pso);
+
+            /// This function "scores" a version's pre-release-ness. The first
+            /// returned value is a number that reflects the overall ranking of
+            /// the particular combination of pre/post/dev flags; the remaining
+            /// three numbers give the specific values of those flags, ordered
+            /// in the appropriate way to allow meaningful comparison if the
+            /// pre/post/dev flags are tied.
+            fn within_release_score(v: &Pep440Version) -> [usize; 4] {
+                match (v.dev_release, v.pre_release, v.post_release) {
+                    (Some(dev), None, None) => [100, dev, 0, 0], // .dev
+
+                    (Some(dev), Some(pre), None) => {
+                        // .pre .dev
+                        let (offset, pre) = prerelease_scores(&pre);
+                        [190 + offset, pre, dev, 0]
+                    }
+
+                    (None, Some(pre), None) => {
+                        // .pre
+                        let (offset, pre) = prerelease_scores(&pre);
+                        [200 + offset, pre, 0, 0]
+                    }
+
+                    (Some(dev), Some(pre), Some(post)) => {
+                        // .pre .post .dev
+                        let (offset, pre) = prerelease_scores(&pre);
+                        [210 + offset, pre, post, dev]
+                    }
+
+                    (None, Some(pre), Some(post)) => {
+                        // .pre .post
+                        let (offset, pre) = prerelease_scores(&pre);
+                        [220 + offset, pre, post, 0]
+                    }
+
+                    (None, None, None) => [500, 0, 0, 0], // (nothing)
+                    (Some(dev), None, Some(post)) => [609, post, dev, 0], // .post .dev
+                    (None, None, Some(post)) => [610, post, 0, 0], // .post
+                }
+            }
+
+            fn prerelease_scores(pr: &Pep440Prerelease) -> (usize, usize) {
+                match pr {
+                    Pep440Prerelease::Alpha(n) => (0, *n),
+                    Pep440Prerelease::Beta(n) => (100, *n),
+                    Pep440Prerelease::Rc(n) => (200, *n),
+                }
+            }
+        }
+    }
+
+    impl PartialOrd for Pep440Version {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(other))
         }
     }
 
