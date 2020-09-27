@@ -200,7 +200,7 @@ mod pep440 {
     ///
     /// There is a crate named `verlib` that I was hoping to use for this, but it
     /// turns out that it doesn't actually implement PEP440 yet.
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug)]
     pub struct Pep440Version {
         pub epoch: usize,
         pub segments: Vec<usize>,
@@ -352,6 +352,35 @@ mod pep440 {
         }
     }
 
+    // Custom implementation to ignore local_identifier, which does not
+    // factor into the ordering
+    impl PartialEq for Pep440Version {
+        fn eq(&self, other: &Self) -> bool {
+            if self.epoch != other.epoch
+                || self.pre_release != other.pre_release
+                || self.dev_release != other.dev_release
+                || self.post_release != other.post_release
+            {
+                return false;
+            }
+
+            let ns = self.segments.len();
+            let no = other.segments.len();
+
+            for i in 0..std::cmp::max(ns, no) {
+                let vs = if i < ns { self.segments[i] } else { 0 };
+                let vo = if i < no { other.segments[i] } else { 0 };
+                if vs != vo {
+                    return false;
+                }
+            }
+
+            true
+        }
+    }
+
+    impl Eq for Pep440Version {}
+
     mod parse {
         use nom::{
             branch::alt,
@@ -435,15 +464,17 @@ mod pep440 {
         /// Try to parse a prerelease tag
         fn pre_tag(i: &str) -> IResult<&str, Segment> {
             let (i, _) = opt(separator)(i)?;
+            // order is important here: when there's a common prefix,
+            // the longer item must come first:
             let (i, tag_text) = alt((
-                tag("a"),
                 tag("alpha"),
-                tag("b"),
+                tag("a"),
                 tag("beta"),
+                tag("b"),
                 tag("c"),
                 tag("rc"),
-                tag("pre"),
                 tag("preview"),
+                tag("pre"),
             ))(i)?;
             let (i, _) = opt(separator)(i)?;
             let (i, n) = map(opt(unsigned), |o| o.unwrap_or(0))(i)?;
@@ -636,6 +667,58 @@ mod pep440 {
                     "  1_RC_1   ",
                     CVers(0, &[1], Some(Pep440Prerelease::Rc(1)), None, None, None),
                 ),
+                (
+                    "1.0a0",
+                    CVers(
+                        0,
+                        &[1, 0],
+                        Some(Pep440Prerelease::Alpha(0)),
+                        None,
+                        None,
+                        None,
+                    ),
+                ),
+                (
+                    "1.0alpha0",
+                    CVers(
+                        0,
+                        &[1, 0],
+                        Some(Pep440Prerelease::Alpha(0)),
+                        None,
+                        None,
+                        None,
+                    ),
+                ),
+                (
+                    "1.0b0",
+                    CVers(
+                        0,
+                        &[1, 0],
+                        Some(Pep440Prerelease::Beta(0)),
+                        None,
+                        None,
+                        None,
+                    ),
+                ),
+                (
+                    "1.0beta0",
+                    CVers(
+                        0,
+                        &[1, 0],
+                        Some(Pep440Prerelease::Beta(0)),
+                        None,
+                        None,
+                        None,
+                    ),
+                ),
+                (
+                    "1.0pre0",
+                    CVers(0, &[1, 0], Some(Pep440Prerelease::Rc(0)), None, None, None),
+                ),
+                (
+                    "1.0preview0",
+                    CVers(0, &[1, 0], Some(Pep440Prerelease::Rc(0)), None, None, None),
+                ),
             ];
 
             for (text, cexp) in PARSE_CASES {
@@ -651,6 +734,70 @@ mod pep440 {
 
             for text in BAD_CASES {
                 assert_eq!(text.parse::<Pep440Version>().is_err(), true);
+            }
+        }
+
+        #[test]
+        fn greater_less() {
+            const CASES: &[(&str, &str)] = &[
+                ("1.0", "1.1"),
+                ("1.0.dev.0", "1.0"),
+                ("1.0.dev.0", "1.0a0"),
+                ("1.0.alpha.0", "1.0b0"),
+                ("1.0-b-0", "1.0c0"),
+                ("1.0rc0", "1.0"),
+                ("1.0", "1.0.post.0"),
+                ("1.0", "1.0-0"),
+                ("1.0a0.dev0", "1.0a0"),
+                ("1.0a0", "1.0a0.post0"),
+                ("1.0b0.dev0", "1.0b0"),
+                ("1.0b0", "1.0b0.post0"),
+                ("1.0rc0.dev0", "1.0rc0"),
+                ("1.0rc0", "1.0rc0.post0"),
+                ("1.0.post0.dev0", "1.0.post0"),
+                ("1.0rc0", "1.0rc0.post0"),
+                ("1.0.b0.post0.dev0", "1.0.b0.post0"),
+                ("2020.99", "1!0"),
+            ];
+
+            for (l_text, g_text) in CASES {
+                let lesser = l_text.parse::<Pep440Version>().unwrap();
+                let greater = g_text.parse::<Pep440Version>().unwrap();
+                assert_eq!(lesser < greater, true);
+                assert_eq!(greater > lesser, true);
+            }
+        }
+
+        #[test]
+        fn eq() {
+            const CASES: &[(&str, &str)] = &[
+                ("1.0", "1"),
+                ("1.0.0.0.0", "1"),
+                ("1.0+something", "1"),
+                ("0!1.0", "1"),
+                ("1.0a0", "1.0.alpha.0"),
+                ("1.0b0", "1.0-beta-0"),
+                ("1.0c0", "1.0rc"),
+                ("1.0c0", "1.0pre0"),
+                ("1.0c0", "1.0preview"),
+                ("1.0-10", "1.0.post_10"),
+            ];
+
+            for (l_text, r_text) in CASES {
+                let left = l_text.parse::<Pep440Version>().unwrap();
+                let right = r_text.parse::<Pep440Version>().unwrap();
+                assert_eq!(left, right);
+            }
+        }
+
+        #[test]
+        fn display_roundtrip() {
+            const CASES: &[&str] = &["0!0", "1.0.0.0.0.0", "1RC0", "1.0+SOME_TEXT", "1.0-0"];
+
+            for text in CASES {
+                let orig = text.parse::<Pep440Version>().unwrap();
+                let roundtripped = orig.to_string().parse().unwrap();
+                assert_eq!(orig, roundtripped);
             }
         }
     }
