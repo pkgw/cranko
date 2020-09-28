@@ -11,7 +11,11 @@ use structopt::StructOpt;
 use toml;
 
 use super::Command;
-use crate::{atry, errors::Result, project::DepRequirement};
+use crate::{
+    atry,
+    errors::{Error, Result},
+    project::DepRequirement,
+};
 
 /// The toplevel bootstrap state structure.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -100,14 +104,34 @@ impl Command for BootstrapCommand {
                 cfg_path.display(),
             );
 
-            let mut f = atry!(
-                fs::OpenOptions::new().write(true).create_new(true).open(&cfg_path);
-                ["could not create Cranko configuration file `{}`", cfg_path.display()]
-            );
-            atry!(
-                f.write_all(cfg_text.as_bytes());
-                ["could not write Cranko configuration file `{}`", cfg_path.display()]
-            );
+            let f = match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&cfg_path)
+            {
+                Ok(f) => Some(f),
+                Err(e) => {
+                    if e.kind() == std::io::ErrorKind::AlreadyExists {
+                        warn!(
+                            "Cranko configuration file `{}` already exists; not modifying it",
+                            cfg_path.display()
+                        );
+                        None
+                    } else {
+                        return Err(Error::new(e).context(format!(
+                            "failed to open Cranko configuration file `{}` for writing",
+                            cfg_path.display()
+                        )));
+                    }
+                }
+            };
+
+            if let Some(mut f) = f {
+                atry!(
+                    f.write_all(cfg_text.as_bytes());
+                    ["could not write Cranko configuration file `{}`", cfg_path.display()]
+                );
+            }
         }
 
         // Now we can initialize the regular app and report on the projects.
