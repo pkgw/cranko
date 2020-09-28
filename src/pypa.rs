@@ -67,7 +67,7 @@ impl PypaLoader {
             // Try pyproject.toml first. If it exists, it might contain metadata
             // that help us gather info from the other project files.
 
-            {
+            let config = {
                 let mut toml_path = dirname.clone();
                 toml_path.push("pyproject.toml");
                 let toml_path = app.repo.resolve_workdir(&toml_path);
@@ -103,11 +103,13 @@ impl PypaLoader {
 
                 let data = data.map(|d| d.tool).flatten().map(|t| t.cranko).flatten();
 
-                if let Some(data) = data {
-                    name = data.name;
-                    main_version_file = data.main_version_file;
+                if let Some(ref data) = data {
+                    name = data.name.clone();
+                    main_version_file = data.main_version_file.clone();
                 }
-            }
+
+                data
+            };
 
             // Now let's see if we have anything to learn from `setup.cfg`.
             //
@@ -279,9 +281,21 @@ impl PypaLoader {
             proj.version = Some(Version::Pep440(version));
             proj.prefix = Some(dirname.to_owned());
 
-            let version_rewrite =
-                PythonRewriter::new(ident, RepoPathBuf::new(main_version_file.as_bytes()));
-            proj.rewriters.push(Box::new(version_rewrite));
+            let mut rw_path = dirname.clone();
+            rw_path.push(main_version_file.as_bytes());
+            let rw = PythonRewriter::new(ident, rw_path);
+            proj.rewriters.push(Box::new(rw));
+
+            for path in config
+                .as_ref()
+                .map(|c| &c.extra_python_rewrite_files[..])
+                .unwrap_or(&[])
+            {
+                let mut rw_path = dirname.clone();
+                rw_path.push(path.as_bytes());
+                let rw = PythonRewriter::new(ident, rw_path);
+                proj.rewriters.push(Box::new(rw));
+            }
         }
 
         Ok(())
@@ -425,6 +439,10 @@ struct PyProjectCranko {
     /// Note that there might be other files that also contain the version that
     /// will need to be rewritten when we apply a new version.
     pub main_version_file: Option<String>,
+
+    /// Additional Python files that should be rewritten on metadata changes.
+    #[serde(default)]
+    pub extra_python_rewrite_files: Vec<String>,
 }
 
 /// Rewrite a Python file to include real version numbers.
@@ -443,6 +461,7 @@ impl PythonRewriter {
 
 impl Rewriter for PythonRewriter {
     fn rewrite(&self, app: &AppSession, changes: &mut ChangeList) -> Result<()> {
+        let mut did_anything = false;
         let file_path = app.repo.resolve_workdir(&self.file_path);
 
         let cur_f = atry!(
@@ -467,6 +486,7 @@ impl Rewriter for PythonRewriter {
 
                 let line = if simple_py_parse::has_commented_marker(&line, "cranko project-version")
                 {
+                    did_anything = true;
                     atry!(
                         simple_py_parse::replace_text_in_string_literal(&line, &proj.version.to_string());
                         ["couldn't rewrite version-string source line `{}`", line]
@@ -488,6 +508,13 @@ impl Rewriter for PythonRewriter {
             Err(atomicwrites::Error::Internal(e)) => Err(e.into()),
             Err(atomicwrites::Error::User(e)) => Err(e),
             Ok(()) => {
+                if !did_anything {
+                    warn!(
+                        "rewriter for Python file `{}` didn't make any modifications",
+                        file_path.display()
+                    );
+                }
+
                 changes.add_path(&self.file_path);
                 Ok(())
             }
