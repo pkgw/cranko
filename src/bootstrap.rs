@@ -132,11 +132,19 @@ impl Command for BootstrapCommand {
                 seen_any = true;
             }
 
+            let loc_desc = {
+                let p = proj.prefix();
+
+                if p.len() == 0 {
+                    "the root directory".to_owned()
+                } else {
+                    format!("`{}`", p.escaped())
+                }
+            };
+
             println!(
-                "    {} @ {} in `{}`",
-                proj.user_facing_name,
-                proj.version,
-                proj.prefix().escaped()
+                "    {} @ {} in {}",
+                proj.user_facing_name, proj.version, loc_desc
             );
         }
 
