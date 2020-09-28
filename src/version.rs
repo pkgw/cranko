@@ -284,6 +284,19 @@ mod pep440 {
         Rc(usize),
     }
 
+    impl Pep440Version {
+        pub fn parse_from_tuple_literal(s: &str) -> Result<Self> {
+            match parse::version_from_tuple_literal(s) {
+                Ok((_, v)) => Ok(v),
+                Err(e) => bail!(
+                    "failed to parse `{}` as a sys.version_info-like tuple literal: {}",
+                    s,
+                    e
+                ),
+            }
+        }
+    }
+
     impl Default for Pep440Version {
         fn default() -> Self {
             Pep440Version {
@@ -464,8 +477,8 @@ mod pep440 {
     mod parse {
         use nom::{
             branch::alt,
-            bytes::complete::tag,
-            character::complete::{digit1, multispace0, one_of},
+            bytes::complete::{tag, take_till},
+            character::complete::{char, digit1, multispace0, one_of},
             combinator::{all_consuming, map, map_res, opt},
             error::ErrorKind,
             AsChar, IResult, InputTakeAtPosition,
@@ -647,6 +660,57 @@ mod pep440 {
                     post_release,
                     dev_release,
                     local_identifier,
+                },
+            ))
+        }
+
+        /// Try to parse a simple version from a `sys.version_info` style tuple
+        /// literal. We allow arbitrary leading text, since our expected use
+        /// case is to analyze a line extracted from a Python source file.
+        pub fn version_from_tuple_literal(i: &str) -> IResult<&str, Pep440Version> {
+            let (i, _) = take_till(|c| c == '(')(i)?;
+            let (i, _) = tag("(")(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, major) = unsigned(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, _) = tag(",")(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, minor) = unsigned(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, _) = tag(",")(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, micro) = unsigned(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, _) = tag(",")(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, delim) = one_of("'\"")(i)?;
+            let (i, level) = take_till(|c| c == delim)(i)?;
+            let (i, _) = char(delim)(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, _) = tag(",")(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, serial) = unsigned(i)?;
+            let (i, _) = multispace0(i)?;
+            let (i, _) = tag(")")(i)?;
+
+            let (pre_release, dev_release) = match level {
+                "alpha" => (Some(Pep440Prerelease::Alpha(serial)), None),
+                "beta" => (Some(Pep440Prerelease::Beta(serial)), None),
+                "candidate" => (Some(Pep440Prerelease::Rc(serial)), None),
+                "final" => (None, None),
+                "dev" => (None, Some(serial)),
+                _ => return Err(nom::Err::Failure((i, ErrorKind::Alt))),
+            };
+
+            Ok((
+                i,
+                Pep440Version {
+                    epoch: 0,
+                    segments: vec![major, minor, micro],
+                    pre_release,
+                    dev_release,
+                    post_release: None,
+                    local_identifier: None,
                 },
             ))
         }

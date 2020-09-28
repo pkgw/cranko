@@ -32,6 +32,7 @@ mod graph;
 mod logger;
 mod npm;
 mod project;
+mod pypa;
 mod repository;
 mod rewriters;
 mod version;
@@ -87,6 +88,10 @@ enum Commands {
     /// Commands specific to the NPM packaging system.
     Npm(npm::NpmCommand),
 
+    #[structopt(name = "python")]
+    /// Commands related to the Python programming language.
+    Python(pypa::PythonCommand),
+
     #[structopt(name = "release-workflow")]
     /// Specialized operations for releases in the just-in-time versioning workflow
     ReleaseWorkflow(ReleaseWorkflowCommand),
@@ -119,6 +124,7 @@ impl Command for Commands {
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
             Commands::Npm(o) => o.execute(),
+            Commands::Python(o) => o.execute(),
             Commands::ReleaseWorkflow(o) => o.execute(),
             Commands::Show(o) => o.execute(),
             Commands::Stage(o) => o.execute(),
@@ -888,6 +894,7 @@ fn list_commands() -> BTreeSet<String> {
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
     commands.insert("npm".to_owned());
+    commands.insert("python".to_owned());
     commands.insert("release-workflow".to_owned());
     commands.insert("show".to_owned());
     commands.insert("stage".to_owned());

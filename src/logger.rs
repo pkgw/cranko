@@ -21,7 +21,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 fn get_wrap_width() -> usize {
     use terminal_size::{terminal_size, Height, Width};
 
-    if let Some((Width(w), Height(h))) = terminal_size() {
+    if let Some((Width(w), Height(_))) = terminal_size() {
         if w > 80 {
             80
         } else if w < 20 {

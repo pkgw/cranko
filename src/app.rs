@@ -75,6 +75,7 @@ impl AppBuilder {
         if self.populate_graph {
             let mut cargo = crate::cargo::CargoLoader::default();
             let mut npm = crate::npm::NpmLoader::default();
+            let mut pypa = crate::pypa::PypaLoader::default();
 
             // Dumb hack around the borrowchecker to allow mutable reference to
             // the graph while iterating over the repo:
@@ -85,6 +86,7 @@ impl AppBuilder {
                 let (dirname, basename) = p.split_basename();
                 cargo.process_index_item(dirname, basename);
                 npm.process_index_item(&repo, &mut graph, p, dirname, basename)?;
+                pypa.process_index_item(dirname, basename);
                 Ok(())
             })?;
 
@@ -94,6 +96,7 @@ impl AppBuilder {
 
             cargo.finalize(&mut self)?;
             npm.finalize(&mut self)?;
+            pypa.finalize(&mut self)?;
         }
 
         // Apply project config and compile the graph.
