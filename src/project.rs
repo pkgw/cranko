@@ -9,9 +9,11 @@
 //! interdependencies inducing a Directed Acyclic Graph (DAG) structure on them,
 //! as implemented in the `graph` module.
 
+use anyhow::{anyhow, bail};
+
 use crate::{
     changelog::{self, Changelog},
-    graph::ProjectGraph,
+    errors::Result,
     repository::{CommitId, PathMatcher, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::Version,
@@ -155,70 +157,60 @@ impl std::fmt::Display for DepRequirement {
 
 /// A builder for initializing a new project entry that will be added to the
 /// graph.
-///
-/// Note that you can also mutate Projects after they have been created, so not
-/// all possible settings are exposed in this interface. This builder exists to
-/// initialize the fields in Project that (1) are required and (2) do not have
-/// "sensible" defaults.
 #[derive(Debug)]
-pub struct ProjectBuilder<'a> {
-    owner: &'a mut ProjectGraph,
-    qnames: Vec<String>,
-    version: Option<Version>,
-    prefix: Option<RepoPathBuf>,
+pub struct ProjectBuilder {
+    pub qnames: Vec<String>,
+    pub version: Option<Version>,
+    pub prefix: Option<RepoPathBuf>,
+    pub rewriters: Vec<Box<dyn Rewriter>>,
+    pub internal_deps: Vec<Dependency>,
 }
 
-impl<'a> ProjectBuilder<'a> {
+impl ProjectBuilder {
     #[doc(hidden)]
-    pub fn new(owner: &'a mut ProjectGraph) -> Self {
+    pub(crate) fn new() -> Self {
         ProjectBuilder {
-            owner,
             qnames: Vec::new(),
             version: None,
             prefix: None,
+            rewriters: Vec::new(),
+            internal_deps: Vec::new(),
         }
     }
 
-    /// Set the qualified names associated with the project to be created.
-    pub fn qnames<T: std::fmt::Display>(
-        &mut self,
-        qnames: impl IntoIterator<Item = T>,
-    ) -> &mut Self {
-        self.qnames = qnames.into_iter().map(|s| s.to_string()).collect();
-        self
-    }
+    #[doc(hidden)]
+    pub(crate) fn finalize(self, ident: ProjectId, user_facing_name: String) -> Result<Project> {
+        if self.qnames.is_empty() {
+            bail!(
+                "could not load project `{}`: never figured out its naming",
+                user_facing_name
+            );
+        }
 
-    /// Set the current version number associated with the project to be created.
-    pub fn version(&mut self, version: Version) -> &mut Self {
-        self.version = Some(version);
-        self
-    }
+        let version = self.version.ok_or_else(|| {
+            anyhow!(
+                "could not load project `{}`: never figured out its version",
+                user_facing_name
+            )
+        })?;
 
-    /// Set the repository file prefix associated with the project to be created.
-    pub fn prefix(&mut self, prefix: RepoPathBuf) -> &mut Self {
-        self.prefix = Some(prefix);
-        self
-    }
+        let prefix = self.prefix.ok_or_else(|| {
+            anyhow!(
+                "could not load project `{}`: never figured out its directory prefix",
+                user_facing_name
+            )
+        })?;
 
-    /// Add the template project to the graph, consuming this object and
-    /// returning its unique ID that can be used to apply further settings.
-    pub fn finish_init(self) -> ProjectId {
-        assert!(self.qnames.len() > 0);
-        let qnames = self.qnames;
-
-        let version = self.version.unwrap();
-        let prefix = self.prefix.unwrap();
-
-        self.owner.finalize_project_addition(|ident| Project {
+        Ok(Project {
             ident,
-            qnames: qnames,
-            user_facing_name: String::new(),
+            qnames: self.qnames,
+            user_facing_name,
             version,
-            rewriters: Vec::new(),
             prefix: prefix.clone(),
+            rewriters: self.rewriters,
             repo_paths: PathMatcher::new_include(prefix),
             changelog: changelog::default(),
-            internal_deps: Vec::new(),
+            internal_deps: self.internal_deps,
         })
     }
 }

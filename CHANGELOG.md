@@ -1,4 +1,9 @@
-# rc: micro bump
+# rc: minor bump
+
+- Add a first cut at Python support. Not yet documented or really well tested,
+  but let's put out a release so that we can see how it works in CI/CD.
+
+# cranko 0.2.3 (2020-09-24)
 
 - Add some colorful highlighting for `cranko status`
 - Add a Concepts reference section and Azure Pipelines integration

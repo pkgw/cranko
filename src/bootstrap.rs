@@ -3,14 +3,19 @@
 
 //! Boostrapping Cranko on a preexisting repository.
 
-use log::{error, info};
+use anyhow::bail;
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, io::Write};
 use structopt::StructOpt;
 use toml;
 
 use super::Command;
-use crate::{atry, errors::Result, project::DepRequirement};
+use crate::{
+    atry,
+    errors::{Error, Result},
+    project::DepRequirement,
+};
 
 /// The toplevel bootstrap state structure.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -29,6 +34,13 @@ pub struct BootstrapProjectInfo {
 /// The `bootstrap` commands.
 #[derive(Debug, PartialEq, StructOpt)]
 pub struct BootstrapCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force operation even in unexpected conditions"
+    )]
+    force: bool,
+
     #[structopt(
         short = "u",
         long = "upstream",
@@ -64,11 +76,13 @@ impl Command for BootstrapCommand {
             repo.check_if_dirty(&[]);
             ["failed to check the repository for modified files"]
         ) {
-            error!(
-                "refusing to proceed with uncommitted changes in the repository (e.g.: `{}`)",
+            warn!(
+                "bootstrapping with uncommitted changes in the repository (e.g.: `{}`)",
                 dirty.escaped()
             );
-            return Ok(1);
+            if !self.force {
+                bail!("refusing to proceed (use `--force` to override)");
+            }
         }
 
         // Stub the config file.
@@ -90,14 +104,34 @@ impl Command for BootstrapCommand {
                 cfg_path.display(),
             );
 
-            let mut f = atry!(
-                fs::OpenOptions::new().write(true).create_new(true).open(&cfg_path);
-                ["could not create Cranko configuration file `{}`", cfg_path.display()]
-            );
-            atry!(
-                f.write_all(cfg_text.as_bytes());
-                ["could not write Cranko configuration file `{}`", cfg_path.display()]
-            );
+            let f = match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&cfg_path)
+            {
+                Ok(f) => Some(f),
+                Err(e) => {
+                    if e.kind() == std::io::ErrorKind::AlreadyExists {
+                        warn!(
+                            "Cranko configuration file `{}` already exists; not modifying it",
+                            cfg_path.display()
+                        );
+                        None
+                    } else {
+                        return Err(Error::new(e).context(format!(
+                            "failed to open Cranko configuration file `{}` for writing",
+                            cfg_path.display()
+                        )));
+                    }
+                }
+            };
+
+            if let Some(mut f) = f {
+                atry!(
+                    f.write_all(cfg_text.as_bytes());
+                    ["could not write Cranko configuration file `{}`", cfg_path.display()]
+                );
+            }
         }
 
         // Now we can initialize the regular app and report on the projects.
@@ -122,11 +156,19 @@ impl Command for BootstrapCommand {
                 seen_any = true;
             }
 
+            let loc_desc = {
+                let p = proj.prefix();
+
+                if p.len() == 0 {
+                    "the root directory".to_owned()
+                } else {
+                    format!("`{}`", p.escaped())
+                }
+            };
+
             println!(
-                "    {} @ {} in `{}`",
-                proj.user_facing_name,
-                proj.version,
-                proj.prefix().escaped()
+                "    {} @ {} in {}",
+                proj.user_facing_name, proj.version, loc_desc
             );
         }
 

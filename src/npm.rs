@@ -26,7 +26,7 @@ use crate::{
     app::{AppBuilder, AppSession},
     atry,
     errors::Result,
-    graph::{GraphQueryBuilder, ProjectGraph},
+    graph::{GraphQueryBuilder, ProjectGraphBuilder},
     project::{DepRequirement, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf, Repository},
     rewriters::Rewriter,
@@ -52,7 +52,7 @@ impl NpmLoader {
     pub fn process_index_item(
         &mut self,
         repo: &Repository,
-        graph: &mut ProjectGraph,
+        graph: &mut ProjectGraphBuilder,
         repopath: &RepoPath,
         dirname: &RepoPath,
         basename: &RepoPath,
@@ -110,15 +110,15 @@ impl NpmLoader {
              version, path.display()]
         );
 
-        let mut pb = graph.add_project();
-        pb.qnames(&[&name, "npm"]);
-        pb.prefix(dirname.to_owned());
-        pb.version(Version::Semver(version));
-        let ident = pb.finish_init();
+        let ident = graph.add_project();
+        let mut proj = graph.lookup_mut(ident);
+        proj.qnames = vec![name.to_owned(), "npm".to_owned()];
+        proj.prefix = Some(dirname.to_owned());
+        proj.version = Some(Version::Semver(version));
 
         // Auto-register a rewriter to update this package's package.json.
         let rewrite = PackageJsonRewriter::new(ident, repopath.to_owned());
-        graph.lookup_mut(ident).rewriters.push(Box::new(rewrite));
+        proj.rewriters.push(Box::new(rewrite));
 
         // Save the info for dep-linking later.
         self.npm_to_graph.insert(
