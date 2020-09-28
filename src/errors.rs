@@ -44,6 +44,7 @@ impl AnnotatedReport {
 }
 
 // Get this name for atry!
+#[doc(hidden)]
 pub use anyhow::Context;
 
 /// "Annotated try” — like `try!`, but with the ability to add extended context
@@ -62,6 +63,29 @@ macro_rules! atry {
     ($op:expr ; $( $annotation:tt )+) => {{
         use $crate::errors::Context;
         $op.with_context(|| {
+            let mut ar = $crate::errors::AnnotatedReport::default();
+            $(
+                atry!(@aa ar $annotation);
+            )+
+            ar
+        })?
+    }};
+}
+
+/// "annotated ok_or” — like `Option::ok_or_else()?`, but with the ability to add
+/// extended context to the error
+#[macro_export]
+macro_rules! a_ok_or {
+    (@aa $ar:ident [ $($inner:tt)+ ] ) => {
+        $ar.set_message(format!($($inner)+));
+    };
+
+    (@aa $ar:ident ( note $($inner:tt)+ ) ) => {
+        $ar.add_note(format!($($inner)+));
+    };
+
+    ($option:expr ; $( $annotation:tt )+) => {{
+        $option.ok_or_else(|| {
             let mut ar = $crate::errors::AnnotatedReport::default();
             $(
                 atry!(@aa ar $annotation);

@@ -12,7 +12,7 @@ use crate::{
     atry,
     config::ConfigurationFile,
     errors::Result,
-    graph::{ProjectGraph, RepoHistories},
+    graph::{ProjectGraph, ProjectGraphBuilder, RepoHistories},
     project::{DepRequirement, ProjectId},
     repository::{
         ChangeList, PathMatcher, RcCommitInfo, RcProjectInfo, ReleaseAvailability,
@@ -24,7 +24,7 @@ use crate::{
 /// Setting up a Cranko application session.
 pub struct AppBuilder {
     pub repo: Repository,
-    pub graph: ProjectGraph,
+    pub graph: ProjectGraphBuilder,
     ci_info: ci_info::types::CiInfo,
     populate_graph: bool,
 }
@@ -36,7 +36,7 @@ impl AppBuilder {
     /// associate the process with a proper Git repository with a work tree.
     pub fn new() -> Result<AppBuilder> {
         let repo = Repository::open_from_env()?;
-        let graph = ProjectGraph::default();
+        let graph = ProjectGraphBuilder::new();
         let ci_info = ci_info::get();
 
         Ok(AppBuilder {
@@ -75,6 +75,7 @@ impl AppBuilder {
         if self.populate_graph {
             let mut cargo = crate::cargo::CargoLoader::default();
             let mut npm = crate::npm::NpmLoader::default();
+            let mut pypa = crate::pypa::PypaLoader::default();
 
             // Dumb hack around the borrowchecker to allow mutable reference to
             // the graph while iterating over the repo:
@@ -85,6 +86,7 @@ impl AppBuilder {
                 let (dirname, basename) = p.split_basename();
                 cargo.process_index_item(dirname, basename);
                 npm.process_index_item(&repo, &mut graph, p, dirname, basename)?;
+                pypa.process_index_item(dirname, basename);
                 Ok(())
             })?;
 
@@ -94,16 +96,20 @@ impl AppBuilder {
 
             cargo.finalize(&mut self)?;
             npm.finalize(&mut self)?;
-
-            self.graph.complete_loading()?;
+            pypa.finalize(&mut self)?;
         }
 
-        // TODO: tweak auto-detected state based on relevant configuration.
+        // Apply project config and compile the graph.
+
+        let graph = atry!(
+            self.graph.complete_loading();
+            ["the project graph is invalid"]
+        );
 
         // All done.
         Ok(AppSession {
             repo: self.repo,
-            graph: self.graph,
+            graph: graph,
             ci_info: self.ci_info,
         })
     }

@@ -18,6 +18,22 @@ use std::{
 };
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
+fn get_wrap_width() -> usize {
+    use terminal_size::{terminal_size, Height, Width};
+
+    if let Some((Width(w), Height(_))) = terminal_size() {
+        if w > 80 {
+            80
+        } else if w < 20 {
+            20
+        } else {
+            w as usize
+        }
+    } else {
+        80
+    }
+}
+
 /// A simple logger.
 pub struct Logger {
     inner: RwLock<InnerLogger>,
@@ -80,13 +96,24 @@ impl Logger {
     }
 
     pub fn print_err_note<T: Display>(msg: T) {
-        if let Ok(mut inner) = LOGGER.inner.write() {
-            let _r = inner.stderr.set_color(&LOGGER.error_cspec);
-            let _r = write!(&mut inner.stderr, "note:");
-            let _r = inner.stderr.reset();
-            let _r = writeln!(&mut inner.stderr, " {}", msg);
-        } else {
-            eprintln!("note: {}", msg);
+        let msg = msg.to_string();
+        let mut first = true;
+
+        for line in textwrap::wrap_iter(&msg, get_wrap_width() - 6) {
+            if first {
+                first = false;
+
+                if let Ok(mut inner) = LOGGER.inner.write() {
+                    let _r = inner.stderr.set_color(&LOGGER.error_cspec);
+                    let _r = write!(&mut inner.stderr, "note:");
+                    let _r = inner.stderr.reset();
+                    let _r = writeln!(&mut inner.stderr, " {}", line);
+                } else {
+                    eprintln!("note: {}", line);
+                }
+            } else {
+                eprintln!("      {}", line);
+            }
         }
     }
 
