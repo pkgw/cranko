@@ -26,7 +26,9 @@ use crate::{
     atry,
     errors::{Error, Result},
     graph::GraphQueryBuilder,
-    repository::{RepoPath, RepoPathBuf},
+    project::ProjectId,
+    repository::{ChangeList, RepoPath, RepoPathBuf},
+    rewriters::Rewriter,
     version::{Pep440Version, Version},
 };
 
@@ -225,7 +227,7 @@ impl PypaLoader {
 
             if !main_version_in_setup {
                 let mut version_path = dirname.clone();
-                version_path.push(main_version_file);
+                version_path.push(&main_version_file);
                 let version_path = app.repo.resolve_workdir(&version_path);
 
                 let f = atry!(
@@ -277,8 +279,9 @@ impl PypaLoader {
             proj.version = Some(Version::Pep440(version));
             proj.prefix = Some(dirname.to_owned());
 
-            // let cargo_rewrite = CargoRewriter::new(ident, manifest_repopath);
-            // proj.rewriters.push(Box::new(cargo_rewrite));
+            let version_rewrite =
+                PythonRewriter::new(ident, RepoPathBuf::new(main_version_file.as_bytes()));
+            proj.rewriters.push(Box::new(version_rewrite));
         }
 
         Ok(())
@@ -345,6 +348,52 @@ mod simple_py_parse {
 
         Ok(inside.to_owned())
     }
+
+    pub fn replace_text_in_string_literal(line: &str, new_val: &str) -> Result<String> {
+        let mut sq_loc = line.find('\'');
+        let mut dq_loc = line.find('"');
+
+        // if both kinds of quotes, go with whichever we saw first.
+        if let (Some(sq_idx), Some(dq_idx)) = (sq_loc, dq_loc) {
+            if sq_idx < dq_idx {
+                dq_loc = None;
+            } else {
+                sq_loc = None;
+            }
+        }
+
+        let (left_idx, right_idx) = if let Some(sq_left) = sq_loc {
+            let sq_right = line.rfind('\'').unwrap();
+            if sq_right <= sq_left {
+                bail!(
+                    "expected a string literal in Python line `{}`, but only found one quote?",
+                    line
+                );
+            }
+
+            (sq_left, sq_right)
+        } else if let Some(dq_left) = dq_loc {
+            let dq_right = line.rfind('"').unwrap();
+            if dq_right <= dq_left {
+                bail!(
+                    "expected a string literal in Python line `{}`, but only found one quote?",
+                    line
+                );
+            }
+
+            (dq_left, dq_right)
+        } else {
+            bail!(
+                "expected a string literal in Python line `{}`, but didn't find any quotation marks",
+                line
+            );
+        };
+
+        let mut replaced = line[..left_idx + 1].to_owned();
+        replaced.push_str(new_val);
+        replaced.push_str(&line[right_idx..]);
+        Ok(replaced)
+    }
 }
 
 /// Toplevel `pyproject.toml` deserialization container.
@@ -376,6 +425,74 @@ struct PyProjectCranko {
     /// Note that there might be other files that also contain the version that
     /// will need to be rewritten when we apply a new version.
     pub main_version_file: Option<String>,
+}
+
+/// Rewrite a Python file to include real version numbers.
+#[derive(Debug)]
+pub struct PythonRewriter {
+    proj_id: ProjectId,
+    file_path: RepoPathBuf,
+}
+
+impl PythonRewriter {
+    /// Create a new Python file rewriter.
+    pub fn new(proj_id: ProjectId, file_path: RepoPathBuf) -> Self {
+        PythonRewriter { proj_id, file_path }
+    }
+}
+
+impl Rewriter for PythonRewriter {
+    fn rewrite(&self, app: &AppSession, changes: &mut ChangeList) -> Result<()> {
+        let file_path = app.repo.resolve_workdir(&self.file_path);
+
+        let cur_f = atry!(
+            File::open(&file_path);
+            ["failed to open file `{}` for reading", file_path.display()]
+        );
+        let cur_reader = BufReader::new(cur_f);
+
+        let new_af = atomicwrites::AtomicFile::new(
+            &file_path,
+            atomicwrites::OverwriteBehavior::AllowOverwrite,
+        );
+
+        let proj = app.graph().lookup(self.proj_id);
+
+        let r = new_af.write(|new_f| {
+            for line in cur_reader.lines() {
+                let line = atry!(
+                    line;
+                    ["error reading data from file `{}`", file_path.display()]
+                );
+
+                let line = if simple_py_parse::has_commented_marker(&line, "cranko project-version")
+                {
+                    atry!(
+                        simple_py_parse::replace_text_in_string_literal(&line, &proj.version.to_string());
+                        ["couldn't rewrite version-string source line `{}`", line]
+                    )
+                } else {
+                    line
+                };
+
+                atry!(
+                    writeln!(new_f, "{}", line);
+                    ["error writing data to `{}`", new_af.path().display()]
+                );
+            }
+
+            Ok(())
+        });
+
+        match r {
+            Err(atomicwrites::Error::Internal(e)) => Err(e.into()),
+            Err(atomicwrites::Error::User(e)) => Err(e),
+            Ok(()) => {
+                changes.add_path(&self.file_path);
+                Ok(())
+            }
+        }
+    }
 }
 
 /// Python-specific CLI utilities.
