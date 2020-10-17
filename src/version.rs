@@ -152,15 +152,20 @@ impl VersionBumpScheme {
 
         fn apply_dev_datecode(version: &mut Version) -> Result<()> {
             let local = Local::now();
-            let code = format!("{:04}{:02}{:02}", local.year(), local.month(), local.day());
 
             match version {
                 Version::Semver(v) => {
+                    let code = format!("{:04}{:02}{:02}", local.year(), local.month(), local.day());
                     v.build.push(semver::Identifier::AlphaNumeric(code));
                 }
 
                 Version::Pep440(v) => {
-                    v.local_identifier = Some(code);
+                    // Here we use a `dev` series number rather than the `local_identifier` so
+                    // that it can be expressed as a version_info tuple if needed.
+                    let num = 10000 * (local.year() as usize)
+                        + 100 * (local.month() as usize)
+                        + (local.day() as usize);
+                    v.dev_release = Some(num);
                 }
             }
 
