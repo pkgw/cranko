@@ -1,3 +1,7 @@
+# cranko 0.3.1 (2020-10-17)
+
+- Python: fix version rewriting when the version is expressed as a tuple
+
 # cranko 0.3.0 (2020-09-28)
 
 - Add a first cut at Python support. Not yet documented or really well tested,
