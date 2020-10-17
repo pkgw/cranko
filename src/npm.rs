@@ -27,7 +27,7 @@ use crate::{
     atry,
     errors::Result,
     graph::{GraphQueryBuilder, ProjectGraphBuilder},
-    project::{DepRequirement, ProjectId},
+    project::{DepRequirement, DependencyTarget, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf, Repository},
     rewriters::Rewriter,
     version::Version,
@@ -170,7 +170,7 @@ impl NpmLoader {
 
                             app.graph.add_dependency(
                                 load_data.ident,
-                                dep_data.ident,
+                                DependencyTarget::Ident(dep_data.ident),
                                 dep_spec.as_str().unwrap_or("UNDEFINED").to_owned(),
                                 req,
                             );

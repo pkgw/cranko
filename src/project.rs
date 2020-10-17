@@ -163,7 +163,30 @@ pub struct ProjectBuilder {
     pub version: Option<Version>,
     pub prefix: Option<RepoPathBuf>,
     pub rewriters: Vec<Box<dyn Rewriter>>,
-    pub internal_deps: Vec<Dependency>,
+    pub internal_deps: Vec<DependencyBuilder>,
+}
+
+/// An in-process dependency. We haven't necessarily yet resolved references to
+/// project ids.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DependencyBuilder {
+    pub target: DependencyTarget,
+    pub literal: String,
+    pub cranko_requirement: DepRequirement,
+    pub resolved_version: Option<Version>,
+}
+
+/// The target of a DependencyBuilder.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DependencyTarget {
+    /// The target expressed as user-specified text that will be resolved to a
+    /// user-facing name. Use this for dependencies manually specified by the
+    /// user that might refer to any packaging system.
+    Text(String),
+
+    /// The target expressed as a known ProjectId. This is generally only
+    /// possible for dependencies within the same packaging system.
+    Ident(ProjectId),
 }
 
 impl ProjectBuilder {
@@ -179,7 +202,12 @@ impl ProjectBuilder {
     }
 
     #[doc(hidden)]
-    pub(crate) fn finalize(self, ident: ProjectId, user_facing_name: String) -> Result<Project> {
+    pub(crate) fn finalize(
+        self,
+        ident: ProjectId,
+        user_facing_name: String,
+        internal_deps: Vec<Dependency>,
+    ) -> Result<Project> {
         if self.qnames.is_empty() {
             bail!(
                 "could not load project `{}`: never figured out its naming",
@@ -210,7 +238,7 @@ impl ProjectBuilder {
             rewriters: self.rewriters,
             repo_paths: PathMatcher::new_include(prefix),
             changelog: changelog::default(),
-            internal_deps: self.internal_deps,
+            internal_deps: internal_deps,
         })
     }
 }
