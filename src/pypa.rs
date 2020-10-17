@@ -408,6 +408,30 @@ mod simple_py_parse {
         replaced.push_str(&line[right_idx..]);
         Ok(replaced)
     }
+
+    pub fn replace_tuple_literal(line: &str, new_val: &str) -> Result<String> {
+        let left_idx = a_ok_or!(
+            line.find('(');
+            ["expected a tuple literal in Python line `{}`, but no left parenthesis", line]
+        );
+
+        let right_idx = a_ok_or!(
+            line.rfind(')');
+            ["expected a tuple literal in Python line `{}`, but no right parenthesis", line]
+        );
+
+        if right_idx <= left_idx {
+            bail!(
+                "expected a tuple literal in Python line `{}`, but parentheses don't line up",
+                line
+            );
+        }
+
+        let mut replaced = line[..left_idx].to_owned();
+        replaced.push_str(new_val);
+        replaced.push_str(&line[right_idx + 1..]);
+        Ok(replaced)
+    }
 }
 
 /// Toplevel `pyproject.toml` deserialization container.
@@ -487,10 +511,22 @@ impl Rewriter for PythonRewriter {
                 let line = if simple_py_parse::has_commented_marker(&line, "cranko project-version")
                 {
                     did_anything = true;
-                    atry!(
-                        simple_py_parse::replace_text_in_string_literal(&line, &proj.version.to_string());
-                        ["couldn't rewrite version-string source line `{}`", line]
-                    )
+
+                    if simple_py_parse::has_commented_marker(&line, "cranko project-version tuple") {
+                        let new_text = atry!(
+                            proj.version.as_pep440_tuple_literal();
+                            ["couldn't convert the project version to a `sys.version_info` tuple"]
+                        );
+                        atry!(
+                            simple_py_parse::replace_tuple_literal(&line, &new_text);
+                            ["couldn't rewrite version-tuple source line `{}`", line]
+                        )
+                    } else {
+                        atry!(
+                            simple_py_parse::replace_text_in_string_literal(&line, &proj.version.to_string());
+                            ["couldn't rewrite version-string source line `{}`", line]
+                        )
+                    }
                 } else {
                     line
                 };

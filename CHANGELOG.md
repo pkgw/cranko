@@ -1,4 +1,8 @@
-# rc: minor bump
+# rc: micro bump
+
+- Python: fix version rewriting when the version is expressed as a tuple
+
+# cranko 0.3.0 (2020-09-28)
 
 - Add a first cut at Python support. Not yet documented or really well tested,
   but let's put out a release so that we can see how it works in CI/CD.
