@@ -3,6 +3,7 @@
 
 //! Version numbers.
 
+use anyhow::bail;
 use chrono::{offset::Local, Datelike};
 use std::fmt::{Display, Formatter};
 use thiserror::Error as ThisError;
@@ -95,6 +96,14 @@ impl Version {
             "major bump" => Ok(VersionBumpScheme::MajorBump),
             "dev-datecode" => Ok(VersionBumpScheme::DevDatecode),
             _ => Err(UnsupportedBumpSchemeError(text.to_owned(), self.clone()).into()),
+        }
+    }
+
+    pub fn as_pep440_tuple_literal(&self) -> Result<String> {
+        if let Version::Pep440(v) = self {
+            v.as_tuple_literal()
+        } else {
+            bail!("version {} cannot be rendered as a PEP440 literal since it is not a PEP440 version", self)
         }
     }
 }
@@ -294,6 +303,47 @@ mod pep440 {
                     e
                 ),
             }
+        }
+
+        pub fn as_tuple_literal(&self) -> Result<String> {
+            let major = self.segments[0];
+
+            let minor = if self.segments.len() > 1 {
+                self.segments[1]
+            } else {
+                0
+            };
+
+            let micro = if self.segments.len() > 2 {
+                self.segments[2]
+            } else {
+                0
+            };
+
+            if self.segments.len() > 3 {
+                bail!(
+                    "cannot express PEP440 version {} as a version_info tuple",
+                    self
+                );
+            }
+
+            let (pre_code, pre_serial) =
+                match (self.pre_release, self.post_release, self.dev_release) {
+                    (Some(Pep440Prerelease::Alpha(serial)), None, None) => ("alpha", serial),
+                    (Some(Pep440Prerelease::Beta(serial)), None, None) => ("beta", serial),
+                    (Some(Pep440Prerelease::Rc(serial)), None, None) => ("candidate", serial),
+                    (None, None, None) => ("final", 0),
+                    (None, None, Some(serial)) => ("dev", serial),
+                    _ => bail!(
+                        "cannot express PEP440 version {} as a version_info tuple",
+                        self
+                    ),
+                };
+
+            Ok(format!(
+                "({}, {}, {}, '{}', {})",
+                major, minor, micro, pre_code, pre_serial
+            ))
         }
     }
 
