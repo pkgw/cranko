@@ -8,7 +8,7 @@ use configparser::ini::Ini;
 use log::warn;
 use serde::Deserialize;
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     env,
     ffi::OsString,
     fs::{File, OpenOptions},
@@ -26,7 +26,7 @@ use crate::{
     atry,
     errors::{Error, Result},
     graph::GraphQueryBuilder,
-    project::ProjectId,
+    project::{DepRequirement, DependencyTarget, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::{Pep440Version, Version},
@@ -67,11 +67,11 @@ impl PypaLoader {
             // Try pyproject.toml first. If it exists, it might contain metadata
             // that help us gather info from the other project files.
 
-            let config = {
-                let mut toml_path = dirname.clone();
-                toml_path.push("pyproject.toml");
-                let toml_path = app.repo.resolve_workdir(&toml_path);
+            let mut toml_repopath = dirname.clone();
+            toml_repopath.push("pyproject.toml");
 
+            let config = {
+                let toml_path = app.repo.resolve_workdir(&toml_repopath);
                 let f = match File::open(&toml_path) {
                     Ok(f) => Some(f),
                     Err(e) => {
@@ -255,7 +255,7 @@ impl PypaLoader {
                 }
             }
 
-            // OK, did we get everything we needed?
+            // OK, did we get the core information?
 
             let name = a_ok_or!(name;
                 ["could not identify the name of the Python project in {}", dir_desc]
@@ -272,34 +272,124 @@ impl PypaLoader {
                       for other supported approaches")
             );
 
-            // OMG, we actually have everything that we need.
+            // OMG, we actually have the core info.
 
             let ident = app.graph.add_project();
-            let mut proj = app.graph.lookup_mut(ident);
 
-            proj.qnames = vec![name, "pypa".to_owned()];
-            proj.version = Some(Version::Pep440(version));
-            proj.prefix = Some(dirname.to_owned());
+            {
+                let mut proj = app.graph.lookup_mut(ident);
 
-            let mut rw_path = dirname.clone();
-            rw_path.push(main_version_file.as_bytes());
-            let rw = PythonRewriter::new(ident, rw_path);
-            proj.rewriters.push(Box::new(rw));
+                proj.qnames = vec![name.clone(), "pypa".to_owned()];
+                proj.version = Some(Version::Pep440(version));
+                proj.prefix = Some(dirname.to_owned());
+
+                let mut rw_path = dirname.clone();
+                rw_path.push(main_version_file.as_bytes());
+                let rw = PythonRewriter::new(ident, rw_path);
+                proj.rewriters.push(Box::new(rw));
+            }
+
+            // Handle the other annotated files. Besides registering them for
+            // rewrites, we also scan them now to detect additional metadata. In
+            // particular, dependencies on non-Python projects.
+
+            let mut internal_reqs = HashSet::new();
 
             for path in config
                 .as_ref()
-                .map(|c| &c.extra_python_rewrite_files[..])
+                .map(|c| &c.annotated_files[..])
                 .unwrap_or(&[])
             {
                 let mut rw_path = dirname.clone();
                 rw_path.push(path.as_bytes());
+
+                atry!(
+                    scan_rewritten_file(app, &rw_path, &mut internal_reqs);
+                    ["in Python project {}, could not scan the `annotated_files` entry {}",
+                     dir_desc, rw_path.escaped()]
+                );
+
                 let rw = PythonRewriter::new(ident, rw_path);
-                proj.rewriters.push(Box::new(rw));
+                {
+                    let proj = app.graph.lookup_mut(ident);
+                    proj.rewriters.push(Box::new(rw));
+                }
+            }
+
+            // Now that we have *all* of the internal requirements, register them with
+            // the graph.
+
+            for req_name in &internal_reqs {
+                let req = config
+                    .as_ref()
+                    .map(|c| c.internal_dep_versions.get(req_name))
+                    .flatten()
+                    .map(|text| app.repo.parse_history_ref(text))
+                    .transpose()?
+                    .map(|cref| app.repo.resolve_history_ref(&cref, &toml_repopath))
+                    .transpose()?;
+
+                if req.is_none() {
+                    warn!(
+                        "missing or invalid key `tool.cranko.internal_dep_versions.{}` in `{}`",
+                        &req_name,
+                        toml_repopath.escaped()
+                    );
+                    warn!("... this is needed to specify the oldest version of `{}` compatible with `{}`",
+                        &req_name, &name);
+                }
+
+                let req = req.unwrap_or(DepRequirement::Unavailable);
+                app.graph.add_dependency(
+                    ident,
+                    DependencyTarget::Text(req_name.clone()),
+                    "(unavailable)".to_owned(),
+                    req,
+                )
             }
         }
 
         Ok(())
     }
+}
+
+fn scan_rewritten_file(
+    app: &mut AppBuilder,
+    path: &RepoPath,
+    reqs: &mut HashSet<String>,
+) -> Result<()> {
+    let file_path = app.repo.resolve_workdir(path);
+
+    let f = atry!(
+        File::open(&file_path);
+        ["failed to open file `{}` for reading", file_path.display()]
+    );
+    let reader = BufReader::new(f);
+    let mut line_num = 0;
+
+    for line in reader.lines() {
+        line_num += 1;
+        let line = atry!(
+            line;
+            ["error reading data from file `{}`", file_path.display()]
+        );
+
+        if simple_py_parse::has_commented_marker(&line, "cranko internal-req") {
+            let idx = line.find("cranko internal-req").unwrap();
+            let mut pieces = line[idx..].split_whitespace();
+            pieces.next(); // skip "cranko"
+            pieces.next(); // skip "internal-req"
+            let name = a_ok_or!(
+                pieces.next();
+                ["in `{}` line {}, `cranko internal-req` comment must provide a project name",
+                 file_path.display(), line_num]
+            );
+
+            reqs.insert(name.to_owned());
+        }
+    }
+
+    Ok(())
 }
 
 mod simple_py_parse {
@@ -466,7 +556,11 @@ struct PyProjectCranko {
 
     /// Additional Python files that should be rewritten on metadata changes.
     #[serde(default)]
-    pub extra_python_rewrite_files: Vec<String>,
+    pub annotated_files: Vec<String>,
+
+    /// Version requirements for internal dependencies.
+    #[serde(default)]
+    pub internal_dep_versions: HashMap<String, String>,
 }
 
 /// Rewrite a Python file to include real version numbers.
@@ -494,6 +588,34 @@ impl Rewriter for PythonRewriter {
         );
         let cur_reader = BufReader::new(cur_f);
 
+        // Helper table for applying internal deps if needed.
+
+        let proj = app.graph().lookup(self.proj_id);
+        let mut internal_reqs = HashMap::new();
+
+        for dep in &proj.internal_deps[..] {
+            let req_text = match dep.cranko_requirement {
+                DepRequirement::Manual(ref t) => t.clone(),
+
+                DepRequirement::Commit(_) => {
+                    if let Some(ref v) = dep.resolved_version {
+                        format!("^{}", v)
+                    } else {
+                        continue;
+                    }
+                }
+
+                DepRequirement::Unavailable => continue,
+            };
+
+            internal_reqs.insert(
+                app.graph().lookup(dep.ident).user_facing_name.clone(),
+                req_text,
+            );
+        }
+
+        // OK, now rewrite the file.
+
         let new_af = atomicwrites::AtomicFile::new(
             &file_path,
             atomicwrites::OverwriteBehavior::AllowOverwrite,
@@ -502,7 +624,10 @@ impl Rewriter for PythonRewriter {
         let proj = app.graph().lookup(self.proj_id);
 
         let r = new_af.write(|new_f| {
+            let mut line_num = 0;
+
             for line in cur_reader.lines() {
+                line_num += 1;
                 let line = atry!(
                     line;
                     ["error reading data from file `{}`", file_path.display()]
@@ -527,6 +652,32 @@ impl Rewriter for PythonRewriter {
                             ["couldn't rewrite version-string source line `{}`", line]
                         )
                     }
+                } else if  simple_py_parse::has_commented_marker(&line, "cranko internal-req") {
+                    did_anything = true;
+
+                    let idx = line.find("cranko internal-req").unwrap();
+                    let mut pieces = line[idx..].split_whitespace();
+                    pieces.next(); // skip "cranko"
+                    pieces.next(); // skip "internal-req"
+                    let name = a_ok_or!(
+                        pieces.next();
+                        ["in `{}` line {}, `cranko internal-req` comment must provide a project name",
+                        file_path.display(), line_num]
+                    );
+
+                    // This "shouldn't happen", but could if someone edits a
+                    // file between the time that the app session starts and
+                    // when we get to rewriting it. That indicates something
+                    // racey happening so make it a hard error.
+                    let req_text = a_ok_or!(
+                        internal_reqs.get(name);
+                        ["found internal requirement of `{}` not traced by Cranko", name]
+                    );
+
+                    atry!(
+                        simple_py_parse::replace_text_in_string_literal(&line, req_text);
+                        ["couldn't rewrite internal-req source line `{}`", line]
+                    )
                 } else {
                     line
                 };
