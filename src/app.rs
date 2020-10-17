@@ -363,8 +363,9 @@ impl AppSession {
         F: FnMut(&mut Repository, &mut ProjectGraph, ProjectId) -> Result<bool>,
     {
         let mut new_versions: HashMap<ProjectId, Version> = HashMap::new();
+        let toposorted_idents: Vec<_> = self.graph.toposorted().collect();
 
-        for ident in self.graph.toposort_idents()? {
+        for ident in (&toposorted_idents[..]).iter().copied() {
             // We can't conveniently navigate the deps while holding a mutable
             // ref to depending project, so do some lifetime futzing and buffer
             // up modifications to its dep info.
@@ -507,7 +508,7 @@ impl AppSession {
     pub fn rewrite(&self) -> Result<ChangeList> {
         let mut changes = ChangeList::default();
 
-        for ident in self.graph.toposort_idents()? {
+        for ident in self.graph.toposorted() {
             let proj = self.graph.lookup(ident);
 
             for rw in &proj.rewriters {
@@ -523,7 +524,7 @@ impl AppSession {
     pub fn rewrite_cranko_requirements(&self) -> Result<ChangeList> {
         let mut changes = ChangeList::default();
 
-        for ident in self.graph.toposort_idents()? {
+        for ident in self.graph.toposorted() {
             let proj = self.graph.lookup(ident);
 
             for rw in &proj.rewriters {
@@ -571,7 +572,9 @@ impl AppSession {
         // probably? I dodn't have a great reason for doing otherwise, other
         // than that it seemed easier at the time.
 
-        for proj in self.graph.toposort()? {
+        for ident in self.graph.toposorted() {
+            let proj = self.graph.lookup(ident);
+
             if let Some(_) = rcinfo.lookup_project(proj) {
                 proj.changelog
                     .finalize_changelog(proj, &self.repo, changes)?;
@@ -583,7 +586,7 @@ impl AppSession {
 
     /// Create version control tags for new releases.
     pub fn create_tags(&mut self, rel_info: &ReleaseCommitInfo) -> Result<()> {
-        for proj in self.graph.toposort_mut()? {
+        for proj in self.graph.toposorted_mut() {
             if let Some(rel) = rel_info.lookup_if_released(proj) {
                 self.repo.tag_project_at_head(proj, rel)?;
             }

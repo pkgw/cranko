@@ -27,7 +27,7 @@ use crate::{
     atry,
     errors::Result,
     graph::{GraphQueryBuilder, ProjectGraphBuilder},
-    project::{DepRequirement, ProjectId},
+    project::{DepRequirement, DependencyTarget, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf, Repository},
     rewriters::Rewriter,
     version::Version,
@@ -170,7 +170,7 @@ impl NpmLoader {
 
                             app.graph.add_dependency(
                                 load_data.ident,
-                                dep_data.ident,
+                                DependencyTarget::Ident(dep_data.ident),
                                 dep_spec.as_str().unwrap_or("UNDEFINED").to_owned(),
                                 req,
                             );
@@ -259,9 +259,13 @@ impl Rewriter for PackageJsonRewriter {
         // Write it out again.
 
         {
-            let f = File::create(&path)?;
+            let mut f = File::create(&path)?;
             atry!(
-                serde_json::to_writer_pretty(f, &pkg_data);
+                serde_json::to_writer_pretty(&mut f, &pkg_data);
+                ["failed to overwrite JSON file `{}`", path.display()]
+            );
+            atry!(
+                writeln!(f, "");
                 ["failed to overwrite JSON file `{}`", path.display()]
             );
             changes.add_path(&self.json_path);

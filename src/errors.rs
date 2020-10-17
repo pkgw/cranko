@@ -85,6 +85,7 @@ macro_rules! a_ok_or {
     };
 
     ($option:expr ; $( $annotation:tt )+) => {{
+        use $crate::atry;
         $option.ok_or_else(|| {
             let mut ar = $crate::errors::AnnotatedReport::default();
             $(

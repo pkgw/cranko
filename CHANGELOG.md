@@ -1,3 +1,11 @@
+# cranko 0.3.2 (2020-10-17)
+
+- Use `.dev` codes for developer codes in PEP440 versions, not `local_identifier`
+- Make sure to add a final newline to rewritten `package.json` files
+- Python packages can now express cross-system internal dependencies. This
+  feature is needed for [pywwt](https://pywwt.readthedocs.io).
+- Internal refactorings in support of the above
+
 # cranko 0.3.1 (2020-10-17)
 
 - Python: fix version rewriting when the version is expressed as a tuple

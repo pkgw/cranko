@@ -26,7 +26,7 @@ use crate::{
     app::{AppBuilder, AppSession},
     errors::Result,
     graph::GraphQueryBuilder,
-    project::{DepRequirement, Project, ProjectId},
+    project::{DepRequirement, DependencyTarget, Project, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::Version,
@@ -185,8 +185,12 @@ impl CargoLoader {
 
                         let req = req.unwrap_or(DepRequirement::Unavailable);
 
-                        app.graph
-                            .add_dependency(*depender_id, *dependee_id, literal, req);
+                        app.graph.add_dependency(
+                            *depender_id,
+                            DependencyTarget::Ident(*dependee_id),
+                            literal,
+                            req,
+                        );
                     }
                 }
             }

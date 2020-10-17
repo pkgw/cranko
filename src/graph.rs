@@ -17,8 +17,12 @@ use std::collections::{HashMap, HashSet};
 use thiserror::Error as ThisError;
 
 use crate::{
+    a_ok_or, atry,
     errors::Result,
-    project::{DepRequirement, Dependency, Project, ProjectBuilder, ProjectId},
+    project::{
+        DepRequirement, Dependency, DependencyBuilder, DependencyTarget, Project, ProjectBuilder,
+        ProjectId,
+    },
     repository::{ReleaseCommitInfo, RepoHistory, Repository},
 };
 
@@ -40,6 +44,9 @@ pub struct ProjectGraph {
     /// Mapping from user-facing project name to project ID. This is calculated
     /// in the complete_loading() method.
     name_to_id: HashMap<String, ProjectId>,
+
+    /// Project IDs in a topologically sorted order.
+    toposorted_ids: Vec<ProjectId>,
 }
 
 /// An error returned when an input has requested a project with a certain name,
@@ -66,13 +73,6 @@ impl ProjectGraph {
         self.name_to_id.get(name.as_ref()).map(|id| *id)
     }
 
-    fn base_toposort(&self) -> std::result::Result<Vec<OurNodeIndex>, DependencyCycleError> {
-        toposort(&self.graph, None).map_err(|cycle| {
-            let ident = self.graph[cycle.node_id()];
-            DependencyCycleError(self.projects[ident].user_facing_name.to_owned())
-        })
-    }
-
     /// Iterate over all projects in the graph, in no particular order.
     ///
     /// In most cases `toposort()` is preferable, but unlike that function,
@@ -96,46 +96,22 @@ impl ProjectGraph {
     /// dependency graph contains cycles — i.e., if project B depends on project
     /// A and project A depends on project B. This shouldn't happen but isn't
     /// strictly impossible.
-    pub fn toposort_idents(&self) -> Result<impl IntoIterator<Item = ProjectId>> {
-        let idents = self
-            .base_toposort()?
-            .iter()
-            .map(|ix| self.graph[*ix])
-            .collect::<Vec<_>>();
-        Ok(idents)
-    }
-
-    /// Get an iterator to visit the projects in the graph in topologically
-    /// sorted order.
-    ///
-    /// TODO: this should be superseded by toposort_idents(), it just gets
-    /// annoying to hold the ref to the graph.
-    ///
-    /// That is, if project A in the repository depends on project B, project B
-    /// will be visited before project A. This operation is fallible if the
-    /// dependency graph contains cycles — i.e., if project B depends on project
-    /// A and project A depends on project B. This shouldn't happen but isn't
-    /// strictly impossible.
-    pub fn toposort(&self) -> Result<GraphIter> {
-        let node_idxs = self.base_toposort()?;
-
-        Ok(GraphIter {
+    pub fn toposorted(&self) -> TopoSortIdentIter {
+        TopoSortIdentIter {
             graph: self,
-            node_idxs_iter: node_idxs.into_iter(),
-        })
+            index: 0,
+        }
     }
 
     /// Get an iterator to visit the projects in the graph in topologically
     /// sorted order, mutably.
     ///
     /// See `toposort()` for details. This function is the mutable variant.
-    pub fn toposort_mut(&mut self) -> Result<GraphIterMut> {
-        let node_idxs = self.base_toposort()?;
-
-        Ok(GraphIterMut {
+    pub fn toposorted_mut(&mut self) -> TopoSortIterMut {
+        TopoSortIterMut {
             graph: self,
-            node_idxs_iter: node_idxs.into_iter(),
-        })
+            index: 0,
+        }
     }
 
     /// Process the query and return a vector of matched project IDs.
@@ -153,10 +129,7 @@ impl ProjectGraph {
         // Build up the list of input projids
 
         let root_idents = if query.no_names() {
-            self.base_toposort()?
-                .iter()
-                .map(|ix| self.graph[*ix])
-                .collect::<Vec<_>>()
+            self.toposorted_ids.clone()
         } else {
             let mut root_idents = Vec::new();
 
@@ -333,20 +306,18 @@ impl ProjectGraphBuilder {
     pub fn add_dependency(
         &mut self,
         depender_id: ProjectId,
-        dependee_id: ProjectId,
+        dependee_target: DependencyTarget,
         literal: String,
         req: DepRequirement,
     ) {
-        let depender_nix = self.node_ixs[depender_id];
-        let dependee_nix = self.node_ixs[dependee_id];
-        self.graph.add_edge(dependee_nix, depender_nix, ());
-
-        self.projects[depender_id].internal_deps.push(Dependency {
-            ident: dependee_id,
-            literal,
-            cranko_requirement: req,
-            resolved_version: None,
-        });
+        self.projects[depender_id]
+            .internal_deps
+            .push(DependencyBuilder {
+                target: dependee_target,
+                literal,
+                cranko_requirement: req,
+                resolved_version: None,
+            });
     }
 
     /// Complete construction of the graph.
@@ -474,22 +445,68 @@ impl ProjectGraphBuilder {
             }
         }
 
-        // Convert the ProjectBuilders into projects.
+        // Now that we've figured out names, convert the ProjectBuilders into
+        // projects. resolving internal dependencies and filling out the graph.
         //
-        // TODO: more lame linear indexing.
 
         let mut projects = Vec::with_capacity(self.projects.len());
 
-        for (ident, proj_builder) in self.projects.drain(..).enumerate() {
-            for (name, i_ident) in &name_to_id {
+        for (ident, mut proj_builder) in self.projects.drain(..).enumerate() {
+            // TODO: more lame linear indexing.
+            let mut name = None;
+
+            for (i_name, i_ident) in &name_to_id {
                 if *i_ident == ident {
-                    // finalize() reports the project name in the context
-                    let proj = proj_builder.finalize(ident, name.clone())?;
-                    projects.push(proj);
+                    name = Some(i_name.clone());
                     break;
                 }
             }
+
+            let name = name.unwrap();
+            let mut internal_deps = Vec::with_capacity(proj_builder.internal_deps.len());
+            let depender_nix = self.node_ixs[ident];
+
+            for dep in proj_builder.internal_deps.drain(..) {
+                let dep_ident = match dep.target {
+                    DependencyTarget::Ident(id) => id,
+                    DependencyTarget::Text(ref dep_name) => *a_ok_or!(
+                        name_to_id.get(dep_name);
+                        ["project `{}` states a dependency on an unrecognized project name: `{}`",
+                         name, dep_name]
+                    ),
+                };
+
+                internal_deps.push(Dependency {
+                    ident: dep_ident,
+                    literal: dep.literal,
+                    cranko_requirement: dep.cranko_requirement,
+                    resolved_version: dep.resolved_version,
+                });
+
+                let dependee_nix = self.node_ixs[dep_ident];
+                self.graph.add_edge(dependee_nix, depender_nix, ());
+            }
+
+            let proj = proj_builder.finalize(ident, name, internal_deps)?;
+            projects.push(proj);
         }
+
+        // Now that we've done that and compiled all of the interdependencies,
+        // we can verify that the graph has no cycles. We compute the
+        // topological sorting once and just reuse it later.
+
+        let sorted_nixs = atry!(
+            toposort(&self.graph, None).map_err(|cycle| {
+                let ident = self.graph[cycle.node_id()];
+                DependencyCycleError(projects[ident].user_facing_name.to_owned())
+            });
+            ["the project graph contains a dependency cycle"]
+        );
+
+        let toposorted_ids = sorted_nixs
+            .iter()
+            .map(|node_ix| self.graph[*node_ix])
+            .collect();
 
         // Another bit of housekeeping: by default we set things up so that
         // project's path matchers are partially disjoint. In particular, if
@@ -519,7 +536,61 @@ impl ProjectGraphBuilder {
             name_to_id: name_to_id,
             graph: self.graph,
             node_ixs: self.node_ixs,
+            toposorted_ids,
         })
+    }
+}
+
+/// An iterator for visiting the graph's pre-toposorted list of idents.
+///
+/// This type only exists to provide the convenience of an iterator over
+/// this toposorted list that (a) doesn't clone the whole vec, by holding
+/// a ref to the graph, but (b) yields ProjectIds, not &ProjectIds.
+pub struct TopoSortIdentIter<'a> {
+    graph: &'a ProjectGraph,
+    index: usize,
+}
+
+impl<'a> Iterator for TopoSortIdentIter<'a> {
+    type Item = ProjectId;
+
+    fn next(&mut self) -> Option<ProjectId> {
+        if self.index < self.graph.toposorted_ids.len() {
+            let rv = self.graph.toposorted_ids[self.index];
+            self.index += 1;
+            Some(rv)
+        } else {
+            None
+        }
+    }
+}
+
+/// An iterator for visiting the toposorted projects in the graph, mutably.
+pub struct TopoSortIterMut<'a> {
+    graph: &'a mut ProjectGraph,
+    index: usize,
+}
+
+impl<'a> Iterator for TopoSortIterMut<'a> {
+    type Item = &'a mut Project;
+
+    fn next(&mut self) -> Option<&'a mut Project> {
+        // Here we have a classic case where a naive implemention runs afoul of
+        // the borrow checker. It thinks that our return value can only have a
+        // lifetime as long as the lifetime of the `&mut self` reference, which
+        // is shorter than 'a. However, if all of the indexes generated by our
+        // iter are unique -- and they are -- we can safely "upgrade" the
+        // returned lifetime since it won't allow multiple aliasing to the same
+        // project over the course of the iteration. The unsafe bit that allows
+        // this. Cf:
+        // https://users.rust-lang.org/t/help-with-iterators-yielding-mutable-references/24892
+        if self.index < self.graph.toposorted_ids.len() {
+            let ident = self.graph.toposorted_ids[self.index];
+            self.index += 1;
+            Some(unsafe { &mut *(self.graph.lookup_mut(ident) as *mut _) })
+        } else {
+            None
+        }
     }
 }
 
