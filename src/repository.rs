@@ -606,7 +606,9 @@ impl Repository {
 
         let mut info = SerializedReleaseCommitInfo::default();
 
-        for proj in graph.toposort()? {
+        for ident in graph.toposorted() {
+            let proj = graph.lookup(ident);
+
             let age = if let Some(ri) = rel_info.lookup_project(proj) {
                 if proj.version.to_string() == ri.version {
                     ri.age + 1

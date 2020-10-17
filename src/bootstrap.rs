@@ -141,15 +141,11 @@ impl Command for BootstrapCommand {
             ["could not initialize app and project graph"]
         );
 
-        let projects = atry!(
-            sess.graph().toposort();
-            ["could not resolve the project internal dependency graph"]
-            (note "this means that there is a cycle in the internal dependencies")
-        );
-
         let mut seen_any = false;
 
-        for proj in projects {
+        for ident in sess.graph().toposorted() {
+            let proj = sess.graph().lookup(ident);
+
             if !seen_any {
                 info!("Cranko detected the following projects in the repo:");
                 println!();
@@ -188,7 +184,7 @@ impl Command for BootstrapCommand {
         let mut bs_cfg = BootstrapConfiguration::default();
         let mut versions = HashMap::new();
 
-        for proj in sess.graph_mut().toposort_mut()? {
+        for proj in sess.graph_mut().toposorted_mut() {
             bs_cfg.project.push(BootstrapProjectInfo {
                 qnames: proj.qualified_names().to_owned(),
                 version: proj.version.to_string(),
@@ -258,7 +254,7 @@ impl Command for BootstrapCommand {
         // portions of the metafiles. Note that our processing above will not
         // have altered `dep.literal`.
 
-        for proj in sess.graph_mut().toposort_mut()? {
+        for proj in sess.graph_mut().toposorted_mut() {
             for dep in &mut proj.internal_deps[..] {
                 dep.cranko_requirement = DepRequirement::Manual(dep.literal.clone());
             }
