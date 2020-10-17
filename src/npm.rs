@@ -259,9 +259,13 @@ impl Rewriter for PackageJsonRewriter {
         // Write it out again.
 
         {
-            let f = File::create(&path)?;
+            let mut f = File::create(&path)?;
             atry!(
-                serde_json::to_writer_pretty(f, &pkg_data);
+                serde_json::to_writer_pretty(&mut f, &pkg_data);
+                ["failed to overwrite JSON file `{}`", path.display()]
+            );
+            atry!(
+                writeln!(f, "");
                 ["failed to overwrite JSON file `{}`", path.display()]
             );
             changes.add_path(&self.json_path);
