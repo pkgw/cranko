@@ -1,3 +1,8 @@
+# cranko 0.3.3 (2020-10-18)
+
+- Escape most illegal characters when creating Git tag names. Not all illegal
+  tags are detected.
+
 # cranko 0.3.2 (2020-10-17)
 
 - Use `.dev` codes for developer codes in PEP440 versions, not `local_identifier`
