@@ -1107,10 +1107,35 @@ impl Repository {
         let mut tagname_args = HashMap::new();
         tagname_args.insert("project_slug", proj.user_facing_name.to_owned());
         tagname_args.insert("version", rel.version.clone());
-        Ok(SimpleCurlyFormat
+
+        let basis = SimpleCurlyFormat
             .format(&self.release_tag_name_format, &tagname_args)
-            .map_err(|e| Error::msg(e.to_string()))?
-            .to_string())
+            .map_err(|e| Error::msg(e.to_string()))?;
+
+        // See: https://git-scm.com/docs/git-check-ref-format . We don't
+        // exhaustively check for invalid tags. The main thing is that our qname
+        // separator ":" isn't allowed in tags. Most invalid characters we
+        // replace with _, but we replace that with '/' to reflect its
+        // hierarchical meaning in Cranko.
+
+        const REPLACEMENT: char = '_';
+
+        Ok(basis
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() {
+                    c
+                } else if c.is_control() {
+                    REPLACEMENT
+                } else {
+                    match c {
+                        ':' => '/',
+                        ' ' | '~' | '^' | '?' | '*' | '[' => REPLACEMENT,
+                        c => c,
+                    }
+                }
+            })
+            .collect())
     }
 
     /// Create a tag for a project release pointing to HEAD.
