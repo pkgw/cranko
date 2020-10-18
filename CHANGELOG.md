@@ -1,5 +1,10 @@
 # rc: micro bump
 
+- Escape most illegal characters when creating Git tag names. Not all illegal
+  tags are detected.
+
+# cranko 0.3.2 (2020-10-17)
+
 - Use `.dev` codes for developer codes in PEP440 versions, not `local_identifier`
 - Make sure to add a final newline to rewritten `package.json` files
 - Python packages can now express cross-system internal dependencies. This
