@@ -48,8 +48,9 @@ The bootstrapper will search for recognized projects in the repo and print out a
 summary of what it finds.
 
 **NOTE:** *The goal is for Cranko to recognize all sorts of projects, but
-currently it only knows Rust/Cargo and NPM! If you’re giving Cranko a first try
-this is the limitation that is most likely to be a dealbreaker. Please [file an
+currently it knows a modest group of them: Rust/Cargo, NPM, and Python. If
+you’re giving Cranko a first try this is the limitation that is most likely to
+be a dealbreaker. Please [file an
 issue](https://github.com/pkgw/cranko/issues/new) reporting your needs so we
 know what to prioritize.*
 
