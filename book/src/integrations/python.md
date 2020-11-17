@@ -179,7 +179,7 @@ rewrites your project files during release processing, it will translate this
 requirement into a concrete version number and update your [annotated files]
 with the appropriate expression.
 
-[jitv-int-deps]: ../jit-versioning/#the-monorepo-wrinkle
+[jitv-int-deps]: ../jit-versioning/index.md#the-monorepo-wrinkle
 
 **TODO**: write some generic docs about these requirement expressions, and link
 to them from here.

@@ -37,6 +37,8 @@
   - [cranko github upload-artifacts](commands/cicd/github-upload-artifacts.md)
   - [cranko npm foreach-released](commands/cicd/npm-foreach-released.md)
   - [cranko npm install-token](commands/cicd/npm-install-token.md)
+  - [cranko python foreach-released](commands/cicd/python-foreach-released.md)
+  - [cranko python install-token](commands/cicd/python-install-token.md)
   - [cranko release-workflow apply-versions](commands/cicd/release-workflow-apply-versions.md)
   - [cranko release-workflow commit](commands/cicd/release-workflow-commit.md)
   - [cranko release-workflow tag](commands/cicd/release-workflow-tag.md)

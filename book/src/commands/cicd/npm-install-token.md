@@ -1,14 +1,14 @@
 # `cranko npm install-token`
 
 Install an [NPM authentication token][npm-token] into the per-user `.npmrc`
-configuration file to enabled publishing NPM packages.
+configuration file to enable the publishing of NPM packages.
 
 [npm-token]: https://docs.npmjs.com/about-authentication-tokens
 
 #### Usage
 
 ```
-cranko npm [--registry=REGISTRY] install-token
+cranko npm install-token [--registry=REGISTRY]
 ```
 
 This command appends the user-global NPM configuration file `.npmrc` to include
