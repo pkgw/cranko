@@ -1,3 +1,9 @@
+# cranko 0.3.4 (2020-11-17)
+
+- Document the Python support introduced in 0.3.0, now that it’s had time to
+  settle down a little bit.
+- No code changes.
+
 # cranko 0.3.3 (2020-10-18)
 
 - Escape most illegal characters when creating Git tag names. Not all illegal

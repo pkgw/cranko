@@ -11,9 +11,23 @@ Cranko’s model takes pains to avoid strong assumptions about what version
 “numbers” look like — they don't even need to be numbers — or how they change
 over time. Well-specified versioning syntaxes like [semver][semver2] are
 supported, but the goal is to make it possible to use domain-specific syntaxes
-as well. In particular, at the moment, Cranko only supports one scheme:
+as well. In particular, at the moment, Cranko only supports two schemes:
 
+- [Python (“PEP440”) versions](#python-pep-440-versions)
 - [Semantic Versioning (“semver”) versions](#semantic-versioning-versions)
+
+
+## Python PEP-440 versions
+
+Python packages are assumed to be versioned according to [PEP-440]. This is a
+very flexible scheme that allows any number of primary numbers as well as
+“alpha”, “beta”, “rc”, “dev”, *and* “post” sequencing. Consult [PEP-440] for
+details.
+
+[PEP-440]: https://www.python.org/dev/peps/pep-0440/
+
+Used by Python packages.
+
 
 ## Semantic Versioning versions
 
