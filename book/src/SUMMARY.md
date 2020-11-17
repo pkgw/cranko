@@ -9,6 +9,7 @@
   - [CI/CD](workflows-cicd/index.md)
 - [Integrations]()
   - [Azure Pipelines](integrations/azure-pipelines.md)
+  - [Python](integrations/python.md)
 
 # Reference Material
 
