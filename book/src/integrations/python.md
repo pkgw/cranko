@@ -83,7 +83,7 @@ Within that file, there are two options:
    and only handles the most basic forms. When your repo is bootstrapped, this
    line will be rewritten to look like:
    ```python
-   version = '0.0.0.dev0'  # cranko project-version tuple
+   version = '0.dev0'  # cranko project-version tuple
    ```
    because Cranko will start managing the version number.
 
