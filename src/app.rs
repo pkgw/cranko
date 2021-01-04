@@ -547,8 +547,8 @@ impl AppSession {
         Ok(changes)
     }
 
-    pub fn make_release_commit(&mut self) -> Result<()> {
-        self.repo.make_release_commit(&self.graph)
+    pub fn make_release_commit(&mut self, rci: &RcCommitInfo) -> Result<()> {
+        self.repo.make_release_commit(&self.graph, rci)
     }
 
     pub fn make_rc_commit(
