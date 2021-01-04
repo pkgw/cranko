@@ -264,6 +264,7 @@ impl Changelog for MarkdownChangelog {
             // Pipe the current changelog into the new one, replacing the `rc`
             // header with the final one.
 
+            #[allow(clippy::enum_variant_names)]
             enum State {
                 BeforeHeader,
                 BlanksAfterHeader,

@@ -109,7 +109,7 @@ impl AppBuilder {
         // All done.
         Ok(AppSession {
             repo: self.repo,
-            graph: graph,
+            graph,
             ci_info: self.ci_info,
         })
     }

@@ -192,13 +192,13 @@ impl PypaLoader {
                             ["error reading data from file `{}`", setup_path.display()]
                         );
 
-                        if simple_py_parse::has_commented_marker(&line, "cranko project-name") {
-                            if name.is_none() {
-                                name = Some(atry!(
-                                    simple_py_parse::extract_text_from_string_literal(&line);
-                                    ["failed to determine Python project name from `{}`", setup_path.display()]
-                                ));
-                            }
+                        if simple_py_parse::has_commented_marker(&line, "cranko project-name")
+                            && name.is_none()
+                        {
+                            name = Some(atry!(
+                                simple_py_parse::extract_text_from_string_literal(&line);
+                                ["failed to determine Python project name from `{}`", setup_path.display()]
+                            ));
                         }
 
                         if main_version_in_setup

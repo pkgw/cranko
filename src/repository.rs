@@ -960,11 +960,9 @@ impl Repository {
                     changes.add_path(path);
                     saw_changelog = true;
                 } // TODO: handle/complain about some other statuses
-            } else {
-                if status.is_ignored() || status.is_wt_new() || status == git2::Status::CURRENT {
-                } else if !dirty_allowed {
-                    return Err(DirtyRepositoryError(path.to_owned()).into());
-                }
+            } else if status.is_ignored() || status.is_wt_new() || status == git2::Status::CURRENT {
+            } else if !dirty_allowed {
+                return Err(DirtyRepositoryError(path.to_owned()).into());
             }
         }
 

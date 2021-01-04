@@ -50,6 +50,7 @@ trait Command {
     fn execute(self) -> Result<i32>;
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, PartialEq, StructOpt)]
 enum Commands {
     #[structopt(name = "bootstrap")]
@@ -134,7 +135,7 @@ impl Command for Commands {
     }
 }
 
-fn main() -> () {
+fn main() {
     let opts = CrankoOptions::from_args();
 
     if let Err(e) = logger::Logger::init() {

@@ -533,7 +533,7 @@ impl ProjectGraphBuilder {
 
         Ok(ProjectGraph {
             projects,
-            name_to_id: name_to_id,
+            name_to_id,
             graph: self.graph,
             node_ixs: self.node_ixs,
             toposorted_ids,
