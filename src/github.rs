@@ -21,7 +21,7 @@ use crate::{
 fn maybe_var(key: &str) -> Result<Option<String>> {
     if let Some(os_str) = env::var_os(key) {
         if let Ok(s) = os_str.into_string() {
-            if s.len() > 0 {
+            if !s.is_empty() {
                 Ok(Some(s))
             } else {
                 Ok(None)
@@ -319,7 +319,7 @@ impl Command for CreateReleasesCommand {
             .query(q)
             .context("could not select projects for GitHub release")?;
 
-        if idents.len() == 0 {
+        if idents.is_empty() {
             info!("no projects selected");
             return Ok(0);
         }

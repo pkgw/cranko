@@ -1,5 +1,24 @@
 # rc: micro bump
 
+- Allow projects that aren't being released to have "improper" internal
+  dependencies in `cranko confirm` and `cranko release-workflow apply-versions`.
+  Here, "improper" means that if the project was published, the version
+  requirements for its internal dependencies would be incorrect or
+  unsatisfiable. Cranko's release model already allowed this in some cases, but
+  now it is more widely tolerated. For instance, if you have a monorepo with a
+  project A that depends on B and requires a new release of it, you weren't able
+  to release B on its own. Now you can.
+- Fix `cranko release-workflow commit` for new, unreleased projects. Previously,
+  if you added a new project and made a release of a different project, the new
+  project would be logged in the release information of the `release` branch.
+  But this would make it appear that the new project had actually been released.
+  Now, the creation of the release commit info takes into account whether the
+  project has been released, or is being released, or not.
+- Run `cargo update` to update dependencies.
+- Make the code clippy-compliant and add a `cargo clippy` check to the CI.
+
+# cranko 0.3.4 (2020-11-17)
+
 - Document the Python support introduced in 0.3.0, now that it’s had time to
   settle down a little bit.
 - No code changes.

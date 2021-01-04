@@ -339,12 +339,12 @@ impl Repository {
 
         if let Ok(id) = text.parse() {
             Ok(ParsedHistoryRef::Id(CommitId(id)))
-        } else if text.starts_with("thiscommit:") {
+        } else if let Some(tctext) = text.strip_prefix("thiscommit:") {
             Ok(ParsedHistoryRef::ThisCommit {
-                salt: text[11..].to_owned(),
+                salt: tctext.to_owned(),
             })
-        } else if text.starts_with("manual:") {
-            Ok(ParsedHistoryRef::Manual(text[7..].to_owned()))
+        } else if let Some(manual_text) = text.strip_prefix("manual:") {
+            Ok(ParsedHistoryRef::Manual(manual_text.to_owned()))
         } else {
             Err(InvalidHistoryReferenceError(text.to_owned()).into())
         }
@@ -357,7 +357,7 @@ impl Repository {
         ref_source_path: &RepoPath,
     ) -> Result<DepRequirement> {
         let cid = match href {
-            ParsedHistoryRef::Id(id) => id.clone(),
+            ParsedHistoryRef::Id(id) => *id,
             ParsedHistoryRef::ThisCommit { ref salt } => lookup_this(self, salt, ref_source_path)?,
             ParsedHistoryRef::Manual(t) => return Ok(DepRequirement::Manual(t.clone())),
         };
@@ -588,7 +588,11 @@ impl Repository {
     }
 
     /// Make a commit merging the current index state into the release branch.
-    pub fn make_release_commit(&mut self, graph: &ProjectGraph) -> Result<()> {
+    ///
+    /// The RC commit info is used to determine when new projects should be
+    /// logged in the release commit. If they've never been made public yet,
+    /// they might not be ready to do so.
+    pub fn make_release_commit(&mut self, graph: &ProjectGraph, rci: &RcCommitInfo) -> Result<()> {
         // Gather useful info.
 
         let rel_info = self.get_latest_release_info()?;
@@ -609,21 +613,28 @@ impl Repository {
         for ident in graph.toposorted() {
             let proj = graph.lookup(ident);
 
-            let age = if let Some(ri) = rel_info.lookup_project(proj) {
+            // If the project was ever published in the past, we should expose
+            // it to the world now. If it is included in the current RC
+            // submission, we should do the same. Otherwise we should hide it,
+            // because if we didn't it would show up with "age = 0" and
+            // subsequent tools would think that it had been released now.
+            let (age, expose) = if let Some(ri) = rel_info.lookup_project(proj) {
                 if proj.version.to_string() == ri.version {
-                    ri.age + 1
+                    (ri.age + 1, true)
                 } else {
-                    0
+                    (0, true)
                 }
             } else {
-                0
+                (0, rci.lookup_project(proj).is_some())
             };
 
-            info.projects.push(ReleasedProjectInfo {
-                qnames: proj.qualified_names().clone(),
-                version: proj.version.to_string(),
-                age,
-            });
+            if expose {
+                info.projects.push(ReleasedProjectInfo {
+                    qnames: proj.qualified_names().clone(),
+                    version: proj.version.to_string(),
+                    age,
+                });
+            }
         }
 
         // TODO: summary should say (e.g.) "Release cranko 0.1.0" if possible.
@@ -719,7 +730,7 @@ impl Repository {
             println!("unterminated release info body; trying to proceed anyway");
         }
 
-        if data.len() == 0 {
+        if data.is_empty() {
             bail!("empty cranko-release-info body in release commit message");
         }
 
@@ -880,7 +891,7 @@ impl Repository {
                     }
 
                     // Save the information for posterity
-                    commit_data.put(oid.clone(), hit_buf);
+                    commit_data.put(oid, hit_buf);
                 }
 
                 // OK, now the commit data is definitely in the cache.
@@ -949,11 +960,9 @@ impl Repository {
                     changes.add_path(path);
                     saw_changelog = true;
                 } // TODO: handle/complain about some other statuses
-            } else {
-                if status.is_ignored() || status.is_wt_new() || status == git2::Status::CURRENT {
-                } else if !dirty_allowed {
-                    return Err(DirtyRepositoryError(path.to_owned()).into());
-                }
+            } else if status.is_ignored() || status.is_wt_new() || status == git2::Status::CURRENT {
+            } else if !dirty_allowed {
+                return Err(DirtyRepositoryError(path.to_owned()).into());
             }
         }
 
@@ -982,8 +991,7 @@ impl Repository {
         // Set up the release request info. This will be serialized into the
         // commit message.
 
-        let mut info = SerializedRcCommitInfo::default();
-        info.projects = rcinfo;
+        let info = SerializedRcCommitInfo { projects: rcinfo };
 
         let message = format!(
             "Release request commit created with Cranko.
@@ -1066,7 +1074,7 @@ impl Repository {
             println!("unterminated RC info body; trying to proceed anyway");
         }
 
-        if data.len() == 0 {
+        if data.is_empty() {
             bail!("empty cranko-rc-info body in RC commit message");
         }
 
@@ -1084,7 +1092,7 @@ impl Repository {
         // If no changes, do nothing. If we don't special-case this, the
         // checkout_head() will affect *all* files, i.e. perform a hard reset to
         // HEAD.
-        if changes.paths.len() == 0 {
+        if changes.paths.is_empty() {
             return Ok(());
         }
 
@@ -1539,7 +1547,7 @@ pub struct RepoPath([u8]);
 
 impl std::convert::AsRef<RepoPath> for [u8] {
     fn as_ref(&self) -> &RepoPath {
-        unsafe { &*(self.as_ref() as *const [_] as *const RepoPath) }
+        unsafe { &*(self as *const [_] as *const RepoPath) }
     }
 }
 
