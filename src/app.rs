@@ -511,7 +511,7 @@ impl AppSession {
                 false
             })
         })
-        .with_context(|| format!("failed to solve internal dependencies"))?;
+        .with_context(|| "failed to solve internal dependencies")?;
 
         Ok(())
     }
@@ -587,7 +587,7 @@ impl AppSession {
         for ident in self.graph.toposorted() {
             let proj = self.graph.lookup(ident);
 
-            if let Some(_) = rcinfo.lookup_project(proj) {
+            if rcinfo.lookup_project(proj).is_some() {
                 proj.changelog
                     .finalize_changelog(proj, &self.repo, changes)?;
             }

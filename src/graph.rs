@@ -70,7 +70,7 @@ impl ProjectGraph {
     ///
     /// None indicates that the name is not found.
     pub fn lookup_ident<S: AsRef<str>>(&self, name: S) -> Option<ProjectId> {
-        self.name_to_id.get(name.as_ref()).map(|id| *id)
+        self.name_to_id.get(name.as_ref()).copied()
     }
 
     /// Iterate over all projects in the graph, in no particular order.
@@ -246,7 +246,7 @@ impl GraphQueryBuilder {
 
     /// Return true if no input names were specified.
     pub fn no_names(&self) -> bool {
-        self.names.len() == 0
+        self.names.is_empty()
     }
 }
 
@@ -420,12 +420,20 @@ impl ProjectGraphBuilder {
                 }
 
                 if !success {
-                    if n1 > n2 {
-                        states[ident1].n_narrow = std::cmp::max(states[ident1].n_narrow, n2 + 1);
-                    } else if n2 > n1 {
-                        states[ident2].n_narrow = std::cmp::max(states[ident2].n_narrow, n1 + 1);
-                    } else {
-                        return Err(NamingClashError(states[ident1].compute_name(proj1)).into());
+                    use std::cmp::Ordering;
+
+                    match n1.cmp(&n2) {
+                        Ordering::Greater => {
+                            states[ident1].n_narrow =
+                                std::cmp::max(states[ident1].n_narrow, n2 + 1);
+                        }
+                        Ordering::Less => {
+                            states[ident2].n_narrow =
+                                std::cmp::max(states[ident2].n_narrow, n1 + 1);
+                        }
+                        Ordering::Equal => {
+                            return Err(NamingClashError(states[ident1].compute_name(proj1)).into());
+                        }
                     }
                 }
 
