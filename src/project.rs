@@ -238,7 +238,7 @@ impl ProjectBuilder {
             rewriters: self.rewriters,
             repo_paths: PathMatcher::new_include(prefix),
             changelog: changelog::default(),
-            internal_deps: internal_deps,
+            internal_deps,
         })
     }
 }

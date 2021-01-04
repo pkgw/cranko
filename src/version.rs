@@ -86,8 +86,8 @@ impl Version {
         &self,
         text: &str,
     ) -> std::result::Result<VersionBumpScheme, UnsupportedBumpSchemeError> {
-        if text.starts_with("force ") {
-            return Ok(VersionBumpScheme::Force(text[6..].to_owned()));
+        if let Some(force_text) = text.strip_prefix("force ") {
+            return Ok(VersionBumpScheme::Force(force_text.to_owned()));
         }
 
         match text {
@@ -95,7 +95,7 @@ impl Version {
             "minor bump" => Ok(VersionBumpScheme::MinorBump),
             "major bump" => Ok(VersionBumpScheme::MajorBump),
             "dev-datecode" => Ok(VersionBumpScheme::DevDatecode),
-            _ => Err(UnsupportedBumpSchemeError(text.to_owned(), self.clone()).into()),
+            _ => Err(UnsupportedBumpSchemeError(text.to_owned(), self.clone())),
         }
     }
 
@@ -670,7 +670,7 @@ mod pep440 {
                             dev_tag,
                             parse_local_identifier,
                             unlabeled_post_tag,
-                            map(dot_unsigned, |n| Segment::Release(n)),
+                            map(dot_unsigned, Segment::Release),
                         )))(i)
                     }
 

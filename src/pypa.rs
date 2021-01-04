@@ -192,13 +192,13 @@ impl PypaLoader {
                             ["error reading data from file `{}`", setup_path.display()]
                         );
 
-                        if simple_py_parse::has_commented_marker(&line, "cranko project-name") {
-                            if name.is_none() {
-                                name = Some(atry!(
-                                    simple_py_parse::extract_text_from_string_literal(&line);
-                                    ["failed to determine Python project name from `{}`", setup_path.display()]
-                                ));
-                            }
+                        if simple_py_parse::has_commented_marker(&line, "cranko project-name")
+                            && name.is_none()
+                        {
+                            name = Some(atry!(
+                                simple_py_parse::extract_text_from_string_literal(&line);
+                                ["failed to determine Python project name from `{}`", setup_path.display()]
+                            ));
                         }
 
                         if main_version_in_setup
@@ -365,10 +365,8 @@ fn scan_rewritten_file(
         ["failed to open file `{}` for reading", file_path.display()]
     );
     let reader = BufReader::new(f);
-    let mut line_num = 0;
 
-    for line in reader.lines() {
-        line_num += 1;
+    for (line_num0, line) in reader.lines().enumerate() {
         let line = atry!(
             line;
             ["error reading data from file `{}`", file_path.display()]
@@ -382,7 +380,7 @@ fn scan_rewritten_file(
             let name = a_ok_or!(
                 pieces.next();
                 ["in `{}` line {}, `cranko internal-req` comment must provide a project name",
-                 file_path.display(), line_num]
+                 file_path.display(), line_num0 + 1]
             );
 
             reqs.insert(name.to_owned());
@@ -624,10 +622,8 @@ impl Rewriter for PythonRewriter {
         let proj = app.graph().lookup(self.proj_id);
 
         let r = new_af.write(|new_f| {
-            let mut line_num = 0;
 
-            for line in cur_reader.lines() {
-                line_num += 1;
+            for (line_num0, line) in cur_reader.lines().enumerate() {
                 let line = atry!(
                     line;
                     ["error reading data from file `{}`", file_path.display()]
@@ -662,7 +658,7 @@ impl Rewriter for PythonRewriter {
                     let name = a_ok_or!(
                         pieces.next();
                         ["in `{}` line {}, `cranko internal-req` comment must provide a project name",
-                        file_path.display(), line_num]
+                        file_path.display(), line_num0 + 1]
                     );
 
                     // This "shouldn't happen", but could if someone edits a

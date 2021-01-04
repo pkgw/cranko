@@ -144,8 +144,7 @@ impl CargoLoader {
                         let mut literal = None;
 
                         for cargo_dep in &pkg.dependencies[..] {
-                            let cmp_name =
-                                cargo_dep.rename.as_ref().unwrap_or_else(|| &cargo_dep.name);
+                            let cmp_name = cargo_dep.rename.as_ref().unwrap_or(&cargo_dep.name);
 
                             if cmp_name == &dep.name {
                                 literal = Some(cargo_dep.req.to_string());

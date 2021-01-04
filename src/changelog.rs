@@ -144,7 +144,7 @@ impl Changelog for MarkdownChangelog {
             .map(|prc| sess.repo.get_file_at_commit(&prc, &changelog_repopath))
             .transpose()?
             .flatten()
-            .unwrap_or_else(|| Vec::new());
+            .unwrap_or_else(Vec::new);
 
         // Now populate the augmented log.
 
@@ -218,8 +218,8 @@ impl Changelog for MarkdownChangelog {
                 continue;
             }
 
-            if line.starts_with("# rc:") {
-                let spec = line[5..].trim();
+            if let Some(spec_text) = line.strip_prefix("# rc:") {
+                let spec = spec_text.trim();
                 bump_spec = Some(spec.to_owned());
                 break;
             }
@@ -227,7 +227,7 @@ impl Changelog for MarkdownChangelog {
             return Err(InvalidChangelogFormatError(changelog_path).into());
         }
 
-        let bump_spec = bump_spec.ok_or_else(|| InvalidChangelogFormatError(changelog_path))?;
+        let bump_spec = bump_spec.ok_or(InvalidChangelogFormatError(changelog_path))?;
         let _check_scheme = proj.version.parse_bump_scheme(&bump_spec)?;
 
         Ok(RcProjectInfo {
@@ -264,6 +264,7 @@ impl Changelog for MarkdownChangelog {
             // Pipe the current changelog into the new one, replacing the `rc`
             // header with the final one.
 
+            #[allow(clippy::enum_variant_names)]
             enum State {
                 BeforeHeader,
                 BlanksAfterHeader,
