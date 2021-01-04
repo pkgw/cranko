@@ -521,8 +521,8 @@ impl Command for ReleaseWorkflowCommitCommand {
         // to `master` or whatever: they might want to monitor that that part of
         // the workflow seems to be in good working order. Just so long as they
         // don't *push* that commit at the wrong time, it's OK.
-        let (_dev, _rci) = sess.ensure_ci_rc_mode(self.force)?;
-        sess.make_release_commit()?;
+        let (_dev, rci) = sess.ensure_ci_rc_mode(self.force)?;
+        sess.make_release_commit(&rci)?;
         Ok(0)
     }
 }

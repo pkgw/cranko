@@ -349,8 +349,12 @@ impl AppSession {
     /// is called, the project's internal dependency information will have been
     /// updated:
     ///
-    /// - No deps will be classified as DepRequirement::Unavailable, because the
-    ///   solver will abort if it encounters one of these.
+    /// - No deps will be classified as DepRequirement::Unavailable
+    ///   - If a project is marked is being scheduled for release, all of its
+    ///     deps must be fully satisfiable
+    ///   - Otherwise, some of its deps may have version requirements that are
+    ///     too young, or its may have deps on projects that are available in
+    ///     the repo but not yet publicly released.
     /// - If the dep is DepRequirement::Commit, `resolved_version` will be a
     ///   Some value containing the required version. It is possible that this
     ///   version will be being released "right now".
@@ -364,11 +368,14 @@ impl AppSession {
     {
         let mut new_versions: HashMap<ProjectId, Version> = HashMap::new();
         let toposorted_idents: Vec<_> = self.graph.toposorted().collect();
+        let mut unsatisfied_deps = Vec::new();
 
         for ident in (&toposorted_idents[..]).iter().copied() {
             // We can't conveniently navigate the deps while holding a mutable
             // ref to depending project, so do some lifetime futzing and buffer
             // up modifications to its dep info.
+
+            unsatisfied_deps.clear();
 
             let mut resolved_versions = {
                 let proj = self.graph.lookup(ident);
@@ -388,11 +395,9 @@ impl AppSession {
 
                             let resolved = match avail {
                                 ReleaseAvailability::NotAvailable => {
-                                    return Err(UnsatisfiedInternalRequirementError(
-                                        proj.user_facing_name.to_string(),
-                                        dependee_proj.user_facing_name.to_string(),
-                                    )
-                                    .into())
+                                    unsatisfied_deps
+                                        .push(dependee_proj.user_facing_name.to_string());
+                                    dependee_proj.version.clone()
                                 }
 
                                 ReleaseAvailability::ExistingRelease(ref v) => v.clone(),
@@ -401,14 +406,9 @@ impl AppSession {
                                     if let Some(v) = new_versions.get(&dep.ident) {
                                         v.clone()
                                     } else {
-                                        return Err(UnsatisfiedInternalRequirementError(
-                                            proj.user_facing_name.to_string(),
-                                            self.graph
-                                                .lookup(dep.ident)
-                                                .user_facing_name
-                                                .to_string(),
-                                        )
-                                        .into());
+                                        unsatisfied_deps
+                                            .push(dependee_proj.user_facing_name.to_string());
+                                        dependee_proj.version.clone()
                                     }
                                 }
                             };
@@ -420,11 +420,8 @@ impl AppSession {
 
                         DepRequirement::Unavailable => {
                             let dependee_proj = self.graph.lookup(dep.ident);
-                            return Err(UnsatisfiedInternalRequirementError(
-                                proj.user_facing_name.to_string(),
-                                dependee_proj.user_facing_name.to_string(),
-                            )
-                            .into());
+                            unsatisfied_deps.push(dependee_proj.user_facing_name.to_string());
+                            resolved_versions.push((idx, dependee_proj.version.clone()));
                         }
                     }
                 }
@@ -448,9 +445,24 @@ impl AppSession {
                 ["failed to solve internal dependencies of project `{}`", self.graph.lookup(ident).user_facing_name]
             );
 
+            let proj = self.graph.lookup(ident);
+
             if updated_version {
-                let proj = self.graph.lookup(ident);
+                if !unsatisfied_deps.is_empty() {
+                    return Err(UnsatisfiedInternalRequirementError(
+                        proj.user_facing_name.to_string(),
+                        unsatisfied_deps.join(", "),
+                    )
+                    .into());
+                }
+
                 new_versions.insert(ident, proj.version.clone());
+            } else if !unsatisfied_deps.is_empty() {
+                warn!(
+                    "project `{}` has internal requirements that won't be satisfiable in the wild, \
+                     but that's OK since it's not going to be released",
+                    proj.user_facing_name
+                );
             }
         }
 
@@ -535,8 +547,8 @@ impl AppSession {
         Ok(changes)
     }
 
-    pub fn make_release_commit(&mut self) -> Result<()> {
-        self.repo.make_release_commit(&self.graph)
+    pub fn make_release_commit(&mut self, rci: &RcCommitInfo) -> Result<()> {
+        self.repo.make_release_commit(&self.graph, rci)
     }
 
     pub fn make_rc_commit(

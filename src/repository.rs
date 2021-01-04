@@ -588,7 +588,11 @@ impl Repository {
     }
 
     /// Make a commit merging the current index state into the release branch.
-    pub fn make_release_commit(&mut self, graph: &ProjectGraph) -> Result<()> {
+    ///
+    /// The RC commit info is used to determine when new projects should be
+    /// logged in the release commit. If they've never been made public yet,
+    /// they might not be ready to do so.
+    pub fn make_release_commit(&mut self, graph: &ProjectGraph, rci: &RcCommitInfo) -> Result<()> {
         // Gather useful info.
 
         let rel_info = self.get_latest_release_info()?;
@@ -609,21 +613,28 @@ impl Repository {
         for ident in graph.toposorted() {
             let proj = graph.lookup(ident);
 
-            let age = if let Some(ri) = rel_info.lookup_project(proj) {
+            // If the project was ever published in the past, we should expose
+            // it to the world now. If it is included in the current RC
+            // submission, we should do the same. Otherwise we should hide it,
+            // because if we didn't it would show up with "age = 0" and
+            // subsequent tools would think that it had been released now.
+            let (age, expose) = if let Some(ri) = rel_info.lookup_project(proj) {
                 if proj.version.to_string() == ri.version {
-                    ri.age + 1
+                    (ri.age + 1, true)
                 } else {
-                    0
+                    (0, true)
                 }
             } else {
-                0
+                (0, rci.lookup_project(proj).is_some())
             };
 
-            info.projects.push(ReleasedProjectInfo {
-                qnames: proj.qualified_names().clone(),
-                version: proj.version.to_string(),
-                age,
-            });
+            if expose {
+                info.projects.push(ReleasedProjectInfo {
+                    qnames: proj.qualified_names().clone(),
+                    version: proj.version.to_string(),
+                    age,
+                });
+            }
         }
 
         // TODO: summary should say (e.g.) "Release cranko 0.1.0" if possible.
