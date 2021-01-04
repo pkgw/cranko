@@ -8,7 +8,6 @@ use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, io::Write};
 use structopt::StructOpt;
-use toml;
 
 use super::Command;
 use crate::{

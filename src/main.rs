@@ -50,6 +50,7 @@ trait Command {
     fn execute(self) -> Result<i32>;
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, PartialEq, StructOpt)]
 enum Commands {
     #[structopt(name = "bootstrap")]
@@ -134,7 +135,7 @@ impl Command for Commands {
     }
 }
 
-fn main() -> () {
+fn main() {
     let opts = CrankoOptions::from_args();
 
     if let Err(e) = logger::Logger::init() {
@@ -375,7 +376,7 @@ impl Command for ConfirmCommand {
             Ok(updated_version)
         })?;
 
-        if rc_info.len() < 1 {
+        if rc_info.is_empty() {
             warn!("no releases seem to have been staged; use \"cranko stage\"?");
             return Ok(0);
         }
@@ -521,8 +522,8 @@ impl Command for ReleaseWorkflowCommitCommand {
         // to `master` or whatever: they might want to monitor that that part of
         // the workflow seems to be in good working order. Just so long as they
         // don't *push* that commit at the wrong time, it's OK.
-        let (_dev, _rci) = sess.ensure_ci_rc_mode(self.force)?;
-        sess.make_release_commit()?;
+        let (_dev, rci) = sess.ensure_ci_rc_mode(self.force)?;
+        sess.make_release_commit(&rci)?;
         Ok(0)
     }
 }
@@ -693,7 +694,7 @@ impl Command for StageCommand {
             .query(q)
             .context("could not select projects for staging")?;
 
-        if idents.len() == 0 {
+        if idents.is_empty() {
             info!("no projects selected");
             return Ok(0);
         }
@@ -706,12 +707,16 @@ impl Command for StageCommand {
         let rel_info = sess.repo.get_latest_release_info()?;
         let mut changes = repository::ChangeList::default();
 
-        for i in 0..idents.len() {
-            let proj = sess.graph().lookup(idents[i]);
-            let history = histories.lookup(idents[i]);
+        for ident in &idents {
+            let proj = sess.graph().lookup(*ident);
+            let history = histories.lookup(*ident);
             let dirty_allowed = self.force;
 
-            if let Some(_) = sess.repo.scan_rc_info(proj, &mut changes, dirty_allowed)? {
+            if sess
+                .repo
+                .scan_rc_info(proj, &mut changes, dirty_allowed)?
+                .is_some()
+            {
                 if !no_names {
                     warn!(
                         "skipping {}: it appears to have already been staged",
@@ -735,7 +740,7 @@ impl Command for StageCommand {
                 // Because Changelog is a boxed trait object, it can't accept
                 // generic types :-(
                 let commits: Vec<repository::CommitId> =
-                    history.commits().into_iter().map(|c| *c).collect();
+                    history.commits().into_iter().copied().collect();
                 proj.changelog
                     .draft_release_update(proj, &sess, &commits[..], rel_info.commit)?;
                 n_staged += 1;
@@ -817,6 +822,7 @@ impl Command for StatusCommand {
     }
 }
 
+#[allow(clippy::redundant_closure)]
 /// Run an external command by executing a subprocess.
 fn do_external(all_args: Vec<String>) -> Result<i32> {
     let (cmd, args) = all_args.split_first().unwrap();
@@ -845,7 +851,7 @@ fn exec_or_spawn(cmd: &mut std::process::Command) -> Result<i32> {
     // exec() only returns an io::Error directly, since on success it never
     // returns; the following tomfoolery transforms it into our Result
     // machinery as desired.
-    Ok(Err(cmd.exec())?)
+    Err(cmd.exec().into())
 }
 
 #[cfg(not(unix))]
