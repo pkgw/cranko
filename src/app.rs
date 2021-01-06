@@ -15,7 +15,7 @@ use crate::{
     graph::{ProjectGraph, ProjectGraphBuilder, RepoHistories},
     project::{DepRequirement, ProjectId},
     repository::{
-        ChangeList, PathMatcher, RcCommitInfo, RcProjectInfo, ReleaseAvailability,
+        ChangeList, CommitId, PathMatcher, RcCommitInfo, RcProjectInfo, ReleaseAvailability,
         ReleaseCommitInfo, Repository,
     },
     version::Version,
@@ -577,9 +577,15 @@ impl AppSession {
         rcinfo
     }
 
-    // Rewrite the changelogs of packages staged for release to include their
-    // final version numbers and other release information.
-    pub fn apply_changelogs(&self, rcinfo: &RcCommitInfo, changes: &mut ChangeList) -> Result<()> {
+    /// Rewrite all packages' changelogs to include their full release-branch
+    /// content. Packages staged for release will have new entries created
+    /// giving their final version numbers and other release information.
+    pub fn apply_changelogs(
+        &self,
+        latest_release_commit: Option<CommitId>,
+        rcinfo: &RcCommitInfo,
+        changes: &mut ChangeList,
+    ) -> Result<()> {
         // This step could plausibly be implemented in the "rewriter" framework,
         // probably? I dodn't have a great reason for doing otherwise, other
         // than that it seemed easier at the time.
@@ -590,6 +596,12 @@ impl AppSession {
             if rcinfo.lookup_project(proj).is_some() {
                 proj.changelog
                     .finalize_changelog(proj, &self.repo, changes)?;
+            } else if let Some(cid) = latest_release_commit {
+                // If the project is not being released, we still have to copy
+                // out its most recent changelog so as not to lose it from the
+                // release branch.
+                proj.changelog
+                    .replace_changelog(proj, &self, changes, cid)?;
             }
         }
 
