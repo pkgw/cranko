@@ -491,11 +491,13 @@ impl Command for ReleaseWorkflowApplyVersionsCommand {
             info!("computing new versions based on `rc` commit request data");
         }
 
+        let rel_info = sess.repo.get_latest_release_info()?;
+
         sess.apply_versions(&rci)?;
         let mut changes = sess.rewrite()?;
 
         if !dev_mode {
-            sess.apply_changelogs(&rci, &mut changes)?;
+            sess.apply_changelogs(rel_info.commit, &rci, &mut changes)?;
         }
 
         Ok(0)

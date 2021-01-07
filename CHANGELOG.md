@@ -1,3 +1,25 @@
+# cranko 0.3.6 (2021-01-07)
+
+Fix preservation of unreleased changelogs. If you had a monorepo, an oversight
+would mean that during the release workflow, the changelogs of unreleased
+projects on the release branch would be reset to whatever was on the main
+branch. This would erase their changelog contents since the main branch
+changelog can just be a placeholder in the Cranko workflow.
+
+Now, the `release-workflow apply-versions` step will copy over the
+release-branch changelogs of unreleased projects, so that they will be preserved
+unchanged when `release-workflow commit` updates the release branch. In the
+typical case that the release workflow process is automated and commits all
+outstanding changes to the working tree, this will transparently fix the issue.
+
+If this mistake caused the release changelog of one of your projects to be
+overwritten on the release branch, the `cranko stage` command will fail to
+populate the project's changelog history during its next release. To fix the
+problem, all you have to do is manually re-add the history before running
+`cranko confirm`. You can obtain the most recent changelog with the command `git
+show $PROJECT_LAST_RELEASE_TAG:$PROJECT_CHANGELOG_PATH`, e.g. `git show
+mymodule@1.2.3:mymodule/CHANGELOG.md`.
+
 # cranko 0.3.5 (2021-01-04)
 
 - Allow projects that aren't being released to have "improper" internal
