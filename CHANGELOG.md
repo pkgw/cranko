@@ -1,3 +1,21 @@
+# cranko 0.4.0 (2021-01-07)
+
+Add the command `cranko npm lerna-workaround`. This will temporarily rewrite the
+internal version requirements of your NPM projects to exactly match the current
+versions of each project in the repo — which seems to be necessary in order for
+Lerna to properly understand a repo's internal dependency structure.
+
+The idea is that you can create your release commit, apply these changes, run
+your Lerna-based NPM scripts, and then `git restore` to get back to project
+files with proper version requirements. Since the internal version requirements
+in `package.json` are the only things that are changing, I think this will be a
+good-enough workflow.
+
+I don't understand Lerna very well so it's possible that there's a better
+solution, but from what I've seen its scheme doesn't play well with Cranko's so
+there's only so much we can do.
+
+
 # cranko 0.3.6 (2021-01-07)
 
 Fix preservation of unreleased changelogs. If you had a monorepo, an oversight

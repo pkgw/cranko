@@ -360,6 +360,11 @@ pub enum NpmCommands {
     #[structopt(name = "install-token")]
     /// Install $NPM_TOKEN in the user's .npmrc
     InstallToken(InstallTokenCommand),
+
+    #[structopt(name = "lerna-workaround")]
+    /// Write incorrect internal version requirements so that Lerna can
+    /// understand them.
+    LernaWorkaround(LernaWorkaroundCommand),
 }
 
 #[derive(Debug, PartialEq, StructOpt)]
@@ -373,6 +378,7 @@ impl Command for NpmCommand {
         match self.command {
             NpmCommands::ForeachReleased(o) => o.execute(),
             NpmCommands::InstallToken(o) => o.execute(),
+            NpmCommands::LernaWorkaround(o) => o.execute(),
         }
     }
 }
@@ -470,6 +476,40 @@ impl Command for InstallTokenCommand {
             writeln!(file, "{}:_authToken={}", self.registry, token);
             ["failed to write token data to file `{}`", p.display()]
         );
+
+        Ok(0)
+    }
+}
+
+/// `cranko npm lerna-workaround`
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct LernaWorkaroundCommand {}
+
+impl Command for LernaWorkaroundCommand {
+    fn execute(self) -> Result<i32> {
+        let mut sess = AppSession::initialize_default()?;
+
+        let mut q = GraphQueryBuilder::default();
+        q.only_project_type("npm");
+        let idents = sess
+            .graph()
+            .query(q)
+            .context("could not select projects for `npm lerna-workaround`")?;
+
+        sess.fake_internal_deps();
+
+        let mut changes = ChangeList::default();
+
+        for ident in &idents {
+            let proj = sess.graph().lookup(*ident);
+
+            for rw in &proj.rewriters {
+                atry!(
+                    rw.rewrite(&sess, &mut changes);
+                    ["failed to rewrite metadata for `{}`", proj.user_facing_name]
+                );
+            }
+        }
 
         Ok(0)
     }

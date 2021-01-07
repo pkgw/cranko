@@ -469,6 +469,39 @@ impl AppSession {
         Ok(())
     }
 
+    /// A fake version of `solve_internal_deps`. Rather than properly expressing
+    /// internal version requirements, this manually assigns each internal
+    /// dependency to match exactly the version of the depended-upon package.
+    /// This functionality is needed for Lerna, which otherwise isn't clever
+    /// enough to correctly detect the internal dependency.
+    pub fn fake_internal_deps(&mut self) {
+        let toposorted_idents: Vec<_> = self.graph.toposorted().collect();
+
+        for ident in (&toposorted_idents[..]).iter().copied() {
+            let mut resolved_versions = {
+                let proj = self.graph.lookup(ident);
+                let mut resolved_versions = Vec::new();
+
+                for (idx, dep) in proj.internal_deps.iter().enumerate() {
+                    let dependee_proj = self.graph.lookup(dep.ident);
+                    resolved_versions.push((idx, dependee_proj.version.clone()));
+                }
+
+                resolved_versions
+            };
+
+            {
+                let proj = self.graph.lookup_mut(ident);
+
+                for (idx, resolved) in resolved_versions.drain(..) {
+                    proj.internal_deps[idx].cranko_requirement =
+                        DepRequirement::Manual(resolved.to_string());
+                    proj.internal_deps[idx].resolved_version = Some(resolved);
+                }
+            }
+        }
+    }
+
     /// Apply version numbers given the current repository state and bump
     /// specifications.
     ///
