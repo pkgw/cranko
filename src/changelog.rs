@@ -38,6 +38,16 @@ pub trait Changelog: std::fmt::Debug {
         prev_release_commit: Option<CommitId>,
     ) -> Result<()>;
 
+    /// Replace the changelog file(s) in the project's working directory with
+    /// the contents from the most recent release of the project.
+    fn replace_changelog(
+        &self,
+        proj: &Project,
+        sess: &AppSession,
+        changes: &mut ChangeList,
+        prev_release_commit: CommitId,
+    ) -> Result<()>;
+
     /// Create a matcher that matches one or more paths in the project's
     /// directory corresponding to its changelog(s). Operations like `cranko
     /// stage` and `cranko confirm` care about working directory dirtiness, but
@@ -52,7 +62,8 @@ pub trait Changelog: std::fmt::Debug {
 
     /// Rewrite the changelog file(s) in the project's working directory, which
     /// are in the "rc" format that includes release candidate metadata, to
-    /// instead include the final release information.
+    /// instead include the final release information. The changelog contents
+    /// will already include earlier entries.
     fn finalize_changelog(
         &self,
         proj: &Project,
@@ -123,6 +134,87 @@ impl MarkdownChangelog {
     fn changelog_path(&self, proj: &Project, repo: &Repository) -> PathBuf {
         repo.resolve_workdir(&self.changelog_repopath(proj))
     }
+
+    /// Generic implementation for draft_release_update and replace_changelog.
+    fn replace_changelog_impl(
+        &self,
+        proj: &Project,
+        sess: &AppSession,
+        prev_release_commit: Option<CommitId>,
+        in_changes: Option<&[CommitId]>,
+        out_changes: Option<&mut ChangeList>,
+    ) -> Result<()> {
+        // Get the previous changelog from the most recent `release`
+        // commit.
+
+        let changelog_repopath = self.changelog_repopath(proj);
+
+        let prev_log: Vec<u8> = prev_release_commit
+            .map(|prc| sess.repo.get_file_at_commit(&prc, &changelog_repopath))
+            .transpose()?
+            .flatten()
+            .unwrap_or_else(Vec::new);
+
+        // Start working on rewriting the existing file.
+
+        let changelog_path = self.changelog_path(proj, &sess.repo);
+
+        let new_af = atomicwrites::AtomicFile::new(
+            &changelog_path,
+            atomicwrites::OverwriteBehavior::AllowOverwrite,
+        );
+
+        let r = new_af.write(|new_f| {
+            if let Some(commits) = in_changes {
+                // We're drafting a release update -- add a new section.
+
+                let mut headfoot_args = HashMap::new();
+                headfoot_args.insert("bump_spec", "micro bump");
+                let header = SimpleCurlyFormat
+                    .format(&self.stage_header_format, &headfoot_args)
+                    .map_err(|e| Error::msg(e.to_string()))?;
+                writeln!(new_f, "{}", header)?;
+
+                // Commit summaries! Note: if we're staging muliple projects and the
+                // same commit affects many of them, we'll reload the same commit many
+                // times when generating changelogs.
+
+                const WRAP_WIDTH: usize = 78;
+
+                for cid in commits {
+                    let message = sess.repo.get_commit_summary(*cid)?;
+                    let mut prefix = "- ";
+
+                    for line in textwrap::wrap_iter(&message, WRAP_WIDTH) {
+                        writeln!(new_f, "{}{}", prefix, line)?;
+                        prefix = "  ";
+                    }
+                }
+
+                // Footer
+
+                let footer = SimpleCurlyFormat
+                    .format(&self.footer_format, &headfoot_args)
+                    .map_err(|e| Error::msg(e.to_string()))?;
+                writeln!(new_f, "{}", footer)?;
+            }
+
+            // Write back all of the previous contents, and we're done.
+            new_f.write_all(&prev_log[..])?;
+
+            Ok(())
+        });
+
+        if let Some(chlist) = out_changes {
+            chlist.add_path(&self.changelog_repopath(proj));
+        }
+
+        match r {
+            Err(atomicwrites::Error::Internal(e)) => Err(e.into()),
+            Err(atomicwrites::Error::User(e)) => Err(e),
+            Ok(()) => Ok(()),
+        }
+    }
 }
 
 impl Changelog for MarkdownChangelog {
@@ -133,72 +225,17 @@ impl Changelog for MarkdownChangelog {
         changes: &[CommitId],
         prev_release_commit: Option<CommitId>,
     ) -> Result<()> {
-        // Populate the previous changelog from the most recent `release`
-        // commit, if available. This gives the opportunity to refer to the
-        // historical changelog entries for stylistic reference and potentially
-        // fix mistakes.
+        self.replace_changelog_impl(proj, sess, prev_release_commit, Some(changes), None)
+    }
 
-        let changelog_repopath = self.changelog_repopath(proj);
-
-        let prev_log: Vec<u8> = prev_release_commit
-            .map(|prc| sess.repo.get_file_at_commit(&prc, &changelog_repopath))
-            .transpose()?
-            .flatten()
-            .unwrap_or_else(Vec::new);
-
-        // Now populate the augmented log.
-
-        let changelog_path = self.changelog_path(proj, &sess.repo);
-
-        let new_af = atomicwrites::AtomicFile::new(
-            &changelog_path,
-            atomicwrites::OverwriteBehavior::AllowOverwrite,
-        );
-
-        let r = new_af.write(|new_f| {
-            // Header
-
-            let mut headfoot_args = HashMap::new();
-            headfoot_args.insert("bump_spec", "micro bump");
-            let header = SimpleCurlyFormat
-                .format(&self.stage_header_format, &headfoot_args)
-                .map_err(|e| Error::msg(e.to_string()))?;
-            writeln!(new_f, "{}", header)?;
-
-            // Commit summaries! Note: if we're staging muliple projects and the
-            // same commit affects many of them, we'll reload the same commit many
-            // times when generating changelogs.
-
-            const WRAP_WIDTH: usize = 78;
-
-            for cid in changes {
-                let message = sess.repo.get_commit_summary(*cid)?;
-                let mut prefix = "- ";
-
-                for line in textwrap::wrap_iter(&message, WRAP_WIDTH) {
-                    writeln!(new_f, "{}{}", prefix, line)?;
-                    prefix = "  ";
-                }
-            }
-
-            // Footer
-
-            let footer = SimpleCurlyFormat
-                .format(&self.footer_format, &headfoot_args)
-                .map_err(|e| Error::msg(e.to_string()))?;
-            writeln!(new_f, "{}", footer)?;
-
-            // Write back all of the previous contents, and we're done.
-            new_f.write_all(&prev_log[..])?;
-
-            Ok(())
-        });
-
-        match r {
-            Err(atomicwrites::Error::Internal(e)) => Err(e.into()),
-            Err(atomicwrites::Error::User(e)) => Err(e),
-            Ok(()) => Ok(()),
-        }
+    fn replace_changelog(
+        &self,
+        proj: &Project,
+        sess: &AppSession,
+        changes: &mut ChangeList,
+        prev_release_commit: CommitId,
+    ) -> Result<()> {
+        self.replace_changelog_impl(proj, sess, Some(prev_release_commit), None, Some(changes))
     }
 
     fn create_path_matcher(&self, proj: &Project) -> Result<PathMatcher> {
