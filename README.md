@@ -59,7 +59,7 @@ Here are some of the things on the radar:
 - Built-in support for more languages / frameworks:
   - [x] Rust
   - [x] NPM
-  - [ ] Python
+  - [x] Python
   - [ ] Visual Studio?
 - [x] Per-repo config file
   - [x] Identify upstream remote from its URL
@@ -106,6 +106,7 @@ Are welcome! Please open pull requests or issues against the [pkgw/cranko] repos
 
 ## Legalities
 
-Cranko copyrights are held by Peter Williams and the Cranko project contributors. Source code is licensed under [the MIT License][mit-license].
+Cranko copyrights are held by Peter Williams and the Cranko project
+contributors. Source code is licensed under [the MIT License][mit-license].
 
 [mit-license]: https://opensource.org/licenses/MIT
