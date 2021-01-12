@@ -1,4 +1,13 @@
-# rc: minor bump
+# rc: micro bump
+
+Fix `apply-versions` for some bootstrapped projects. Due to an oversight, if you
+were making the first release of a project that had a bootstrap version assigned
+in repo in which other projects had previously been released, the bootstrap
+version would be ignored, resulting in an incorrect version assignment. This has
+been remedied.
+
+
+# cranko 0.4.0 (2021-01-07)
 
 Add the command `cranko npm lerna-workaround`. This will temporarily rewrite the
 internal version requirements of your NPM projects to exactly match the current
