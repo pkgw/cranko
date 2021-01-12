@@ -8,7 +8,7 @@ use dynfmt::{Format, SimpleCurlyFormat};
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
@@ -734,7 +734,20 @@ impl Repository {
             bail!("empty cranko-release-info body in release commit message");
         }
 
-        let srci: SerializedReleaseCommitInfo = toml::from_str(&data)?;
+        let mut srci: SerializedReleaseCommitInfo = toml::from_str(&data)?;
+
+        // Update with any projects in the bootstrap info but not previous
+        // releases. Without this, if a new project is bootstrapped into a repo
+        // with existing releases, we'll mess up its version.
+
+        let mut bsri = self.get_bootstrap_release_info();
+        let seen_projects: HashSet<_> = srci.projects.iter().map(|p| p.qnames.clone()).collect();
+
+        for bs_proj in bsri.projects.drain(..) {
+            if !seen_projects.contains(&bs_proj.qnames) {
+                srci.projects.push(bs_proj);
+            }
+        }
 
         Ok(ReleaseCommitInfo {
             commit: Some(CommitId(commit.id())),
