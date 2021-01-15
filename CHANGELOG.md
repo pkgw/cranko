@@ -1,3 +1,9 @@
+# cranko 0.4.2 (2021-01-15)
+
+- Have `cranko stage` honor `--force` in the intuitive way for projects with no
+  detect modifications since last release.
+
+
 # cranko 0.4.1 (2021-01-12)
 
 Fix `apply-versions` for some bootstrapped projects. Due to an oversight, if you
