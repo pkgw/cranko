@@ -11,6 +11,11 @@ cranko stage [--force] [PROJECT-NAMES...]
 If `{PROJECT-NAMES}` is unspecified, all projects that have been affected by any
 commits since their last release are staged.
 
+Using the `--force` flag and explicit `{PROJECT-NAMES}` will allow you to stage
+projects even if Cranko believes that they have not been affected by any commits
+since their most recent releases. This can be useful if, say, you need to
+re-attempt a release with updated CI configuration but no code changes.
+
 For each project that is staged, its changelog files in the working directory
 are rewritten to include template release-request information and a draft set of
 release notes based on the Git commits affecting the project since its last
