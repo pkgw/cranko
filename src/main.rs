@@ -728,7 +728,11 @@ impl Command for StageCommand {
                 continue;
             }
 
-            if history.n_commits() == 0 {
+            // We selected this project but don't stage it if:
+            // - there are no new commits AND EITHER
+            //   - we're not in force-mode OR
+            //   - we only selected it because we're in "no-specific-names" mode
+            if (no_names || !self.force) && history.n_commits() == 0 {
                 if !no_names {
                     warn!("no changes detected for project {}", proj.user_facing_name);
                 }
