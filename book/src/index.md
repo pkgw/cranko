@@ -3,9 +3,17 @@
 Cranko is a release automation tool implementing the [just-in-time
 versioning](jit-versioning/) workflow. It is cross-platform, installable as a
 single executable, supports multiple languages and packaging systems, and is
-designed from the ground up to work with [monorepos].
+designed from the ground up to work with [monorepos]. Here’s a video that shows
+how it works:
 
 [monorepos]: https://en.wikipedia.org/wiki/Monorepo
+
+<!-- This will look bad on mobile; not sure what to do about that :-( -->
+<iframe width="750" height="414" src="https://www.youtube.com/embed/BvKNB_sRj-E"
+  frameborder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowfullscreen>
+</iframe>
 
 If you’re just getting started, your first step should probably be to
 [install cranko][installation]. Or, check the table of contents to the left if
