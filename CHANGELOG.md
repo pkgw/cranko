@@ -1,3 +1,8 @@
+# cranko 0.4.3 (2021-01-22)
+
+- No code changes; just adding the new YouTube video to the book index page.
+
+
 # cranko 0.4.2 (2021-01-15)
 
 - Have `cranko stage` honor `--force` in the intuitive way for projects with no
