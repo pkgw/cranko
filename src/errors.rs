@@ -104,7 +104,7 @@ pub fn report(r: Result<i32>) -> i32 {
 
     let mut notes = Vec::new();
 
-    eprintln!("");
+    eprintln!();
     error!("{}", err);
 
     if let Some(ann) = err.downcast_ref::<AnnotatedReport>() {
@@ -120,7 +120,7 @@ pub fn report(r: Result<i32>) -> i32 {
     });
 
     for note in &notes {
-        eprintln!("");
+        eprintln!();
         crate::logger::Logger::print_err_note(note);
     }
 

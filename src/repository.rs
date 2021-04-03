@@ -1685,6 +1685,7 @@ impl RepoPathBuf {
     /// relative to the repository working directory root and doesn't have any
     /// funny business like ".." in it.
     #[cfg(unix)]
+    #[allow(clippy::unnecessary_wraps)]
     fn from_path<P: AsRef<Path>>(p: P) -> Result<Self> {
         use std::os::unix::ffi::OsStrExt;
         Ok(Self::new(p.as_ref().as_os_str().as_bytes()))
