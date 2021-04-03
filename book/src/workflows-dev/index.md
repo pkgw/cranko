@@ -23,9 +23,9 @@ $
 ```
 
 Here, relevance is determined using the prefixing scheme described in the
-[Concepts] section. The [cranko log] command will print Git history logs for the
-commits relevant to a specified project, using the style of the `git log`
-command.
+[Concepts] section. Merge commits are skipped. The [cranko log] command will
+print Git history logs for the commits relevant to a specified project, using
+the style of the `git log` command.
 
 [cranko log]: ../commands/dev/log.md
 
