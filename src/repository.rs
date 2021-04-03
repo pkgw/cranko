@@ -884,19 +884,25 @@ impl Repository {
                         trees.put(ptid, pt);
                     }
 
-                    // Examine the diff and see what file paths, and therefore which
-                    // projects, are affected. Vec<bool> is a bit of a silly way to
-                    // store the info, but hopefully good enough.
+                    // Examine the diff and see what file paths, and therefore
+                    // which projects, are affected. Vec<bool> is a bit of a
+                    // silly way to store the info, but hopefully good enough.
+                    //
+                    // Here is where we ignore merge commits. It's a bit
+                    // inefficient to do all of the work above if we're just
+                    // going to wholly ignore this commit -- oh well.
 
                     let mut hit_buf = vec![false; projects.len()];
 
-                    for delta in diff.deltas() {
-                        for file in &[delta.old_file(), delta.new_file()] {
-                            if let Some(path_bytes) = file.path_bytes() {
-                                let path = RepoPath::new(path_bytes);
-                                for (idx, proj) in projects.iter().enumerate() {
-                                    if proj.repo_paths.repo_path_matches(path) {
-                                        hit_buf[idx] = true;
+                    if commit.parent_count() < 2 {
+                        for delta in diff.deltas() {
+                            for file in &[delta.old_file(), delta.new_file()] {
+                                if let Some(path_bytes) = file.path_bytes() {
+                                    let path = RepoPath::new(path_bytes);
+                                    for (idx, proj) in projects.iter().enumerate() {
+                                        if proj.repo_paths.repo_path_matches(path) {
+                                            hit_buf[idx] = true;
+                                        }
                                     }
                                 }
                             }
@@ -1679,6 +1685,7 @@ impl RepoPathBuf {
     /// relative to the repository working directory root and doesn't have any
     /// funny business like ".." in it.
     #[cfg(unix)]
+    #[allow(clippy::unnecessary_wraps)]
     fn from_path<P: AsRef<Path>>(p: P) -> Result<Self> {
         use std::os::unix::ffi::OsStrExt;
         Ok(Self::new(p.as_ref().as_os_str().as_bytes()))
