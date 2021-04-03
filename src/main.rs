@@ -17,6 +17,7 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
+    process,
 };
 use structopt::StructOpt;
 
@@ -85,6 +86,10 @@ enum Commands {
     /// List available subcommands
     ListCommands(ListCommandsCommand),
 
+    #[structopt(name = "log")]
+    /// Show the version control log for a specific project
+    Log(LogCommand),
+
     #[structopt(name = "npm")]
     /// Commands specific to the NPM packaging system.
     Npm(npm::NpmCommand),
@@ -124,6 +129,7 @@ impl Command for Commands {
             Commands::GitUtil(o) => o.execute(),
             Commands::Help(o) => o.execute(),
             Commands::ListCommands(o) => o.execute(),
+            Commands::Log(o) => o.execute(),
             Commands::Npm(o) => o.execute(),
             Commands::Python(o) => o.execute(),
             Commands::ReleaseWorkflow(o) => o.execute(),
@@ -140,11 +146,11 @@ fn main() {
 
     if let Err(e) = logger::Logger::init() {
         eprintln!("error: cannot initialize logging backend: {}", e);
-        std::process::exit(1);
+        process::exit(1);
     }
     log::set_max_level(log::LevelFilter::Info);
 
-    std::process::exit(errors::report(opts.command.execute()));
+    process::exit(errors::report(opts.command.execute()));
 }
 
 // ci-util
@@ -431,6 +437,65 @@ impl Command for ListCommandsCommand {
         }
 
         Ok(0)
+    }
+}
+
+// log
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct LogCommand {
+    #[structopt(long = "stat", help = "Show a diffstat with each commit")]
+    stat: bool,
+
+    #[structopt(help = "Name of the project to query")]
+    proj_names: Vec<String>,
+}
+
+impl Command for LogCommand {
+    fn execute(self) -> Result<i32> {
+        let sess = app::AppSession::initialize_default()?;
+
+        let mut q = graph::GraphQueryBuilder::default();
+        q.names(self.proj_names);
+        let idents = sess.graph().query(q)?;
+        if idents.len() != 1 {
+            bail!("must specify exactly one project to log");
+        }
+        let ident = idents[0];
+
+        let histories = atry!(
+            sess.analyze_histories();
+            ["failed to analyze the repository history"]
+        );
+
+        let history = histories.lookup(ident);
+
+        if history.n_commits() == 0 {
+            println!(
+                "no relevant commits to show for `{}`",
+                sess.graph().lookup(ident).user_facing_name
+            );
+            return Ok(0);
+        }
+
+        // I think the most sensible thing to do here is just launch `git` as a
+        // command. Note, however, that we might in principle be installed
+        // somewhere where the Git CLI isn't actually available.
+
+        let mut cmd = process::Command::new("git");
+        cmd.arg("show");
+
+        if self.stat {
+            cmd.arg("--stat");
+        } else {
+            cmd.arg("--no-patch");
+        }
+
+        for cid in history.commits() {
+            cmd.arg(&cid.to_string()[..8]);
+        }
+
+        exec_or_spawn(&mut cmd)
     }
 }
 
@@ -845,13 +910,13 @@ fn do_external(all_args: Vec<String>) -> Result<i32> {
             cmd.to_owned()
         )
     })?;
-    exec_or_spawn(std::process::Command::new(command).args(args))
+    exec_or_spawn(process::Command::new(command).args(args))
 }
 
 #[cfg(unix)]
 /// On Unix, exec() to replace ourselves with the child process. This function
 /// *should* never return.
-fn exec_or_spawn(cmd: &mut std::process::Command) -> Result<i32> {
+fn exec_or_spawn(cmd: &mut process::Command) -> Result<i32> {
     use std::os::unix::process::CommandExt;
 
     // exec() only returns an io::Error directly, since on success it never
@@ -862,7 +927,7 @@ fn exec_or_spawn(cmd: &mut std::process::Command) -> Result<i32> {
 
 #[cfg(not(unix))]
 /// On other platforms, just run the process and wait for it.
-fn exec_or_spawn(cmd: &mut std::process::Command) -> Result<i32> {
+fn exec_or_spawn(cmd: &mut process::Command) -> Result<i32> {
     // code() can only return None on Unix when the subprocess was killed by a
     // signal. This function only runs if we're not on Unix, so we'll always
     // get Some.
@@ -905,6 +970,7 @@ fn list_commands() -> BTreeSet<String> {
     commands.insert("github".to_owned());
     commands.insert("help".to_owned());
     commands.insert("list-commands".to_owned());
+    commands.insert("log".to_owned());
     commands.insert("npm".to_owned());
     commands.insert("python".to_owned());
     commands.insert("release-workflow".to_owned());
