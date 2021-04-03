@@ -10,8 +10,10 @@ If your repository uses Cranko, your standard development practices don’t need
 to change. The only thing that’s different is that your version numbers should
 all be set to `0.0.0-dev.0` or something similar.
 
-The `cranko status` command will analyze your repository’s commit history since
+The [cranko status] command will analyze your repository’s commit history since
 the last release on the `release` branch. It might tell you:
+
+[cranko status]: ../commands/dev/status.md
 
 ```shell
 $ cranko status
@@ -21,9 +23,15 @@ $
 ```
 
 Here, relevance is determined using the prefixing scheme described in the
-[Concepts] section. The most release reference point is determined from your
-upstream’s release branch (likely `origin/release`), so make sure to `git fetch`
-your upstream after a release so that Cranko is comparing to the right thing.
+[Concepts] section. Merge commits are skipped. The [cranko log] command will
+print Git history logs for the commits relevant to a specified project, using
+the style of the `git log` command.
+
+[cranko log]: ../commands/dev/log.md
+
+The most release reference point is determined from your upstream’s release
+branch (likely `origin/release`), so make sure to `git fetch` your upstream
+after a release so that Cranko is comparing to the right thing.
 
 [Concepts]: ../concepts/index.md
 
@@ -34,9 +42,11 @@ to maintain Cranko’s extra versioning metadata. **TODO write me!**
 ## Requesting releases
 
 When you’re ready to release one or more projects, it’s a two-step process. The
-`cranko stage` command will mark projects as release candidates. If run without
+[cranko stage] command will mark projects as release candidates. If run without
 arguments, it will use Cranko’s analysis of the repo’s commit history since the
 last release to determine which projects need to be staged:
+
+[cranko stage]: ../commands/dev/stage.md
 
 ```shell
 $ cranko stage
@@ -51,7 +61,7 @@ with a template version bump command and summaries of the commits affecting each
 project since the last release. In this example, this looks like:
 
 ```shell
-$ head tcprint/CHANGELOG.md 
+$ head tcprint/CHANGELOG.md
 # rc: micro bump
 
 - Add an amazing new feature
