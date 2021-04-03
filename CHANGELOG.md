@@ -1,3 +1,10 @@
+# cranko 0.5.0 (2021-04-03)
+
+- Add the `cranko log` command
+- Ignore merge commits when analyzing the repo history. These usually don't
+  provide any extra value.
+
+
 # cranko 0.4.3 (2021-01-22)
 
 - No code changes; just adding the new YouTube video to the book index page.

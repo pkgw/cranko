@@ -150,6 +150,7 @@ impl VersionBumpScheme {
             VersionBumpScheme::Force(ref t) => apply_force(version, t),
         };
 
+        #[allow(clippy::unnecessary_wraps)]
         fn apply_dev_datecode(version: &mut Version) -> Result<()> {
             let local = Local::now();
 
@@ -172,6 +173,7 @@ impl VersionBumpScheme {
             Ok(())
         }
 
+        #[allow(clippy::unnecessary_wraps)]
         fn apply_micro_bump(version: &mut Version) -> Result<()> {
             match version {
                 Version::Semver(v) => {
@@ -198,6 +200,7 @@ impl VersionBumpScheme {
             Ok(())
         }
 
+        #[allow(clippy::unnecessary_wraps)]
         fn apply_minor_bump(version: &mut Version) -> Result<()> {
             match version {
                 Version::Semver(v) => {
@@ -226,6 +229,7 @@ impl VersionBumpScheme {
             Ok(())
         }
 
+        #[allow(clippy::unnecessary_wraps)]
         fn apply_major_bump(version: &mut Version) -> Result<()> {
             match version {
                 Version::Semver(v) => {
