@@ -1,3 +1,13 @@
+# cranko 0.6.1 (2021-06-03)
+
+When writing out dependencies for pre-1.0 versions in Cargo.toml files, use a
+`>=` expression rather than a caret (`^`). Cargo is actually somewhat looser
+than strict semver, which says that before 1.0 nothing is guaranteed to be
+compatible with anything, but still says that `0.2` is not compatible with
+`^0.1`, which is annoyingly strict for our usage. The greater-than expression is
+interpreted more liberally.
+
+
 # cranko 0.6.0 (2021-06-03)
 
 - Add the `cranko show tctag` command. It's a bit silly, but should be convenient.
