@@ -1,3 +1,8 @@
+# cranko 0.6.0 (2021-06-03)
+
+- Add the `cranko show tctag` command. It's a bit silly, but should be convenient.
+
+
 # cranko 0.5.0 (2021-04-03)
 
 - Add the `cranko log` command

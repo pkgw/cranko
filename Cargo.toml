@@ -1,6 +1,6 @@
 [package]
 name = "cranko"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Peter Williams <peter@newton.cx>"]
 edition = "2018"
 license = "MIT"
@@ -36,6 +36,7 @@ log = "^0.4"
 lru = "^0.6"
 nom = "^5"
 petgraph = "^0.5"
+rand = "^0.8"
 reqwest = { version = "^0.10", features = ["blocking"] }
 semver = "^0.9"
 serde = { version = "^1.0", features = ["derive"] }
