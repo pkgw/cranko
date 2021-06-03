@@ -628,6 +628,10 @@ enum ShowCommands {
     /// Report if a project was just released
     IfReleased(ShowIfReleasedCommand),
 
+    #[structopt(name = "tctag")]
+    /// Print a "thiscommit:" tag for copy/pasting
+    TcTag(ShowTcTagCommand),
+
     #[structopt(name = "version")]
     /// Print the current version number of a project
     Version(ShowVersionCommand),
@@ -636,8 +640,9 @@ enum ShowCommands {
 impl Command for ShowCommand {
     fn execute(self) -> Result<i32> {
         match self.command {
-            ShowCommands::Version(o) => o.execute(),
             ShowCommands::IfReleased(o) => o.execute(),
+            ShowCommands::TcTag(o) => o.execute(),
+            ShowCommands::Version(o) => o.execute(),
         }
     }
 }
@@ -691,6 +696,34 @@ impl Command for ShowIfReleasedCommand {
         } else {
             0
         })
+    }
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ShowTcTagCommand {}
+
+impl Command for ShowTcTagCommand {
+    fn execute(self) -> Result<i32> {
+        use chrono::prelude::*;
+        use rand::{distributions::Alphanumeric, Rng};
+
+        let utc: DateTime<Utc> = Utc::now();
+
+        let mut rng = rand::thread_rng();
+        let chars: String = std::iter::repeat(())
+            .map(|()| rng.sample(Alphanumeric))
+            .map(char::from)
+            .take(7)
+            .collect();
+
+        println!(
+            "thiscommit:{:>04}-{:>02}-{:>02}:{}",
+            utc.year(),
+            utc.month(),
+            utc.day(),
+            chars
+        );
+        Ok(0)
     }
 }
 

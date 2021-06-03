@@ -34,6 +34,25 @@ $ cranko show if-released --tf myproject
 false
 ```
 
+## `cranko show tctag`
+
+This command prints out a `thiscommit:` tag that includes the current date and
+some random characters, for easy copy-pasting into Cranko internal-dependency
+lines.
+
+#### Usage
+
+```
+cranko show tctag
+```
+
+#### Example
+
+```shell
+$ cranko show tctag
+thiscommit:2021-06-03:NmEuWn3
+```
+
 ## `cranko show version`
 
 This command prints out the version assigned to a project.
