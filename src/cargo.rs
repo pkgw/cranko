@@ -1,4 +1,4 @@
-// Copyright 2020 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2020-2021 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
 //! Cargo (Rust) projects.
@@ -238,7 +238,16 @@ impl Rewriter for CargoRewriter {
 
                 DepRequirement::Commit(_) => {
                     if let Some(ref v) = dep.resolved_version {
-                        format!("^{}", v)
+                        // Hack: For versions before 1.0, Cargo treats minor
+                        // versions as incompatible: ^0.1 is not compatible with
+                        // 0.2. This busts our paradigm. We can work around by
+                        // using explicit greater-than expressions.
+                        let v = v.to_string();
+                        if v.starts_with("0.") {
+                            format!(">={},<1", v)
+                        } else {
+                            format!("^{}", v)
+                        }
                     } else {
                         continue;
                     }
