@@ -148,21 +148,20 @@ impl Repository {
             let mut info = None;
             let mut n_remotes = 0;
 
-            for remote_name in &self.repo.remotes()? {
-                // `None` happens if a remote name is not valid UTF8. At the moment
-                // I can't be bothered to properly handle that.
-                if let Some(remote_name) = remote_name {
-                    n_remotes += 1;
-                    match self.repo.find_remote(remote_name) {
-                        Err(e) => {
-                            warn!("error querying Git remote `{}`: {}", remote_name, e);
-                        }
+            // `None` happens if a remote name is not valid UTF8. At the moment
+            // I can't be bothered to properly handle that, so we just skip those
+            // with the `flatten()`
+            for remote_name in self.repo.remotes()?.into_iter().flatten() {
+                n_remotes += 1;
+                match self.repo.find_remote(remote_name) {
+                    Err(e) => {
+                        warn!("error querying Git remote `{}`: {}", remote_name, e);
+                    }
 
-                        Ok(remote) => {
-                            if let Some(remote_url) = remote.url() {
-                                if info.is_none() || remote_name == "origin" {
-                                    info = Some((remote_name.to_owned(), remote_url.to_owned()));
-                                }
+                    Ok(remote) => {
+                        if let Some(remote_url) = remote.url() {
+                            if info.is_none() || remote_name == "origin" {
+                                info = Some((remote_name.to_owned(), remote_url.to_owned()));
                             }
                         }
                     }
