@@ -1590,7 +1590,7 @@ impl RepoPath {
         // include the separating items, which we want.
         let basename = self.0.rsplit(|c| *c == b'/').next().unwrap();
         let ndir = self.0.len() - basename.len();
-        return (&self.0[..ndir].as_ref(), basename.as_ref());
+        return (self.0[..ndir].as_ref(), basename.as_ref());
     }
 
     /// Get the length of the path, in bytes
