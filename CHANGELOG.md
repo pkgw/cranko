@@ -1,4 +1,9 @@
-# rc: micro bump
+# rc: minor bump
+
+- Add `cranko show toposort` utility command (#22, @pkgw)
+
+
+# cranko 0.6.1 (2021-06-03)
 
 When writing out dependencies for pre-1.0 versions in Cargo.toml files, use a
 `>=` expression rather than a caret (`^`). Cargo is actually somewhat looser

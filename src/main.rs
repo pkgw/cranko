@@ -329,7 +329,7 @@ impl Command for ConfirmCommand {
 
                 let (old_version_text, new_version) = {
                     let proj = graph.lookup_mut(ident);
-                    let last_rel_info = history.release_info(&repo)?;
+                    let last_rel_info = history.release_info(repo)?;
                     let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
 
                     if let Some(last_release) = last_rel_info.lookup_project(proj) {
@@ -632,6 +632,10 @@ enum ShowCommands {
     /// Print a "thiscommit:" tag for copy/pasting
     TcTag(ShowTcTagCommand),
 
+    #[structopt(name = "toposort")]
+    /// Print the projects in topologically-sorted order
+    Toposort(ShowToposortCommand),
+
     #[structopt(name = "version")]
     /// Print the current version number of a project
     Version(ShowVersionCommand),
@@ -642,6 +646,7 @@ impl Command for ShowCommand {
         match self.command {
             ShowCommands::IfReleased(o) => o.execute(),
             ShowCommands::TcTag(o) => o.execute(),
+            ShowCommands::Toposort(o) => o.execute(),
             ShowCommands::Version(o) => o.execute(),
         }
     }
@@ -723,6 +728,23 @@ impl Command for ShowTcTagCommand {
             utc.day(),
             chars
         );
+        Ok(0)
+    }
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ShowToposortCommand {}
+
+impl Command for ShowToposortCommand {
+    fn execute(self) -> Result<i32> {
+        let sess = app::AppSession::initialize_default()?;
+        let graph = sess.graph();
+
+        for ident in graph.toposorted() {
+            let proj = graph.lookup(ident);
+            println!("{}", proj.user_facing_name);
+        }
+
         Ok(0)
     }
 }

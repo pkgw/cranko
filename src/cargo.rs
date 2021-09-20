@@ -489,7 +489,7 @@ impl Command for ForeachReleasedCommand {
 
         for ident in &idents {
             let proj = sess.graph().lookup(*ident);
-            let dir = sess.repo.resolve_workdir(&proj.prefix());
+            let dir = sess.repo.resolve_workdir(proj.prefix());
             cmd.current_dir(&dir);
 
             if print_which {
