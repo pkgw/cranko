@@ -218,8 +218,8 @@ impl PypaLoader {
             }
 
             fn version_from_line(line: &str) -> Result<Pep440Version> {
-                if simple_py_parse::has_commented_marker(&line, "cranko project-version tuple") {
-                    Pep440Version::parse_from_tuple_literal(&line)
+                if simple_py_parse::has_commented_marker(line, "cranko project-version tuple") {
+                    Pep440Version::parse_from_tuple_literal(line)
                 } else {
                     Ok(simple_py_parse::extract_text_from_string_literal(line)?.parse()?)
                 }
@@ -766,7 +766,7 @@ impl Command for ForeachReleasedCommand {
 
         for ident in &idents {
             let proj = sess.graph().lookup(*ident);
-            let dir = sess.repo.resolve_workdir(&proj.prefix());
+            let dir = sess.repo.resolve_workdir(proj.prefix());
             cmd.current_dir(&dir);
 
             if print_which {

@@ -936,7 +936,7 @@ mod pep440 {
             const BAD_CASES: &[&str] = &["-1", "bad!1.0", "1.dev0.pre0"];
 
             for text in BAD_CASES {
-                assert_eq!(text.parse::<Pep440Version>().is_err(), true);
+                assert!(text.parse::<Pep440Version>().is_err());
             }
         }
 
@@ -966,8 +966,8 @@ mod pep440 {
             for (l_text, g_text) in CASES {
                 let lesser = l_text.parse::<Pep440Version>().unwrap();
                 let greater = g_text.parse::<Pep440Version>().unwrap();
-                assert_eq!(lesser < greater, true);
-                assert_eq!(greater > lesser, true);
+                assert!(lesser < greater);
+                assert!(greater > lesser);
             }
         }
 

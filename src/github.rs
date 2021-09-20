@@ -331,7 +331,7 @@ impl Command for CreateReleasesCommand {
             let proj = sess.graph().lookup(*ident);
 
             if let Some(rel) = rel_info.lookup_if_released(proj) {
-                info.create_release(&sess, proj, &rel, rel_commit, &mut client)?;
+                info.create_release(&sess, proj, rel, rel_commit, &mut client)?;
                 n_released += 1;
             } else if !no_names {
                 warn!(

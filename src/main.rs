@@ -329,7 +329,7 @@ impl Command for ConfirmCommand {
 
                 let (old_version_text, new_version) = {
                     let proj = graph.lookup_mut(ident);
-                    let last_rel_info = history.release_info(&repo)?;
+                    let last_rel_info = history.release_info(repo)?;
                     let scheme = proj.version.parse_bump_scheme(&info.bump_spec)?;
 
                     if let Some(last_release) = last_rel_info.lookup_project(proj) {
