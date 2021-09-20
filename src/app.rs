@@ -589,7 +589,7 @@ impl AppSession {
         rcinfo: Vec<RcProjectInfo>,
         changes: &ChangeList,
     ) -> Result<()> {
-        self.repo.make_rc_commit(rcinfo, &changes)?;
+        self.repo.make_rc_commit(rcinfo, changes)?;
         Ok(())
     }
 
@@ -633,8 +633,7 @@ impl AppSession {
                 // If the project is not being released, we still have to copy
                 // out its most recent changelog so as not to lose it from the
                 // release branch.
-                proj.changelog
-                    .replace_changelog(proj, &self, changes, cid)?;
+                proj.changelog.replace_changelog(proj, self, changes, cid)?;
             }
         }
 
