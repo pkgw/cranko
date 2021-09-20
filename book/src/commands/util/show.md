@@ -1,7 +1,14 @@
 # `cranko show`
 
 The `cranko show` command displays various potentially useful pieces of
-information about Cranko, its execution environment, and so on.
+information about Cranko, its execution environment, and so on. It provides
+several subcommands:
+
+- [`cranko show if-released`](#cranko-show-if-released)
+- [`cranko show tctag`](#cranko-show-tctag)
+- [`cranko show toposort`](#cranko-show-toposort)
+- [`cranko show version`](#cranko-show-version)
+
 
 ## `cranko show if-released`
 
@@ -51,6 +58,32 @@ cranko show tctag
 ```shell
 $ cranko show tctag
 thiscommit:2021-06-03:NmEuWn3
+```
+
+## `cranko show toposort`
+
+This command prints out the names of the projects in the repository, one per
+line, in topologically-sorted order according to internal dependencies. That is,
+the name of a project is only printed after the names of all of its dependencies
+in the repo have already been printed. Because dependency cycles are prohibited,
+this is always possible. The exact ordering may not be stable, even from one
+invocation to the next.
+
+#### Usage
+
+```
+cranko show toposort
+```
+
+#### Example
+
+```shell
+$ cranko show toposort
+tectonic_errors
+tectonic_status_base
+tectonic_io_base
+tectonic_engine_xetex
+tectonic
 ```
 
 ## `cranko show version`

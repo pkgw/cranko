@@ -75,8 +75,7 @@ impl ProjectGraph {
 
     /// Iterate over all projects in the graph, in no particular order.
     ///
-    /// In most cases `toposort()` is preferable, but unlike that function,
-    /// this one is infallible.
+    /// In many cases [[`Self::toposorted`]] may be preferable.
     pub fn projects(&self) -> GraphIter {
         GraphIter {
             graph: self,
