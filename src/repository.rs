@@ -16,7 +16,7 @@ use std::{
 use thiserror::Error as ThisError;
 
 use crate::{
-    atry,
+    a_ok_or, atry,
     bootstrap::BootstrapConfiguration,
     config::RepoConfiguration,
     errors::{Error, Result},
@@ -1431,6 +1431,27 @@ impl RepoHistory {
     /// history.
     pub fn release_commit(&self) -> Option<CommitId> {
         self.release_commit
+    }
+
+    /// Get the commit on the main branch associated with the
+    /// release commit of this chunk of history, if it exists.
+    pub fn main_branch_commit(&self, repo: &Repository) -> Result<Option<CommitId>> {
+        let rcid = match self.release_commit {
+            Some(c) => c,
+            None => return Ok(None),
+        };
+
+        let release_commit = repo.repo.find_commit(rcid.0)?;
+        let rc_commit = a_ok_or!(
+            release_commit.parents().last();
+            ["release commit has no parents?"]
+        );
+        let main_commit = a_ok_or!(
+            rc_commit.parents().last();
+            ["rc commit has no parents?"]
+        );
+
+        Ok(Some(CommitId(main_commit.id())))
     }
 
     /// Get the release information corresponding to this item's release commit.
