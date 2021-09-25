@@ -70,6 +70,10 @@ enum Commands {
     /// Commit staged release requests to the `rc` branch
     Confirm(ConfirmCommand),
 
+    #[structopt(name = "diff")]
+    /// Show "diff" output since the latest release
+    Diff(DiffCommand),
+
     #[structopt(name = "github")]
     /// GitHub release utilities
     Github(github::GithubCommand),
@@ -125,6 +129,7 @@ impl Command for Commands {
             Commands::Cargo(o) => o.execute(),
             Commands::CiUtil(o) => o.execute(),
             Commands::Confirm(o) => o.execute(),
+            Commands::Diff(o) => o.execute(),
             Commands::Github(o) => o.execute(),
             Commands::GitUtil(o) => o.execute(),
             Commands::Help(o) => o.execute(),
@@ -398,6 +403,60 @@ impl Command for ConfirmCommand {
     }
 }
 
+// diff
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct DiffCommand {
+    #[structopt(help = "Name of the project to query")]
+    proj_names: Vec<String>,
+}
+
+impl Command for DiffCommand {
+    fn execute(self) -> Result<i32> {
+        // See also "log" -- these follow similar patterns
+        let sess = app::AppSession::initialize_default()?;
+
+        let mut q = graph::GraphQueryBuilder::default();
+        q.names(self.proj_names);
+        let idents = sess.graph().query(q)?;
+        if idents.len() != 1 {
+            bail!("must specify exactly one project to diff");
+        }
+        let ident = idents[0];
+
+        let dir = sess
+            .repo
+            .resolve_workdir(sess.graph().lookup(ident).prefix());
+
+        let histories = atry!(
+            sess.analyze_histories();
+            ["failed to analyze the repository history"]
+        );
+
+        let history = histories.lookup(ident);
+
+        let commit = match history.main_branch_commit(&sess.repo)? {
+            Some(c) => c,
+            None => {
+                println!(
+                    "no known last release commit to diff against for `{}`",
+                    sess.graph().lookup(ident).user_facing_name
+                );
+                return Ok(0);
+            }
+        };
+
+        // For now, just launch "git" as a command.
+
+        let mut cmd = process::Command::new("git");
+        cmd.arg("diff");
+        cmd.arg(&commit.to_string()[..8]);
+        cmd.arg("--");
+        cmd.arg(dir);
+        exec_or_spawn(&mut cmd)
+    }
+}
+
 // help
 
 #[derive(Debug, PartialEq, StructOpt)]
@@ -453,6 +512,7 @@ struct LogCommand {
 
 impl Command for LogCommand {
     fn execute(self) -> Result<i32> {
+        // See also "diff" -- these follow similar patterns
         let sess = app::AppSession::initialize_default()?;
 
         let mut q = graph::GraphQueryBuilder::default();

@@ -24,6 +24,7 @@
 - [Developer Commands]()
   - [cranko bootstrap](commands/dev/bootstrap.md)
   - [cranko confirm](commands/dev/confirm.md)
+  - [cranko diff](commands/dev/diff.md)
   - [cranko log](commands/dev/log.md)
   - [cranko stage](commands/dev/stage.md)
   - [cranko status](commands/dev/status.md)
