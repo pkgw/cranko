@@ -1,6 +1,12 @@
 # rc: minor bump
 
-- Add `cranko show toposort` utility command (#22, @pkgw)
+- Add [`cranko diff`], analogous to `git diff` but diffing against the most recent
+  release of a project
+- Add [`cranko show toposort`] to print out the list of projects in a repo in a
+  topologically-sorted order, with regards to intra-repo dependencies.
+
+[`cranko diff`]: https://pkgw.github.io/cranko/book/latest/commands/dev/diff.html
+[`cranko show toposort`]: https://pkgw.github.io/cranko/book/latest/commands/util/show.html#cranko-show-toposort
 
 
 # cranko 0.6.1 (2021-06-03)
@@ -33,7 +39,7 @@ interpreted more liberally.
 # cranko 0.4.2 (2021-01-15)
 
 - Have `cranko stage` honor `--force` in the intuitive way for projects with no
-  detect modifications since last release.
+  detected modifications since last release.
 
 
 # cranko 0.4.1 (2021-01-12)
