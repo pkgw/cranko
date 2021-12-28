@@ -35,9 +35,6 @@ pub struct ProjectGraph {
     /// vector.
     projects: Vec<Project>,
 
-    /// NodeIndex values for each project based on its identifier.
-    node_ixs: Vec<OurNodeIndex>,
-
     /// The `petgraph` state expressing the project graph.
     graph: DiGraph<ProjectId, ()>,
 
@@ -542,7 +539,6 @@ impl ProjectGraphBuilder {
             projects,
             name_to_id,
             graph: self.graph,
-            node_ixs: self.node_ixs,
             toposorted_ids,
         })
     }
