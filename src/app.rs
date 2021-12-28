@@ -74,6 +74,7 @@ impl AppBuilder {
 
         if self.populate_graph {
             let mut cargo = crate::cargo::CargoLoader::default();
+            let mut csproj = crate::csproj::CsProjLoader::default();
             let mut npm = crate::npm::NpmLoader::default();
             let mut pypa = crate::pypa::PypaLoader::default();
 
@@ -85,6 +86,7 @@ impl AppBuilder {
             repo.scan_paths(|p| {
                 let (dirname, basename) = p.split_basename();
                 cargo.process_index_item(dirname, basename);
+                csproj.process_index_item(&repo, p, dirname, basename)?;
                 npm.process_index_item(&repo, &mut graph, p, dirname, basename)?;
                 pypa.process_index_item(dirname, basename);
                 Ok(())
@@ -95,6 +97,7 @@ impl AppBuilder {
             // End dumb hack.
 
             cargo.finalize(&mut self)?;
+            csproj.finalize(&mut self)?;
             npm.finalize(&mut self)?;
             pypa.finalize(&mut self)?;
         }

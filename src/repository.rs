@@ -1614,6 +1614,18 @@ impl RepoPath {
         return (self.0[..ndir].as_ref(), basename.as_ref());
     }
 
+    /// Return this path with a trailing directory separator removed, if one is
+    /// present.
+    pub fn pop_sep(&self) -> &RepoPath {
+        let n = self.0.len();
+
+        if n == 0 || self.0[n - 1] != b'/' {
+            self
+        } else {
+            self.0[..n - 1].as_ref()
+        }
+    }
+
     /// Get the length of the path, in bytes
     pub fn len(&self) -> usize {
         self.0.len()
