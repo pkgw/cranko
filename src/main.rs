@@ -372,7 +372,9 @@ impl Command for ConfirmCommand {
                             format!(">= {}", dep.resolved_version.as_ref().unwrap())
                         }
                         DepRequirement::Manual(t) => format!("{} (manual)", t),
-                        DepRequirement::Unavailable => unreachable!(),
+                        DepRequirement::Unavailable => {
+                            "** version requirement unavailable **".to_owned()
+                        }
                     };
 
                     info!("    internal dep {}: {}", dproj.user_facing_name, req_text);
