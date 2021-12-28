@@ -1,5 +1,13 @@
 # rc: minor bump
 
+- Add basic support for Visual Studio C# projects, based on reading and writing
+  `AssemblyInfo.cs` files. It's quite simplistic but should meet my particular
+  need.
+- Fix a crash in `cranko confirm` when internal deps are missing (#24).
+
+
+# cranko 0.8.0 (2021-09-25)
+
 - Add [`cranko diff`], analogous to `git diff` but diffing against the most recent
   release of a project
 - Add [`cranko show toposort`] to print out the list of projects in a repo in a
