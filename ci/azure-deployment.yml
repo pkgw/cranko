@@ -7,7 +7,7 @@ jobs:
 - ${{ if ne(variables['Build.SourceBranchName'], 'rc') }}:
   - job: dummy_setup_only
     pool:
-      vmImage: ubuntu-20.04
+      vmImage: ubuntu-latest
     steps:
     - template: azure-deployment-setup.yml
       parameters:
@@ -16,7 +16,7 @@ jobs:
 - ${{ if eq(variables['Build.SourceBranchName'], 'rc') }}:
   - job: branch_and_tag
     pool:
-      vmImage: ubuntu-20.04
+      vmImage: ubuntu-latest
     variables:
     - group: Deployment Credentials
     steps:
@@ -33,7 +33,7 @@ jobs:
 
   - job: cargo_publish
     pool:
-      vmImage: ubuntu-20.04
+      vmImage: ubuntu-latest
     variables:
     - group: Deployment Credentials
     steps:
@@ -51,7 +51,7 @@ jobs:
   - job: github_releases
     dependsOn: branch_and_tag # otherwise, GitHub creates the tag itself
     pool:
-      vmImage: ubuntu-20.04
+      vmImage: ubuntu-latest
     variables:
     - group: Deployment Credentials
     steps:
@@ -68,7 +68,7 @@ jobs:
 
   - job: update_website
     pool:
-      vmImage: ubuntu-20.04
+      vmImage: ubuntu-latest
     variables:
       - group: Deployment Credentials
     steps:

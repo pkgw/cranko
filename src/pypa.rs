@@ -390,7 +390,7 @@ fn scan_rewritten_file(
     Ok(())
 }
 
-mod simple_py_parse {
+pub(crate) mod simple_py_parse {
     use super::*;
 
     pub fn has_commented_marker(line: &str, marker: &str) -> bool {
@@ -527,6 +527,7 @@ mod simple_py_parse {
 struct PyProjectFile {
     pub tool: Option<PyProjectTool>,
 
+    #[allow(dead_code)]
     #[serde(flatten)]
     pub rest: Value,
 }
@@ -536,6 +537,7 @@ struct PyProjectFile {
 struct PyProjectTool {
     pub cranko: Option<PyProjectCranko>,
 
+    #[allow(dead_code)]
     #[serde(flatten)]
     pub rest: Value,
 }

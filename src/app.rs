@@ -74,6 +74,7 @@ impl AppBuilder {
 
         if self.populate_graph {
             let mut cargo = crate::cargo::CargoLoader::default();
+            let mut csproj = crate::csproj::CsProjLoader::default();
             let mut npm = crate::npm::NpmLoader::default();
             let mut pypa = crate::pypa::PypaLoader::default();
 
@@ -85,6 +86,7 @@ impl AppBuilder {
             repo.scan_paths(|p| {
                 let (dirname, basename) = p.split_basename();
                 cargo.process_index_item(dirname, basename);
+                csproj.process_index_item(&repo, p, dirname, basename)?;
                 npm.process_index_item(&repo, &mut graph, p, dirname, basename)?;
                 pypa.process_index_item(dirname, basename);
                 Ok(())
@@ -95,6 +97,7 @@ impl AppBuilder {
             // End dumb hack.
 
             cargo.finalize(&mut self)?;
+            csproj.finalize(&mut self)?;
             npm.finalize(&mut self)?;
             pypa.finalize(&mut self)?;
         }
@@ -347,21 +350,19 @@ impl AppSession {
     /// project, the callback `process` is called, which should return true if a
     /// new release of the project is being scheduled. By the time the callback
     /// is called, the project's internal dependency information will have been
-    /// updated:
-    ///
-    /// - No deps will be classified as DepRequirement::Unavailable
-    ///   - If a project is marked is being scheduled for release, all of its
-    ///     deps must be fully satisfiable
-    ///   - Otherwise, some of its deps may have version requirements that are
-    ///     too young, or its may have deps on projects that are available in
-    ///     the repo but not yet publicly released.
-    /// - If the dep is DepRequirement::Commit, `resolved_version` will be a
-    ///   Some value containing the required version. It is possible that this
-    ///   version will be being released "right now".
+    /// updated: for DepRequirement::Commit deps, `resolved_version` will be a
+    /// Some value containing the required version. It is possible that this
+    /// version will be being released "right now".
     ///
     /// By the time the callback returns, the project's `version` field should
     /// have been updated with its reference version for this release process --
     /// which should be a new value, if the callback returns true.
+    ///
+    /// After processing all projects, the function will return an error if
+    /// there are unsatisfiable internal dependencies. This can happen either
+    /// because no sufficiently new release of the dependee exists (and it's not
+    /// being released now), or the internal version requirement information
+    /// hasn't been annotated.
     pub fn solve_internal_deps<F>(&mut self, mut process: F) -> Result<()>
     where
         F: FnMut(&mut Repository, &mut ProjectGraph, ProjectId) -> Result<bool>,

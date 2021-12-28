@@ -15,6 +15,19 @@ To learn more, check out [the book]!
 
 [the book]: https://pkgw.github.io/cranko/book/latest/
 
+In order to use Cranko, it has to have explicit support for the
+language/project/package type(s) that you're using. It currently supports:
+
+- NPM / Node.js
+- Python (PyPA standards)
+- Rust
+- Visual Studio C# projects
+
+In order to add support for new languages, one has to implement a "loader" that
+detects project files and extracts metadata, and one or more "rewriters" that
+can update those files with the new versions that Cranko determines. Simple
+support can usually be accomplished with a few hundred lines of Rust code.
+
 
 ## Installation
 
@@ -51,27 +64,15 @@ book.
 [getting-started]: https://pkgw.github.io/cranko/book/latest/getting-started/
 
 
-## Development Roadmap
+## Future Directions
 
 Cranko is still a new project and is lacking many features that would be useful.
-Here are some of the things on the radar:
+Here are some potential directions for future work:
 
-- Built-in support for more languages / frameworks:
-  - [x] Rust
-  - [x] NPM
-  - [x] Python
-  - [ ] Visual Studio?
-- [x] Per-repo config file
-  - [x] Identify upstream remote from its URL
-  - [ ] Customize project configuration
-    - [ ] Custom per-project "rewriter" additions
-  - [ ] Defined "unaffiliated" projects
-- [x] Revamp error handling infrastructure
-- [x] `cranko bootstrap` command to help people onboard
-- [ ] Figure out how we're going to make a test suite for this beast
-
-Here are some larger projects that would be cool:
-
+- Support for more project types (languages), CI frameworks, etc.
+- A mode to manually define projects and rewrites so that Cranko can be used with
+  projects that don't currently have built-in integrations
+- Figure out how we're going to make a test suite for this beast
 - Split the main implementation into multiple crates
 - Pluggable framework for auto-generating release notes (e.g., taking advantage
   of Conventional Commit formats, auto-linking to GitHub pull requests)

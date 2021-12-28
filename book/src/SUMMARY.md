@@ -10,6 +10,7 @@
 - [Integrations]()
   - [Azure Pipelines](integrations/azure-pipelines.md)
   - [Python](integrations/python.md)
+  - [Visual Studio C# Projects](integrations/csproj.md)
 
 # Reference Material
 

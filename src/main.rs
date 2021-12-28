@@ -1,4 +1,4 @@
-// Copyright 2020 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2020-2022 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
 //! The main cranko command-line interface.
@@ -26,6 +26,7 @@ mod bootstrap;
 mod cargo;
 mod changelog;
 mod config;
+mod csproj;
 mod errors;
 mod github;
 mod gitutil;
@@ -371,7 +372,9 @@ impl Command for ConfirmCommand {
                             format!(">= {}", dep.resolved_version.as_ref().unwrap())
                         }
                         DepRequirement::Manual(t) => format!("{} (manual)", t),
-                        DepRequirement::Unavailable => unreachable!(),
+                        DepRequirement::Unavailable => {
+                            "** version requirement unavailable **".to_owned()
+                        }
                     };
 
                     info!("    internal dep {}: {}", dproj.user_facing_name, req_text);
