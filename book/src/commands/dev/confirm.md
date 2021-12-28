@@ -13,7 +13,8 @@ to `cranko stage` and synthesizes it into a new commit on the `rc` branch.
 Edited changelog files in the working directory are then reset to match the HEAD
 commit.
 
-The `cranko confirm` command analyzes the internal interdependencies of the
+The `cranko confirm` command analyzes the
+[internal interdependencies](../../concepts/internal-dependencies.md) of the
 projects within the repository and will refuse to propose a release with
 unsatisfied requirements. That is, if a proposed new release of project X would
 require a new release of project Y but one is not being requested, the command

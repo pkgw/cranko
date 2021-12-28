@@ -114,9 +114,9 @@ annotated_files = [
 
 ## Internal Dependencies
 
-“Internal” dependencies refer to [monorepo] situations where one repository
-contains more than one project, and some of those projects depend on one
-another.
+[“Internal” dependencies](../concepts/internal-dependencies.md) refer to
+[monorepo] situations where one repository contains more than one project, and
+some of those projects depend on one another.
 
 [monorepo]: https://en.wikipedia.org/wiki/Monorepo
 

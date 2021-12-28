@@ -16,8 +16,9 @@ This command will rewrite the `package.json` files of your NPM projects.
 
 #### Example
 
-The [Lerna] tool is somewhat limited in its understanding of internal
-dependencies within a repository. If projects A and B are both at version 0.3,
+The [Lerna] tool is somewhat limited in its understanding of [internal
+dependencies](../../concepts/internal-dependencies.md) within a repository. If
+projects A and B are both at version 0.3,
 and project B states a requirement on version 0.3 of project A, Lerna
 understands the dependency. However, if project B only requires version 0.2 of
 project A, Lerna won't realize that the interdependency is internal. This will

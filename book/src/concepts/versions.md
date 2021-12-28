@@ -46,7 +46,7 @@ Used by Cargo and NPM packages.
 
 .NET versions emulate the .NET [System.Version][sysver] type. This is a simple
 type following the form `MAJOR.MINOR.BUILD.REVISION`, where each piece is an
-integer.
+integer. The maximum allowed value of each item is 65534.
 
 [sysver]: https://docs.microsoft.com/en-us/dotnet/api/system.version
 
