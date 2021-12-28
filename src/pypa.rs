@@ -527,6 +527,7 @@ mod simple_py_parse {
 struct PyProjectFile {
     pub tool: Option<PyProjectTool>,
 
+    #[allow(dead_code)]
     #[serde(flatten)]
     pub rest: Value,
 }
@@ -536,6 +537,7 @@ struct PyProjectFile {
 struct PyProjectTool {
     pub cranko: Option<PyProjectCranko>,
 
+    #[allow(dead_code)]
     #[serde(flatten)]
     pub rest: Value,
 }

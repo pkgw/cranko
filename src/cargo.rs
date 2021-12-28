@@ -33,17 +33,9 @@ use crate::{
 };
 
 /// Framework for auto-loading Cargo projects from the repository contents.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CargoLoader {
     shortest_toml_dirname: Option<RepoPathBuf>,
-}
-
-impl Default for CargoLoader {
-    fn default() -> Self {
-        CargoLoader {
-            shortest_toml_dirname: None,
-        }
-    }
 }
 
 impl CargoLoader {

@@ -201,21 +201,11 @@ impl RepoHistories {
 /// The main purpose of this type is to support command-line applications that
 /// accept some number of projects as arguments. Depending on the use case, it
 /// might be zero or more projects, exactly one project, etc.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GraphQueryBuilder {
     names: Vec<String>,
     release_info: Option<ReleaseCommitInfo>,
     project_type: Option<String>,
-}
-
-impl Default for GraphQueryBuilder {
-    fn default() -> Self {
-        GraphQueryBuilder {
-            names: Vec::new(),
-            release_info: None,
-            project_type: None,
-        }
-    }
 }
 
 impl GraphQueryBuilder {
