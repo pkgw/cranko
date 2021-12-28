@@ -35,9 +35,6 @@ pub struct ProjectGraph {
     /// vector.
     projects: Vec<Project>,
 
-    /// NodeIndex values for each project based on its identifier.
-    node_ixs: Vec<OurNodeIndex>,
-
     /// The `petgraph` state expressing the project graph.
     graph: DiGraph<ProjectId, ()>,
 
@@ -204,21 +201,11 @@ impl RepoHistories {
 /// The main purpose of this type is to support command-line applications that
 /// accept some number of projects as arguments. Depending on the use case, it
 /// might be zero or more projects, exactly one project, etc.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GraphQueryBuilder {
     names: Vec<String>,
     release_info: Option<ReleaseCommitInfo>,
     project_type: Option<String>,
-}
-
-impl Default for GraphQueryBuilder {
-    fn default() -> Self {
-        GraphQueryBuilder {
-            names: Vec::new(),
-            release_info: None,
-            project_type: None,
-        }
-    }
 }
 
 impl GraphQueryBuilder {
@@ -542,7 +529,6 @@ impl ProjectGraphBuilder {
             projects,
             name_to_id,
             graph: self.graph,
-            node_ixs: self.node_ixs,
             toposorted_ids,
         })
     }

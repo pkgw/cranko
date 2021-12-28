@@ -10,6 +10,7 @@ use thiserror::Error as ThisError;
 
 use crate::errors::Result;
 
+pub use dotnet::DotNetVersion;
 pub use pep440::Pep440Version;
 
 /// A version number associated with a project.
@@ -23,6 +24,9 @@ pub enum Version {
 
     // A version compatible with the Python PEP-440 specification.
     Pep440(Pep440Version),
+
+    // A version compatible with the .NET System.Version type.
+    DotNet(DotNetVersion),
 }
 
 impl Display for Version {
@@ -30,6 +34,7 @@ impl Display for Version {
         match self {
             Version::Semver(ref v) => write!(f, "{}", v),
             Version::Pep440(ref v) => write!(f, "{}", v),
+            Version::DotNet(ref v) => write!(f, "{}", v),
         }
     }
 }
@@ -40,6 +45,7 @@ impl Version {
         Ok(match self {
             Version::Semver(_) => Version::Semver(semver::Version::parse(text.as_ref())?),
             Version::Pep440(_) => Version::Pep440(text.as_ref().parse()?),
+            Version::DotNet(_) => Version::DotNet(text.as_ref().parse()?),
         })
     }
 
@@ -48,6 +54,7 @@ impl Version {
         match self {
             Version::Semver(_) => Version::Semver(semver::Version::new(0, 0, 0)),
             Version::Pep440(_) => Version::Pep440(Pep440Version::default()),
+            Version::DotNet(_) => Version::DotNet(DotNetVersion::default()),
         }
     }
 
@@ -73,6 +80,13 @@ impl Version {
                 v.post_release = None;
                 v.dev_release = Some(0);
                 v.local_identifier = None;
+            }
+
+            Version::DotNet(v) => {
+                // Quasi-hack for WWT
+                v.minor = 99;
+                v.build = 0;
+                v.revision = 0;
             }
         }
     }
@@ -168,6 +182,13 @@ impl VersionBumpScheme {
                         + (local.day() as usize);
                     v.dev_release = Some(num);
                 }
+
+                Version::DotNet(v) => {
+                    let num = 10000 * (local.year() as usize)
+                        + 100 * (local.month() as usize)
+                        + (local.day() as usize);
+                    v.revision = num as i32;
+                }
             }
 
             Ok(())
@@ -194,6 +215,11 @@ impl VersionBumpScheme {
 
                     v.segments[2] += 1;
                     v.segments.truncate(3);
+                }
+
+                Version::DotNet(v) => {
+                    v.revision = 0;
+                    v.build += 1;
                 }
             }
 
@@ -223,6 +249,12 @@ impl VersionBumpScheme {
                     v.segments[1] += 1;
                     v.segments[2] = 0;
                     v.segments.truncate(3);
+                }
+
+                Version::DotNet(v) => {
+                    v.revision = 0;
+                    v.build = 0;
+                    v.minor += 1;
                 }
             }
 
@@ -255,6 +287,13 @@ impl VersionBumpScheme {
                     v.segments[2] = 0;
                     v.segments.truncate(3);
                 }
+
+                Version::DotNet(v) => {
+                    v.revision = 0;
+                    v.build = 0;
+                    v.minor = 0;
+                    v.major += 1;
+                }
             }
 
             Ok(())
@@ -263,6 +302,80 @@ impl VersionBumpScheme {
         fn apply_force(version: &mut Version, text: &str) -> Result<()> {
             *version = version.parse_like(text)?;
             Ok(())
+        }
+    }
+}
+
+/// .NET System.Version versions
+mod dotnet {
+    use anyhow::bail;
+    use std::fmt::{Display, Formatter};
+
+    use crate::errors::{Error, Result};
+
+    /// A version compatible with .NET's System.Version
+    ///
+    /// These versions are simple: they have the form
+    /// `{major}.{minor}.{build}.{revision}`.
+    #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+    pub struct DotNetVersion {
+        pub major: i32,
+        pub minor: i32,
+        pub build: i32,
+        pub revision: i32,
+    }
+
+    impl Display for DotNetVersion {
+        fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
+            write!(
+                f,
+                "{}.{}.{}.{}",
+                self.major, self.minor, self.build, self.revision
+            )
+        }
+    }
+
+    impl std::str::FromStr for DotNetVersion {
+        type Err = Error;
+
+        fn from_str(s: &str) -> Result<Self> {
+            let pieces: std::result::Result<Vec<_>, _> = s.split('.').map(|s| s.parse()).collect();
+
+            match pieces.as_ref().map(|v| v.len()) {
+                Ok(4) => {}
+                _ => bail!("failed to parse `{}` as a .NET version", s),
+            }
+
+            let pieces = pieces.unwrap();
+
+            Ok(DotNetVersion {
+                major: pieces[0],
+                minor: pieces[1],
+                build: pieces[2],
+                revision: pieces[3],
+            })
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn greater_less() {
+            const CASES: &[(&str, &str)] = &[
+                ("0.0.0.9999", "0.0.1.0"),
+                ("0.0.0.9999", "0.1.0.0"),
+                ("0.0.0.9999", "1.0.0.0"),
+                ("1.0.0.0", "1.0.0.1"),
+            ];
+
+            for (l_text, g_text) in CASES {
+                let lesser = l_text.parse::<DotNetVersion>().unwrap();
+                let greater = g_text.parse::<DotNetVersion>().unwrap();
+                assert!(lesser < greater);
+                assert!(greater > lesser);
+            }
         }
     }
 }
