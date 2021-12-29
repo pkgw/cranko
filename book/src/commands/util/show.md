@@ -63,7 +63,8 @@ thiscommit:2021-06-03:NmEuWn3
 ## `cranko show toposort`
 
 This command prints out the names of the projects in the repository, one per
-line, in topologically-sorted order according to internal dependencies. That is,
+line, in topologically-sorted order according to
+[internal dependencies](../../concepts/internal-dependencies.md). That is,
 the name of a project is only printed after the names of all of its dependencies
 in the repo have already been printed. Because dependency cycles are prohibited,
 this is always possible. The exact ordering may not be stable, even from one
