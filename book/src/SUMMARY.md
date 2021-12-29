@@ -15,6 +15,7 @@
 # Reference Material
 
 - [Concepts]()
+  - [Internal Dependencies](concepts/internal-dependencies.md)
   - [Projects](concepts/projects.md)
   - [Releases](concepts/releases.md)
   - [Versions](concepts/versions.md)

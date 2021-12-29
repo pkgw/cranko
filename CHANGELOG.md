@@ -1,4 +1,10 @@
-# rc: minor bump
+# rc: micro bump
+
+- Fix up the C# support to avoid too-big version numbers in .NET development
+  versions, which can only go up to 65534.
+
+
+# cranko 0.9.0 (2021-12-28)
 
 - Add basic support for Visual Studio C# projects, based on reading and writing
   `AssemblyInfo.cs` files. It's quite simplistic but should meet my particular

@@ -79,8 +79,9 @@ basis for assigning new version numbers.
 
 If your repository contains more than one project, some of those projects
 probably depend on each other. With zeroed-out version numbers, it is not
-generally possible to express the version constraints of those internal
-dependencies in existing metadata formats. For instance, before bootstrapping,
+generally possible to express the version constraints of those [internal
+dependencies](../concepts/internal-dependencies.md) in existing metadata
+formats. For instance, before bootstrapping,
 you might have had a package `foo_cli` that depends on `foo_lib >= 1.3`: it
 works if linked against `foo_lib` version 1.3.0, but not if linked against
 `foo_lib` version 1.2.17. That didn’t stop being true just because the version
