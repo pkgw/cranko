@@ -184,10 +184,11 @@ impl VersionBumpScheme {
                 }
 
                 Version::DotNet(v) => {
-                    let num = 10000 * (local.year() as usize)
-                        + 100 * (local.month() as usize)
-                        + (local.day() as usize);
-                    v.revision = num as i32;
+                    // We can't use a human-readable date-code because version
+                    // terms have a maximum value of 65534, so we use a number
+                    // that's about the number of days since 1970. That should
+                    // take us to about the year 2149.
+                    v.revision = (local.timestamp() / 86400) as i32;
                 }
             }
 
@@ -316,7 +317,8 @@ mod dotnet {
     /// A version compatible with .NET's System.Version
     ///
     /// These versions are simple: they have the form
-    /// `{major}.{minor}.{build}.{revision}`.
+    /// `{major}.{minor}.{build}.{revision}`. Each term must be between 0 and
+    /// 65534.
     #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
     pub struct DotNetVersion {
         pub major: i32,
