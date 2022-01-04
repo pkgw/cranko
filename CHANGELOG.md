@@ -1,4 +1,15 @@
-# rc: micro bump
+# rc: minor bump
+
+- Cranko will now detect `.vdproj` files (Visual Studio setup/installer projects)
+  and try to associate them with C# `.csproj` projects. When that can be done, it
+  will update the ProductVersion in the installer to track the associated project.
+- When rewriting files on Windows, Cranko will now emit them with CRLF line endings.
+  Note that this is done unconditionally, without checking the line endings on
+  the original file. Before, line endings were unconditionally LF-only on all
+  platforms, generating large Git diffs on Windows in standard use cases.
+
+
+# cranko 0.9.1 (2021-12-29)
 
 - Fix up the C# support to avoid too-big version numbers in .NET development
   versions, which can only go up to 65534.
