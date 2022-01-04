@@ -41,6 +41,11 @@ System.Version](../concepts/versions.md#net-versions) type.
 When updating project files, both the `AssemblyVersion` and the
 `AssemblyFileVersion` attributes are updated, if present.
 
+If a project has one or more associated `.vdproj` installer projects, the
+`ProductVersion` stored with the installer(s) will lose the fourth component
+(the "revision") of the project version, because four-component versions are
+rejected by the installer builder.
+
 
 ## Internal Dependencies
 

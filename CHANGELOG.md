@@ -1,4 +1,10 @@
-# rc: minor bump
+# rc: micro bump
+
+- Bugfix `.vdproj` rewriting: the rewritten file should contain only the first
+  three terms of the project version. The "revision" isn't supported.
+
+
+# cranko 0.10.0 (2022-01-04)
 
 - Cranko will now detect `.vdproj` files (Visual Studio setup/installer projects)
   and try to associate them with C# `.csproj` projects. When that can be done, it
