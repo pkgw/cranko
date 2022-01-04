@@ -243,7 +243,7 @@ impl Command for CiUtilEnvToFileCommand {
         }
 
         #[cfg(not(unix))]
-        fn platform_options(o: &mut OpenOptions) {}
+        fn platform_options(_o: &mut OpenOptions) {}
 
         platform_options(&mut options);
 
@@ -1121,4 +1121,24 @@ fn search_directories() -> Vec<PathBuf> {
         dirs.extend(env::split_paths(&val));
     }
     dirs
+}
+
+// I tried to set up the line-ending character as a macro that evaluated to a string
+// literal, but couldn't get the macro imports to work, for some reason along the
+// lines of https://github.com/rust-lang/rust/issues/57966.
+
+#[cfg(not(windows))]
+#[macro_export]
+macro_rules! write_crlf {
+    ($stream:expr, $format:literal $($rest:tt)*) => {
+        write!($stream, $format $($rest)*).and_then(|_x| write!($stream, "\n"))
+    }
+}
+
+#[cfg(windows)]
+#[macro_export]
+macro_rules! write_crlf {
+    ($stream:expr, $format:literal $($rest:tt)*) => {
+        write!($stream, $format $($rest)*).and_then(|_x| write!($stream, "\r\n"))
+    }
 }
