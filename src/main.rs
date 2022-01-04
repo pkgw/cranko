@@ -243,7 +243,7 @@ impl Command for CiUtilEnvToFileCommand {
         }
 
         #[cfg(not(unix))]
-        fn platform_options(o: &mut OpenOptions) {}
+        fn platform_options(_o: &mut OpenOptions) {}
 
         platform_options(&mut options);
 
