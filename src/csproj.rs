@@ -23,6 +23,7 @@ use crate::{
     repository::{ChangeList, RepoPath, RepoPathBuf, Repository},
     rewriters::Rewriter,
     version::Version,
+    write_crlf,
 };
 
 /// Framework for auto-loading Visual Studio C# projects from the repository
@@ -414,7 +415,7 @@ impl Rewriter for AssemblyInfoCsRewriter {
                 };
 
                 atry!(
-                    writeln!(new_f, "{}", line);
+                    write_crlf!(new_f, "{}", line);
                     ["error writing data to `{}`", new_af.path().display()]
                 );
             }

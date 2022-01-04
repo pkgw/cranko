@@ -31,6 +31,7 @@ use crate::{
     repository::{ChangeList, RepoPath, RepoPathBuf, Repository},
     rewriters::Rewriter,
     version::Version,
+    write_crlf,
 };
 
 const DEPENDENCY_KEYS: &[&str] = &["dependencies", "devDependencies", "optionalDependencies"];
@@ -265,7 +266,7 @@ impl Rewriter for PackageJsonRewriter {
                 ["failed to overwrite JSON file `{}`", path.display()]
             );
             atry!(
-                writeln!(f, "");
+                write_crlf!(f, "");
                 ["failed to overwrite JSON file `{}`", path.display()]
             );
             changes.add_path(&self.json_path);
@@ -473,7 +474,7 @@ impl Command for InstallTokenCommand {
         );
 
         atry!(
-            writeln!(file, "{}:_authToken={}", self.registry, token);
+            write_crlf!(file, "{}:_authToken={}", self.registry, token);
             ["failed to write token data to file `{}`", p.display()]
         );
 

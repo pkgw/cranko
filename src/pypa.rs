@@ -30,6 +30,7 @@ use crate::{
     repository::{ChangeList, RepoPath, RepoPathBuf},
     rewriters::Rewriter,
     version::{Pep440Version, Version},
+    write_crlf,
 };
 
 /// Framework for auto-loading PyPA projects from the repository contents.
@@ -681,7 +682,7 @@ impl Rewriter for PythonRewriter {
                 };
 
                 atry!(
-                    writeln!(new_f, "{}", line);
+                    write_crlf!(new_f, "{}", line);
                     ["error writing data to `{}`", new_af.path().display()]
                 );
             }
@@ -824,9 +825,9 @@ impl Command for InstallTokenCommand {
         );
 
         let mut write = || -> Result<()> {
-            writeln!(file, "[{}]", self.repository)?;
-            writeln!(file, "username = __token__")?;
-            writeln!(file, "password = {}", token)?;
+            write_crlf!(file, "[{}]", self.repository)?;
+            write_crlf!(file, "username = __token__")?;
+            write_crlf!(file, "password = {}", token)?;
             Ok(())
         };
 
