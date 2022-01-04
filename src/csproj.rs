@@ -546,9 +546,15 @@ impl Rewriter for VdprojRewriter {
                 );
 
                 let line = if line.contains("\"ProductVersion\" =") {
+                    // ProductVersion must have the form `X.Y.Z`; the "revision"
+                    // component must be stripped.
+                    let prod_vers = proj.version.to_string();
+                    let pieces: Vec<_> = prod_vers.split('.').collect();
+                    let prod_vers = &pieces[..3].join(".");
+
                     did_anything = true;
                     atry!(
-                        replace_vdproj_text(&line, &proj.version.to_string());
+                        replace_vdproj_text(&line, prod_vers);
                         ["couldn't rewrite version-string source line `{}`", line]
                     )
                 } else {
