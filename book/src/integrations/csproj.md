@@ -12,6 +12,12 @@ with a name ending in `.csproj` *and* another file with a name matching the
 pattern `*/AssemblyInfo.cs`. Cranko will get confused if you have more than one
 `.csproj` file in a single directory.
 
+Cranko additionally searches for "setup installer" project files, whose names
+end in `.vdproj`. If such a file is found, *and* it seems to refer to a single
+"primary output project" recognized by Cranko (via a `OutputProjectGuid` key),
+the `ProductVersion` key in the file will be updated to track the corresponding
+project version.
+
 
 ## Project Metadata
 
