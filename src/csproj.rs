@@ -31,6 +31,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct CsProjLoader {
     dirs_of_interest: HashMap<RepoPathBuf, DirData>,
+    vdproj_files: Vec<RepoPathBuf>,
 }
 
 #[derive(Debug, Default)]
@@ -57,13 +58,66 @@ impl CsProjLoader {
             let dir = dir.to_owned();
             let mut e = self.dirs_of_interest.entry(dir).or_default();
             e.assembly_info = Some(repopath.to_owned());
+        } else if basename.ends_with(b".vdproj") {
+            self.vdproj_files.push(repopath.to_owned());
         }
 
         Ok(())
     }
 
     /// Finalize autoloading any CsProj projects. Consumes this object.
-    pub fn finalize(self, app: &mut AppBuilder) -> Result<()> {
+    pub fn finalize(mut self, app: &mut AppBuilder) -> Result<()> {
+        // Scan any vdproj files that might be associated with projects.
+
+        let mut guid_to_vdproj: HashMap<String, Vec<RepoPathBuf>> = HashMap::new();
+
+        for vdproj in self.vdproj_files.drain(..) {
+            let p = app.repo.resolve_workdir(&vdproj);
+            let f = atry!(
+                File::open(&p);
+                ["failed to open file `{}`", p.display()]
+            );
+            let reader = BufReader::new(f);
+            let mut guid = None;
+            let mut ignore = false;
+
+            for line in reader.lines() {
+                let line = atry!(
+                    line;
+                    ["error reading data from file `{}`", p.display()]
+                );
+
+                if line.contains("OutputProjectGuid") {
+                    // lines look like: `   "OutputProjectGuid" = "8:{733C84E7-58F2-4E09-AC82-58AFD7E7BDD3}"`
+                    // Our GUIDs include the curly braces and are always lowercased since the casing isn't
+                    // always consistent in different files.
+                    let mut this_guid = extract_braced_text(&line)?.to_owned();
+                    this_guid.make_ascii_lowercase();
+
+                    if let Some(prev_guid) = guid.as_ref() {
+                        if &this_guid != prev_guid {
+                            warn!(
+                                "ignoring setup project `{}` that seems to reference multiple key project GUIDs",
+                                p.display()
+                            );
+                            ignore = true;
+                        }
+                    } else {
+                        guid = Some(this_guid);
+                    }
+                }
+            }
+
+            if ignore {
+                continue;
+            }
+
+            // If no GUID found, silently ignore.
+            if let Some(guid) = guid {
+                guid_to_vdproj.entry(guid).or_default().push(vdproj);
+            }
+        }
+
         // Build up the table of projects and their deps.
 
         struct Info {
@@ -327,6 +381,14 @@ impl CsProjLoader {
             let rewrite = AssemblyInfoCsRewriter::new(ident, assembly_info.to_owned());
             proj.rewriters.push(Box::new(rewrite));
 
+            // Any vdproj rewriters?
+            if let Some(mut vdprojs) = guid_to_vdproj.remove(&guid) {
+                for vdproj in vdprojs.drain(..) {
+                    let rewrite = VdprojRewriter::new(ident, vdproj);
+                    proj.rewriters.push(Box::new(rewrite));
+                }
+            }
+
             // Save the info for dep-linking.
 
             guid_to_info.insert(
@@ -439,4 +501,134 @@ impl Rewriter for AssemblyInfoCsRewriter {
             }
         }
     }
+}
+
+/// Rewrite a vdproj (setup installer) to include real version numbers.
+#[derive(Debug)]
+pub struct VdprojRewriter {
+    proj_id: ProjectId,
+    vdproj_path: RepoPathBuf,
+}
+
+impl VdprojRewriter {
+    /// Create a new `AssemblyInfo.cs` rewriter.
+    pub fn new(proj_id: ProjectId, vdproj_path: RepoPathBuf) -> Self {
+        VdprojRewriter {
+            proj_id,
+            vdproj_path,
+        }
+    }
+}
+
+impl Rewriter for VdprojRewriter {
+    fn rewrite(&self, app: &AppSession, changes: &mut ChangeList) -> Result<()> {
+        let mut did_anything = false;
+        let file_path = app.repo.resolve_workdir(&self.vdproj_path);
+
+        let cur_f = atry!(
+            File::open(&file_path);
+            ["failed to open file `{}` for reading", file_path.display()]
+        );
+        let cur_reader = BufReader::new(cur_f);
+
+        let new_af = atomicwrites::AtomicFile::new(
+            &file_path,
+            atomicwrites::OverwriteBehavior::AllowOverwrite,
+        );
+
+        let proj = app.graph().lookup(self.proj_id);
+
+        let r = new_af.write(|new_f| {
+            for line in cur_reader.lines() {
+                let line = atry!(
+                    line;
+                    ["error reading data from file `{}`", file_path.display()]
+                );
+
+                let line = if line.contains("\"ProductVersion\" =") {
+                    did_anything = true;
+                    atry!(
+                        replace_vdproj_text(&line, &proj.version.to_string());
+                        ["couldn't rewrite version-string source line `{}`", line]
+                    )
+                } else {
+                    line
+                };
+
+                atry!(
+                    write_crlf!(new_f, "{}", line);
+                    ["error writing data to `{}`", new_af.path().display()]
+                );
+            }
+
+            Ok(())
+        });
+
+        match r {
+            Err(atomicwrites::Error::Internal(e)) => Err(e.into()),
+            Err(atomicwrites::Error::User(e)) => Err(e),
+            Ok(()) => {
+                if !did_anything {
+                    warn!(
+                        "rewriter for vdproj file `{}` didn't make any modifications",
+                        file_path.display()
+                    );
+                }
+
+                changes.add_path(&self.vdproj_path);
+                Ok(())
+            }
+        }
+    }
+}
+
+pub fn extract_braced_text(line: &str) -> Result<&str> {
+    let lc_loc = line.find('{');
+    let rc_loc = line.rfind('}');
+
+    match (lc_loc, rc_loc) {
+        (Some(lc_idx), Some(rc_idx)) => {
+            if lc_idx < rc_idx {
+                Ok(&line[lc_idx..=rc_idx])
+            } else {
+                bail!(
+                    "expected braced text in line `{}`, but the braces were confusing",
+                    line
+                );
+            }
+        }
+        _ => {
+            bail!(
+                "expected braced text in line `{}`, but didn't find a matched pair",
+                line
+            );
+        }
+    }
+}
+
+/// This function works on vdproj ProductVersion lines that look like:
+///
+/// ```
+///         "ProductVersion" = "8:6.0.13"
+/// ```
+///
+/// Our goal is to replace the `6.0.13` in this example.
+pub fn replace_vdproj_text(line: &str, new_val: &str) -> Result<String> {
+    let left_loc = line.rfind(':');
+    let right_loc = line.rfind('"');
+
+    let (left_idx, right_idx) = match (left_loc, right_loc) {
+        (Some(li), Some(ri)) => (li, ri),
+        _ => {
+            bail!(
+                "expected a vdproj string in line `{}`, but I couldn't understand the syntax",
+                line
+            );
+        }
+    };
+
+    let mut replaced = line[..=left_idx].to_owned();
+    replaced.push_str(new_val);
+    replaced.push_str(&line[right_idx..]);
+    Ok(replaced)
 }
