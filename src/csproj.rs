@@ -6,7 +6,7 @@
 //! We currently "manually" update `Properties/AssemblyInfo.cs`.
 
 use anyhow::bail;
-use log::warn;
+use log::{info, warn};
 use quick_xml::{events::Event, Reader};
 use std::{
     collections::HashMap,
@@ -538,12 +538,33 @@ impl Rewriter for VdprojRewriter {
 
         let proj = app.graph().lookup(self.proj_id);
 
+        let mut pcode = uuid::Uuid::new_v4().to_hyphenated().to_string();
+        pcode.make_ascii_uppercase();
+        let pcode = format!("{{{}}}", pcode);
+        info!(
+            "new Product/PackageCode UUID for `{}`: {}",
+            self.vdproj_path.escaped(),
+            pcode
+        );
+
         let r = new_af.write(|new_f| {
+            let mut seen_product = false;
+
             for line in cur_reader.lines() {
                 let line = atry!(
                     line;
                     ["error reading data from file `{}`", file_path.display()]
                 );
+
+                // This is a super janky workaround for the fact that the "Configurations"
+                // section of a vdproj can list components with "ProductCode" keys that
+                // superficially look like the one that we're trying to replace. In my
+                // one sample file, the "Product" section containing the ones that we *do*
+                // want to replace comes after "Configurations", and its delimiter is
+                // distinctive.
+                if line.trim() == "\"Product\"" {
+                    seen_product = true;
+                }
 
                 let line = if line.contains("\"ProductVersion\" =") {
                     // ProductVersion must have the form `X.Y.Z`; the "revision"
@@ -556,6 +577,14 @@ impl Rewriter for VdprojRewriter {
                     atry!(
                         replace_vdproj_text(&line, prod_vers);
                         ["couldn't rewrite version-string source line `{}`", line]
+                    )
+                } else if seen_product
+                    && (line.contains("\"ProductCode\" =") || line.contains("\"PackageCode\" ="))
+                {
+                    did_anything = true;
+                    atry!(
+                        replace_vdproj_text(&line, &pcode);
+                        ["couldn't rewrite pcode source line `{}`", line]
                     )
                 } else {
                     line

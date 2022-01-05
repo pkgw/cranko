@@ -51,6 +51,7 @@ textwrap = "^0.12"
 thiserror = "1.0"
 toml = "^0.5"
 toml_edit = "^0.2"
+uuid = { version = "^0.8", features = ["v4"] }
 zip = { version = "^0.5", default-features = false, features = ["deflate", "time"] }
 
 [features]
