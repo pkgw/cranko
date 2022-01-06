@@ -1,5 +1,17 @@
 # rc: micro bump
 
+- Tackle an important `.vdproj` bug. In MSI installers, the `ProductCode` and
+  `PackageCode` UUIDs have important semantics that affect the continuity of
+  packages across versions. In particular, no two non-identical installers should
+  have the same `PackageCode`. So when we rewrite a `.vdproj` file, we need to
+  change these fields as well. The current behavior is to generate a new UUID
+  on-the-fly and use it to rewrite both the `ProductCode` and `PackageCode`, which
+  by my read is a valid, conservative approach. It would be better to have
+  the Cranko user provide Cranko with the information needed to allow a bit more
+  flexibility, but we'll see how far we can go with this support.
+
+# cranko 0.10.1 (2022-01-04)
+
 - Bugfix `.vdproj` rewriting: the rewritten file should contain only the first
   three terms of the project version. The "revision" isn't supported.
 

@@ -44,7 +44,14 @@ When updating project files, both the `AssemblyVersion` and the
 If a project has one or more associated `.vdproj` installer projects, the
 `ProductVersion` stored with the installer(s) will lose the fourth component
 (the "revision") of the project version, because four-component versions are
-rejected by the installer builder.
+rejected by the installer builder. The `PackageCode` and `ProductCode` of the
+installer will be replaced with a new, randomly-generated UUID (the same one for
+both codes). This is a conservative, and possibly sketchy, approach, since it
+means that different installer versions will unconditionally be treated as
+["major upgrades"]. See [Changing the Product Code][ctpc] for more information.
+
+["major upgrades"]: https://docs.microsoft.com/en-us/windows/win32/msi/major-upgrades
+[ctpc]: https://docs.microsoft.com/en-us/windows/win32/msi/changing-the-product-code
 
 
 ## Internal Dependencies
