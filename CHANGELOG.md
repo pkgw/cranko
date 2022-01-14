@@ -1,5 +1,14 @@
 # rc: micro bump
 
+No code changes since 0.10.2. Issuing a rebuilt release since the Cranko binary
+isn't running on Azure pipelines right now, and I'm wondering if it's an issue
+having to do with either the latest version of Rust (1.58) or an update to the
+Azure MacOS infrastructure. Either way, it's cheap to make a release, so let's
+see if it fixes anything.
+
+
+# cranko 0.10.2 (2022-01-06)
+
 - Tackle an important `.vdproj` bug. In MSI installers, the `ProductCode` and
   `PackageCode` UUIDs have important semantics that affect the continuity of
   packages across versions. In particular, no two non-identical installers should
