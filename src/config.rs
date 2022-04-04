@@ -1,4 +1,4 @@
-// Copyright 2020 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2020-2022 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
 //! The Cranko configuration file.
@@ -8,7 +8,7 @@
 //! per-repository level.
 
 use anyhow::Context;
-use std::{fs::File, io::Read, path::Path};
+use std::{collections::HashMap, fs::File, io::Read, path::Path};
 
 use crate::{
     atry,
@@ -19,12 +19,17 @@ use crate::{
 /// format.
 mod syntax {
     use serde::{Deserialize, Serialize};
+    use std::collections::HashMap;
 
     /// The toplevel (per-repo) configuration structure.
     #[derive(Clone, Debug, Deserialize, Serialize)]
     pub struct SerializedConfiguration {
         /// General per-repository configuration.
         pub repo: RepoConfiguration,
+
+        /// Centralized per-project configuration.
+        #[serde(default)]
+        pub projects: HashMap<String, ProjectConfiguration>,
     }
 
     /// Configuration relating to the backing repository. This is applied
@@ -43,23 +48,36 @@ mod syntax {
         /// The format for release tag names.
         pub release_tag_name_format: Option<String>,
     }
+
+    /// Configuration relating to individual projects.
+    ///
+    /// Whenever possible, this configuration should be specified in per-project
+    /// metadata files to preserve locality. But some pieces of configuration
+    /// need to be centralized.
+    #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+    pub struct ProjectConfiguration {
+        /// Ignore this project if/when it is automatically detected.
+        pub ignore: bool,
+    }
 }
 
 // The rest of this module normalizes the on-disk format into forms more useful
 // at runtime.
 
-pub use syntax::RepoConfiguration;
+pub use syntax::{ProjectConfiguration, RepoConfiguration};
 
 #[derive(Clone, Debug)]
 pub struct ConfigurationFile {
     pub repo: RepoConfiguration,
+    pub projects: HashMap<String, ProjectConfiguration>,
 }
 
 impl Default for ConfigurationFile {
     fn default() -> Self {
         let repo = RepoConfiguration::default();
+        let projects = Default::default();
 
-        ConfigurationFile { repo }
+        ConfigurationFile { repo, projects }
     }
 }
 
@@ -91,11 +109,17 @@ impl ConfigurationFile {
             )
         })?;
 
-        Ok(ConfigurationFile { repo: sercfg.repo })
+        Ok(ConfigurationFile {
+            repo: sercfg.repo,
+            projects: sercfg.projects,
+        })
     }
 
     pub fn into_toml(self) -> Result<String> {
-        let syn_cfg = syntax::SerializedConfiguration { repo: self.repo };
+        let syn_cfg = syntax::SerializedConfiguration {
+            repo: self.repo,
+            projects: self.projects,
+        };
         Ok(atry!(
             toml::to_string_pretty(&syn_cfg);
             ["could not serialize configuration into TOML format"]

@@ -24,6 +24,7 @@ use super::Command;
 
 use crate::{
     app::{AppBuilder, AppSession},
+    config::ProjectConfiguration,
     errors::Result,
     graph::GraphQueryBuilder,
     project::{DepRequirement, DependencyTarget, Project, ProjectId},
@@ -69,7 +70,11 @@ impl CargoLoader {
     ///
     /// If this repository contains one or more `Cargo.toml` files, the
     /// `cargo_metadata` crate will be used to load project information.
-    pub fn finalize(self, app: &mut AppBuilder) -> Result<()> {
+    pub fn finalize(
+        self,
+        app: &mut AppBuilder,
+        pconfig: &HashMap<String, ProjectConfiguration>,
+    ) -> Result<()> {
         let shortest_toml_dirname = match self.shortest_toml_dirname {
             Some(d) => d,
             None => return Ok(()),
@@ -91,22 +96,24 @@ impl CargoLoader {
                 continue; // This is an external package; not to be tracked.
             }
 
-            // Auto-register a rewriter to update this package's Cargo.toml.
+            // Plan to auto-register a rewriter to update this package's Cargo.toml.
             let manifest_repopath = app.repo.convert_path(&pkg.manifest_path)?;
             let (prefix, _) = manifest_repopath.split_basename();
 
-            let ident = app.graph.add_project();
-            let mut proj = app.graph.lookup_mut(ident);
+            let qnames = vec![pkg.name.to_owned(), "cargo".to_owned()];
 
-            // Q: should we include a registry name as a qualifier?
-            proj.qnames = vec![pkg.name.to_owned(), "cargo".to_owned()];
-            proj.version = Some(Version::Semver(pkg.version.clone()));
-            proj.prefix = Some(prefix.to_owned());
-            cargo_to_graph.insert(pkg.id.clone(), ident);
+            if let Some(ident) = app.graph.try_add_project(qnames, pconfig) {
+                let mut proj = app.graph.lookup_mut(ident);
 
-            // Auto-register a rewriter to update this package's Cargo.toml.
-            let cargo_rewrite = CargoRewriter::new(ident, manifest_repopath);
-            proj.rewriters.push(Box::new(cargo_rewrite));
+                // Q: should we include a registry name as a qualifier?
+                proj.version = Some(Version::Semver(pkg.version.clone()));
+                proj.prefix = Some(prefix.to_owned());
+                cargo_to_graph.insert(pkg.id.clone(), ident);
+
+                // Auto-register a rewriter to update this package's Cargo.toml.
+                let cargo_rewrite = CargoRewriter::new(ident, manifest_repopath);
+                proj.rewriters.push(Box::new(cargo_rewrite));
+            }
         }
 
         // Now establish the interdependencies.
