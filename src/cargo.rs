@@ -672,7 +672,7 @@ impl BinaryArchiveMode {
         path.push(format!(
             "{}-{}-{}.zip",
             proj.qualified_names()[0],
-            proj.version.to_string(),
+            proj.version,
             target
         ));
 
@@ -732,7 +732,7 @@ impl BinaryArchiveMode {
         path.push(format!(
             "{}-{}-{}.tar.gz",
             proj.qualified_names()[0],
-            proj.version.to_string(),
+            proj.version,
             target
         ));
 

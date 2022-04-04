@@ -107,7 +107,7 @@ impl PypaLoader {
                     })
                     .transpose()?;
 
-                let data = data.map(|d| d.tool).flatten().map(|t| t.cranko).flatten();
+                let data = data.and_then(|d| d.tool).and_then(|t| t.cranko);
 
                 if let Some(ref data) = data {
                     name = data.name.clone();
@@ -328,8 +328,7 @@ impl PypaLoader {
                 for req_name in &internal_reqs {
                     let req = config
                         .as_ref()
-                        .map(|c| c.internal_dep_versions.get(req_name))
-                        .flatten()
+                        .and_then(|c| c.internal_dep_versions.get(req_name))
                         .map(|text| app.repo.parse_history_ref(text))
                         .transpose()?
                         .map(|cref| app.repo.resolve_history_ref(&cref, &toml_repopath))
