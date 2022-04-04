@@ -18,6 +18,7 @@ use crate::{
     a_ok_or,
     app::{AppBuilder, AppSession},
     atry,
+    config::ProjectConfiguration,
     errors::Result,
     project::{DepRequirement, DependencyTarget, ProjectId},
     repository::{ChangeList, RepoPath, RepoPathBuf, Repository},
@@ -66,7 +67,11 @@ impl CsProjLoader {
     }
 
     /// Finalize autoloading any CsProj projects. Consumes this object.
-    pub fn finalize(mut self, app: &mut AppBuilder) -> Result<()> {
+    pub fn finalize(
+        mut self,
+        app: &mut AppBuilder,
+        pconfig: &HashMap<String, ProjectConfiguration>,
+    ) -> Result<()> {
         // Scan any vdproj files that might be associated with projects.
 
         let mut guid_to_vdproj: HashMap<String, Vec<RepoPathBuf>> = HashMap::new();
@@ -369,36 +374,38 @@ impl CsProjLoader {
                 }
             };
 
-            // Finally we can register this project.
+            // Finally we can (try to) register this project.
 
-            let ident = app.graph.add_project();
-            let mut proj = app.graph.lookup_mut(ident);
-            proj.qnames = vec![name.to_owned(), "csproj".to_owned()];
-            proj.prefix = Some(repodir.to_owned());
-            proj.version = Some(version);
+            let qnames = vec![name.to_owned(), "csproj".to_owned()];
 
-            // Auto-register a rewriter to update this package's `AssemblyInfo.cs`.
-            let rewrite = AssemblyInfoCsRewriter::new(ident, assembly_info.to_owned());
-            proj.rewriters.push(Box::new(rewrite));
+            if let Some(ident) = app.graph.try_add_project(qnames, pconfig) {
+                let mut proj = app.graph.lookup_mut(ident);
+                proj.prefix = Some(repodir.to_owned());
+                proj.version = Some(version);
 
-            // Any vdproj rewriters?
-            if let Some(mut vdprojs) = guid_to_vdproj.remove(&guid) {
-                for vdproj in vdprojs.drain(..) {
-                    let rewrite = VdprojRewriter::new(ident, vdproj);
-                    proj.rewriters.push(Box::new(rewrite));
+                // Auto-register a rewriter to update this package's `AssemblyInfo.cs`.
+                let rewrite = AssemblyInfoCsRewriter::new(ident, assembly_info.to_owned());
+                proj.rewriters.push(Box::new(rewrite));
+
+                // Any vdproj rewriters?
+                if let Some(mut vdprojs) = guid_to_vdproj.remove(&guid) {
+                    for vdproj in vdprojs.drain(..) {
+                        let rewrite = VdprojRewriter::new(ident, vdproj);
+                        proj.rewriters.push(Box::new(rewrite));
+                    }
                 }
+
+                // Save the info for dep-linking.
+
+                guid_to_info.insert(
+                    guid,
+                    Info {
+                        ident,
+                        name: name.to_owned(),
+                        deps: resolved_reqs,
+                    },
+                );
             }
-
-            // Save the info for dep-linking.
-
-            guid_to_info.insert(
-                guid,
-                Info {
-                    ident,
-                    name: name.to_owned(),
-                    deps: resolved_reqs,
-                },
-            );
         }
 
         // Now that we've registered them all, we can populate the interdependencies.

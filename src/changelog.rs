@@ -154,7 +154,7 @@ impl MarkdownChangelog {
             .map(|prc| sess.repo.get_file_at_commit(&prc, &changelog_repopath))
             .transpose()?
             .flatten()
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
 
         // Start working on rewriting the existing file.
 

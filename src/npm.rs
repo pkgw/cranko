@@ -25,6 +25,7 @@ use super::Command;
 use crate::{
     app::{AppBuilder, AppSession},
     atry,
+    config::ProjectConfiguration,
     errors::Result,
     graph::{GraphQueryBuilder, ProjectGraphBuilder},
     project::{DepRequirement, DependencyTarget, ProjectId},
@@ -50,6 +51,8 @@ struct PackageLoadData {
 }
 
 impl NpmLoader {
+    // TODO: should should defer detailed processing to finalize() like the
+    // othe loaders
     pub fn process_index_item(
         &mut self,
         repo: &Repository,
@@ -57,6 +60,7 @@ impl NpmLoader {
         repopath: &RepoPath,
         dirname: &RepoPath,
         basename: &RepoPath,
+        pconfig: &HashMap<String, ProjectConfiguration>,
     ) -> Result<()> {
         if basename.as_ref() != b"package.json" {
             return Ok(());
@@ -111,25 +115,28 @@ impl NpmLoader {
              version, path.display()]
         );
 
-        let ident = graph.add_project();
-        let mut proj = graph.lookup_mut(ident);
-        proj.qnames = vec![name.to_owned(), "npm".to_owned()];
-        proj.prefix = Some(dirname.to_owned());
-        proj.version = Some(Version::Semver(version));
+        let qnames = vec![name.to_owned(), "npm".to_owned()];
 
-        // Auto-register a rewriter to update this package's package.json.
-        let rewrite = PackageJsonRewriter::new(ident, repopath.to_owned());
-        proj.rewriters.push(Box::new(rewrite));
+        if let Some(ident) = graph.try_add_project(qnames, pconfig) {
+            let mut proj = graph.lookup_mut(ident);
+            proj.prefix = Some(dirname.to_owned());
+            proj.version = Some(Version::Semver(version));
 
-        // Save the info for dep-linking later.
-        self.npm_to_graph.insert(
-            name,
-            PackageLoadData {
-                ident,
-                pkg_data,
-                json_path: repopath.to_owned(),
-            },
-        );
+            // Auto-register a rewriter to update this package's package.json.
+            let rewrite = PackageJsonRewriter::new(ident, repopath.to_owned());
+            proj.rewriters.push(Box::new(rewrite));
+
+            // Save the info for dep-linking later.
+            self.npm_to_graph.insert(
+                name,
+                PackageLoadData {
+                    ident,
+                    pkg_data,
+                    json_path: repopath.to_owned(),
+                },
+            );
+        }
+
         Ok(())
     }
 

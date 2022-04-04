@@ -907,7 +907,7 @@ mod pep440 {
             fn to_owned(&self) -> Pep440Version {
                 Pep440Version {
                     epoch: self.0,
-                    segments: self.1.iter().copied().collect(),
+                    segments: self.1.to_vec(),
                     pre_release: self.2,
                     post_release: self.3,
                     dev_release: self.4,
