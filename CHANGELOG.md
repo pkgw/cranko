@@ -1,3 +1,15 @@
+# cranko 0.11.0 (2022-04-04)
+
+- Add the ability to ignore projects discovered during the autodetection phase.
+  Specifically, the `.config/cranko/config.toml` file now supports a
+  `projects.$qname.ignore = true` key that does this, [as documented in the
+  book][docs]. The ignoring is done in the central configuration file in case
+  the autodetected project file is something vendored that you can’t or don’t
+  want to modify.
+
+[docs]: https://pkgw.github.io/cranko/book/latest/configuration/
+
+
 # cranko 0.10.3 (2022-01-14)
 
 No code changes since 0.10.2. Issuing a rebuilt release since the Cranko binary

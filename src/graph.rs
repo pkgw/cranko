@@ -18,6 +18,7 @@ use thiserror::Error as ThisError;
 
 use crate::{
     a_ok_or, atry,
+    config::ProjectConfiguration,
     errors::Result,
     project::{
         DepRequirement, Dependency, DependencyBuilder, DependencyTarget, Project, ProjectBuilder,
@@ -275,12 +276,43 @@ impl ProjectGraphBuilder {
         }
     }
 
-    /// Register a new project with the graph.
-    pub fn add_project(&mut self) -> ProjectId {
+    /// Request to register a new project with the graph.
+    ///
+    /// The request may be denied if the user has specified that
+    /// the project should be ignored.
+    pub fn try_add_project(
+        &mut self,
+        qnames: Vec<String>,
+        pconfig: &HashMap<String, ProjectConfiguration>,
+    ) -> Option<ProjectId> {
+        // Not the most elegant ... I can't get join() to work here due to the
+        // rev(), though.
+
+        let mut full_name = String::new();
+
+        for term in qnames.iter().rev() {
+            if !full_name.is_empty() {
+                full_name.push(':')
+            }
+
+            full_name.push_str(term);
+        }
+
+        let ignore = pconfig
+            .get(&full_name)
+            .map(|c| c.ignore)
+            .unwrap_or_default();
+        if ignore {
+            return None;
+        }
+
+        let mut pbuilder = ProjectBuilder::new();
+        pbuilder.qnames = qnames;
+
         let id = self.projects.len();
-        self.projects.push(ProjectBuilder::new());
+        self.projects.push(pbuilder);
         self.node_ixs.push(self.graph.add_node(id));
-        id
+        Some(id)
     }
 
     /// Get a mutable reference to a project buider from its ID.
@@ -637,11 +669,12 @@ mod tests {
     fn do_name_assignment_test(spec: &[(&[&str], &str)]) -> Result<()> {
         let mut graph = ProjectGraphBuilder::new();
         let mut ids = HashMap::new();
+        let empty_config = HashMap::new();
 
         for (qnames, user_facing) in spec {
-            let projid = graph.add_project();
+            let qnames = qnames.iter().map(|s| (*s).to_owned()).collect();
+            let projid = graph.try_add_project(qnames, &empty_config).unwrap();
             let mut b = graph.lookup_mut(projid);
-            b.qnames = qnames.iter().map(|s| (*s).to_owned()).collect();
             b.version = Some(Version::Semver(semver::Version::new(0, 0, 0)));
             b.prefix = Some(RepoPathBuf::new(b""));
             ids.insert(projid, user_facing);

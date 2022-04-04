@@ -24,6 +24,7 @@ use crate::{
     a_ok_or,
     app::{AppBuilder, AppSession},
     atry,
+    config::ProjectConfiguration,
     errors::{Error, Result},
     graph::GraphQueryBuilder,
     project::{DepRequirement, DependencyTarget, ProjectId},
@@ -49,7 +50,11 @@ impl PypaLoader {
     }
 
     /// Finalize autoloading any PyPA projects. Consumes this object.
-    pub fn finalize(self, app: &mut AppBuilder) -> Result<()> {
+    pub fn finalize(
+        self,
+        app: &mut AppBuilder,
+        pconfig: &HashMap<String, ProjectConfiguration>,
+    ) -> Result<()> {
         if self.dirs_of_interest.len() > 1 {
             warn!("multiple Python projects detected. Internal interdependenciess are not yet supported.")
         }
@@ -102,7 +107,7 @@ impl PypaLoader {
                     })
                     .transpose()?;
 
-                let data = data.map(|d| d.tool).flatten().map(|t| t.cranko).flatten();
+                let data = data.and_then(|d| d.tool).and_then(|t| t.cranko);
 
                 if let Some(ref data) = data {
                     name = data.name.clone();
@@ -275,78 +280,78 @@ impl PypaLoader {
 
             // OMG, we actually have the core info.
 
-            let ident = app.graph.add_project();
+            let qnames = vec![name.clone(), "pypa".to_owned()];
 
-            {
-                let mut proj = app.graph.lookup_mut(ident);
-
-                proj.qnames = vec![name.clone(), "pypa".to_owned()];
-                proj.version = Some(Version::Pep440(version));
-                proj.prefix = Some(dirname.to_owned());
-
-                let mut rw_path = dirname.clone();
-                rw_path.push(main_version_file.as_bytes());
-                let rw = PythonRewriter::new(ident, rw_path);
-                proj.rewriters.push(Box::new(rw));
-            }
-
-            // Handle the other annotated files. Besides registering them for
-            // rewrites, we also scan them now to detect additional metadata. In
-            // particular, dependencies on non-Python projects.
-
-            let mut internal_reqs = HashSet::new();
-
-            for path in config
-                .as_ref()
-                .map(|c| &c.annotated_files[..])
-                .unwrap_or(&[])
-            {
-                let mut rw_path = dirname.clone();
-                rw_path.push(path.as_bytes());
-
-                atry!(
-                    scan_rewritten_file(app, &rw_path, &mut internal_reqs);
-                    ["in Python project {}, could not scan the `annotated_files` entry {}",
-                     dir_desc, rw_path.escaped()]
-                );
-
-                let rw = PythonRewriter::new(ident, rw_path);
+            if let Some(ident) = app.graph.try_add_project(qnames, pconfig) {
                 {
-                    let proj = app.graph.lookup_mut(ident);
+                    let mut proj = app.graph.lookup_mut(ident);
+
+                    proj.version = Some(Version::Pep440(version));
+                    proj.prefix = Some(dirname.to_owned());
+
+                    let mut rw_path = dirname.clone();
+                    rw_path.push(main_version_file.as_bytes());
+                    let rw = PythonRewriter::new(ident, rw_path);
                     proj.rewriters.push(Box::new(rw));
                 }
-            }
 
-            // Now that we have *all* of the internal requirements, register them with
-            // the graph.
+                // Handle the other annotated files. Besides registering them for
+                // rewrites, we also scan them now to detect additional metadata. In
+                // particular, dependencies on non-Python projects.
 
-            for req_name in &internal_reqs {
-                let req = config
+                let mut internal_reqs = HashSet::new();
+
+                for path in config
                     .as_ref()
-                    .map(|c| c.internal_dep_versions.get(req_name))
-                    .flatten()
-                    .map(|text| app.repo.parse_history_ref(text))
-                    .transpose()?
-                    .map(|cref| app.repo.resolve_history_ref(&cref, &toml_repopath))
-                    .transpose()?;
+                    .map(|c| &c.annotated_files[..])
+                    .unwrap_or(&[])
+                {
+                    let mut rw_path = dirname.clone();
+                    rw_path.push(path.as_bytes());
 
-                if req.is_none() {
-                    warn!(
-                        "missing or invalid key `tool.cranko.internal_dep_versions.{}` in `{}`",
-                        &req_name,
-                        toml_repopath.escaped()
+                    atry!(
+                        scan_rewritten_file(app, &rw_path, &mut internal_reqs);
+                        ["in Python project {}, could not scan the `annotated_files` entry {}",
+                        dir_desc, rw_path.escaped()]
                     );
-                    warn!("... this is needed to specify the oldest version of `{}` compatible with `{}`",
-                        &req_name, &name);
+
+                    let rw = PythonRewriter::new(ident, rw_path);
+                    {
+                        let proj = app.graph.lookup_mut(ident);
+                        proj.rewriters.push(Box::new(rw));
+                    }
                 }
 
-                let req = req.unwrap_or(DepRequirement::Unavailable);
-                app.graph.add_dependency(
-                    ident,
-                    DependencyTarget::Text(req_name.clone()),
-                    "(unavailable)".to_owned(),
-                    req,
-                )
+                // Now that we have *all* of the internal requirements, register them with
+                // the graph.
+
+                for req_name in &internal_reqs {
+                    let req = config
+                        .as_ref()
+                        .and_then(|c| c.internal_dep_versions.get(req_name))
+                        .map(|text| app.repo.parse_history_ref(text))
+                        .transpose()?
+                        .map(|cref| app.repo.resolve_history_ref(&cref, &toml_repopath))
+                        .transpose()?;
+
+                    if req.is_none() {
+                        warn!(
+                            "missing or invalid key `tool.cranko.internal_dep_versions.{}` in `{}`",
+                            &req_name,
+                            toml_repopath.escaped()
+                        );
+                        warn!("... this is needed to specify the oldest version of `{}` compatible with `{}`",
+                            &req_name, &name);
+                    }
+
+                    let req = req.unwrap_or(DepRequirement::Unavailable);
+                    app.graph.add_dependency(
+                        ident,
+                        DependencyTarget::Text(req_name.clone()),
+                        "(unavailable)".to_owned(),
+                        req,
+                    )
+                }
             }
         }
 

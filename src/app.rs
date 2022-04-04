@@ -70,6 +70,8 @@ impl AppBuilder {
             .apply_config(config.repo)
             .with_context(|| "failed to finalize repository setup")?;
 
+        let proj_config = config.projects;
+
         // Now auto-detect everything in the repo index.
 
         if self.populate_graph {
@@ -87,7 +89,7 @@ impl AppBuilder {
                 let (dirname, basename) = p.split_basename();
                 cargo.process_index_item(dirname, basename);
                 csproj.process_index_item(&repo, p, dirname, basename)?;
-                npm.process_index_item(&repo, &mut graph, p, dirname, basename)?;
+                npm.process_index_item(&repo, &mut graph, p, dirname, basename, &proj_config)?;
                 pypa.process_index_item(dirname, basename);
                 Ok(())
             })?;
@@ -96,10 +98,10 @@ impl AppBuilder {
             self.graph = graph;
             // End dumb hack.
 
-            cargo.finalize(&mut self)?;
-            csproj.finalize(&mut self)?;
+            cargo.finalize(&mut self, &proj_config)?;
+            csproj.finalize(&mut self, &proj_config)?;
             npm.finalize(&mut self)?;
-            pypa.finalize(&mut self)?;
+            pypa.finalize(&mut self, &proj_config)?;
         }
 
         // Apply project config and compile the graph.

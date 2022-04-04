@@ -1787,7 +1787,7 @@ pub fn escape_pathlike(b: &[u8]) -> String {
         s.to_owned()
     } else {
         let mut buf = vec![b'\"'];
-        buf.extend(b.iter().map(|c| std::ascii::escape_default(*c)).flatten());
+        buf.extend(b.iter().flat_map(|c| std::ascii::escape_default(*c)));
         buf.push(b'\"');
         String::from_utf8(buf).unwrap()
     }
