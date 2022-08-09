@@ -608,9 +608,23 @@ impl Command for PublishCommand {
         let svc = ZenodoService::new()?;
         let client = svc.make_blocking_client()?;
 
-        // XXXXX set state=done????
+        // Tests indicate that we need to update `state` here:
 
-        // Pretty straightforward:
+        let url = svc.api_url(&format!("deposit/depositions/{}", &md.version_rec_id));
+        let resp = client
+            .post(&url)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(r#"{"state": "done"}"#)
+            .send()?;
+        let status = resp.status();
+        let parsed = json::parse(&resp.text()?)?;
+
+        if !status.is_success() {
+            error!("Zenodo metadata API response: {}", parsed);
+            bail!("publication of record `{}` failed", &md.version_rec_id);
+        }
+
+        // Final publication:
 
         let url = svc.api_url(&format!(
             "deposit/depositions/{}/actions/publish",
@@ -625,7 +639,10 @@ impl Command for PublishCommand {
             bail!("publication of record `{}` failed", &md.version_rec_id);
         }
 
-        info!("successfully published record `{}`", &md.version_rec_id);
+        info!(
+            "publication successful - view at https://zenodo.org/record/{}",
+            &md.version_rec_id
+        );
         Ok(0)
     }
 }
