@@ -8,6 +8,7 @@ use chrono::prelude::*;
 use json::JsonValue;
 use json5;
 use log::{error, info, warn};
+use percent_encoding;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Map, Value};
 use std::{
@@ -291,6 +292,16 @@ impl<'a> ZenodoWorkflow<'a> {
             );
         }
 
+        if let Some(s) = parsed["links"]["bucket"].take_string() {
+            md.bucket_link = s;
+        } else {
+            error!("Zenodo response: {}", parsed);
+            bail!(
+                "Zenodo preregistration seems to have succeeded, but response was \
+                missing `links.bucket` string field; cannot proceed"
+            );
+        }
+
         // As far as I can tell, when we're preregistering in this mode, the concept
         // DOI is not yet known or registered. But we need it now so that it can
         // be rewritten into the source code for display to users. Fortunately (?)
@@ -391,6 +402,11 @@ pub struct ZenodoMetadata {
     /// preregistration step.
     #[serde(rename = "doi", default)]
     pub version_doi: String,
+
+    /// The URL to use for uploading artifacts. Should not be stored in version
+    /// control.
+    #[serde(default)]
+    pub bucket_link: String,
 }
 
 impl ZenodoMetadata {
@@ -412,6 +428,23 @@ impl ZenodoMetadata {
         ensure!(
             md.version_doi.is_empty(),
             "`doi` field of `{}` must not be specified before preregistration",
+            path.display()
+        );
+        ensure!(
+            md.bucket_link.is_empty(),
+            "`bucket_link` field of `{}` must not be specified before preregistration",
+            path.display()
+        );
+        Ok(md)
+    }
+
+    /// Read the metadata file for the deployment phase.
+    fn load_for_deployment<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path = path.as_ref();
+        let md = Self::load_base(path)?;
+        ensure!(
+            !md.version_doi.is_empty(),
+            "`doi` field of `{}` should be specified for deployment",
             path.display()
         );
         Ok(md)
@@ -515,7 +548,7 @@ impl Command for PreregisterCommand {
                 );
             } else {
                 error!(
-                    "project `{}` does not seem to be freshly released; ignoring due to --force mode",
+                    "project `{}` does not seem to be freshly released",
                     self.proj_name
                 );
                 bail!("refusing to proceed (use `--force` to override)",);
@@ -534,12 +567,81 @@ impl Command for PreregisterCommand {
 /// Upload one or more files as artifacts associated with a Zenodo deposit.
 #[derive(Debug, PartialEq, StructOpt)]
 pub struct UploadArtifactsCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force operation even in unexpected conditions"
+    )]
+    force: bool,
+
+    #[structopt(
+        long = "metadata",
+        help = "The path to a JSON5 file containing Zenodo deposition metadata.",
+        required = true
+    )]
+    metadata_path: PathBuf,
+
     #[structopt(help = "The path(s) to the file(s) to upload", required = true)]
     paths: Vec<PathBuf>,
 }
 
 impl Command for UploadArtifactsCommand {
     fn execute(self) -> Result<i32> {
+        let sess = AppSession::initialize_default()?;
+        let (dev_mode, _rci) = sess.ensure_ci_rc_mode(self.force)?;
+
+        if dev_mode {
+            if self.force {
+                warn!("should not upload artifacts in development mode, but you're forcing me to");
+            } else {
+                error!("do not upload artifacts in development mode");
+                bail!("refusing to proceed (use `--force` to override)",);
+            }
+        }
+
+        let md = atry!(
+            ZenodoMetadata::load_for_deployment(&self.metadata_path);
+            ["failed to load Zenodo metadata file `{}`", &self.metadata_path.display()]
+        );
+
+        let svc = ZenodoService::new()?;
+        let client = svc.make_blocking_client()?;
+
+        // Ready to go
+
+        for path in &self.paths {
+            // Make sure the file exists!
+            let file = File::open(path)?;
+
+            let name = path
+                .file_name()
+                .ok_or_else(|| anyhow!("input file has no name component??"))?
+                .to_str()
+                .ok_or_else(|| anyhow!("input file name cannot be stringified"))?
+                .to_owned();
+
+            let enc =
+                percent_encoding::utf8_percent_encode(&name, percent_encoding::NON_ALPHANUMERIC);
+            info!("uploading `{}` => {}", path.display(), &name);
+
+            let url = format!("{}/{}", md.bucket_link, enc);
+            let resp = client
+                .put(&url)
+                .header(reqwest::header::CONTENT_TYPE, "application/octet-stream")
+                .body(file)
+                .send()?;
+            let status = resp.status();
+            let parsed = json::parse(&resp.text()?)?;
+
+            if !status.is_success() {
+                error!("Zenodo API response: {}", parsed);
+                bail!("creation of asset `{}` failed", name);
+            }
+
+            // On success, we don't have anything important to do with the
+            // response.
+        }
+
         Ok(0)
     }
 }

@@ -262,6 +262,7 @@ dependencies = [
  "log",
  "lru",
  "nom",
+ "percent-encoding",
  "petgraph",
  "quick-xml",
  "rand 0.8.5",
