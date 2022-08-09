@@ -12,7 +12,7 @@ use anyhow::{anyhow, bail, Context};
 use log::{info, warn};
 use std::{
     collections::BTreeSet,
-    env,
+    env as stdenv,
     ffi::OsString,
     fs,
     io::Write,
@@ -27,6 +27,7 @@ mod cargo;
 mod changelog;
 mod config;
 mod csproj;
+mod env;
 mod errors;
 mod github;
 mod gitutil;
@@ -224,7 +225,7 @@ impl Command for CiUtilEnvToFileCommand {
         use std::fs::OpenOptions;
 
         // Get the variable value.
-        let value = std::env::var_os(&self.var_name).ok_or_else(|| {
+        let value = stdenv::var_os(&self.var_name).ok_or_else(|| {
             anyhow!(
                 "environment variable `{}` not available",
                 &self.var_name.to_string_lossy()
@@ -477,7 +478,7 @@ impl Command for HelpCommand {
             }
 
             Some(cmd) => {
-                CrankoOptions::from_iter(&[&std::env::args().next().unwrap(), cmd, "--help"])
+                CrankoOptions::from_iter(&[&stdenv::args().next().unwrap(), cmd, "--help"])
                     .command
                     .execute()
             }
@@ -1016,7 +1017,7 @@ impl Command for StatusCommand {
 fn do_external(all_args: Vec<String>) -> Result<i32> {
     let (cmd, args) = all_args.split_first().unwrap();
 
-    let command_exe = format!("cranko-{}{}", cmd, env::consts::EXE_SUFFIX);
+    let command_exe = format!("cranko-{}{}", cmd, stdenv::consts::EXE_SUFFIX);
     let path = search_directories()
         .iter()
         .map(|dir| dir.join(&command_exe))
@@ -1056,7 +1057,7 @@ fn exec_or_spawn(cmd: &mut process::Command) -> Result<i32> {
 
 fn list_commands() -> BTreeSet<String> {
     let prefix = "cranko-";
-    let suffix = env::consts::EXE_SUFFIX;
+    let suffix = stdenv::consts::EXE_SUFFIX;
     let mut commands = BTreeSet::new();
 
     for dir in search_directories() {
@@ -1117,8 +1118,8 @@ fn is_executable<P: AsRef<Path>>(path: P) -> bool {
 fn search_directories() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
 
-    if let Some(val) = env::var_os("PATH") {
-        dirs.extend(env::split_paths(&val));
+    if let Some(val) = stdenv::var_os("PATH") {
+        dirs.extend(stdenv::split_paths(&val));
     }
     dirs
 }
