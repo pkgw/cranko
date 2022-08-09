@@ -472,6 +472,9 @@ pub enum ZenodoCommands {
     /// Pre-register a deposition, obtaining DOIs and applying them to the source.
     Preregister(PreregisterCommand),
 
+    /// Publish a deposition, registering the DOI(s).
+    Publish(PublishCommand),
+
     #[structopt(name = "upload-artifacts")]
     /// Upload one or more files as artifacts associated with a Zenodo deposit.
     UploadArtifacts(UploadArtifactsCommand),
@@ -487,6 +490,7 @@ impl Command for ZenodoCommand {
     fn execute(self) -> Result<i32> {
         match self.command {
             ZenodoCommands::Preregister(o) => o.execute(),
+            ZenodoCommands::Publish(o) => o.execute(),
             ZenodoCommands::UploadArtifacts(o) => o.execute(),
         }
     }
@@ -560,6 +564,68 @@ impl Command for PreregisterCommand {
         // Go!
 
         wf.preregister(&self.metadata_path, &self.rewrite_paths[..])?;
+        Ok(0)
+    }
+}
+
+/// Publish a deposition, registering the DOI(s).
+#[derive(Debug, PartialEq, StructOpt)]
+pub struct PublishCommand {
+    #[structopt(
+        short = "f",
+        long = "force",
+        help = "Force operation even in unexpected conditions"
+    )]
+    force: bool,
+
+    #[structopt(
+        long = "metadata",
+        help = "The path to a JSON5 file containing Zenodo deposition metadata.",
+        required = true
+    )]
+    metadata_path: PathBuf,
+}
+
+impl Command for PublishCommand {
+    fn execute(self) -> Result<i32> {
+        let sess = AppSession::initialize_default()?;
+        let (dev_mode, _rci) = sess.ensure_ci_rc_mode(self.force)?;
+
+        if dev_mode {
+            if self.force {
+                warn!("should not publish to Zenodo in development mode, but you're forcing me to");
+            } else {
+                error!("do not publish to Zenodo in development mode");
+                bail!("refusing to proceed (use `--force` to override)",);
+            }
+        }
+
+        let md = atry!(
+            ZenodoMetadata::load_for_deployment(&self.metadata_path);
+            ["failed to load Zenodo metadata file `{}`", &self.metadata_path.display()]
+        );
+
+        let svc = ZenodoService::new()?;
+        let client = svc.make_blocking_client()?;
+
+        // XXXXX set state=done????
+
+        // Pretty straightforward:
+
+        let url = svc.api_url(&format!(
+            "deposit/depositions/{}/actions/publish",
+            &md.version_rec_id
+        ));
+        let resp = client.post(&url).send()?;
+        let status = resp.status();
+        let parsed = json::parse(&resp.text()?)?;
+
+        if !status.is_success() {
+            error!("Zenodo API response: {}", parsed);
+            bail!("publication of record `{}` failed", &md.version_rec_id);
+        }
+
+        info!("successfully published record `{}`", &md.version_rec_id);
         Ok(0)
     }
 }
