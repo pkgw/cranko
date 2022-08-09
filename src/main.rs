@@ -39,6 +39,7 @@ mod pypa;
 mod repository;
 mod rewriters;
 mod version;
+mod zenodo;
 
 use errors::Result;
 
@@ -120,6 +121,10 @@ enum Commands {
     /// Report release status inside the active repo
     Status(StatusCommand),
 
+    #[structopt(name = "zenodo")]
+    /// Zenodo deposition utilities
+    Zenodo(zenodo::ZenodoCommand),
+
     #[structopt(external_subcommand)]
     External(Vec<String>),
 }
@@ -143,6 +148,7 @@ impl Command for Commands {
             Commands::Show(o) => o.execute(),
             Commands::Stage(o) => o.execute(),
             Commands::Status(o) => o.execute(),
+            Commands::Zenodo(o) => o.execute(),
             Commands::External(args) => do_external(args),
         }
     }
