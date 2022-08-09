@@ -694,6 +694,14 @@ struct ShowCommand {
 
 #[derive(Debug, PartialEq, StructOpt)]
 enum ShowCommands {
+    #[structopt(name = "cranko-version-doi")]
+    /// Print the DOI associated with this specific version of Cranko.
+    CrankoVersionDoi(ShowCrankoVersionDoiCommand),
+
+    #[structopt(name = "cranko-concept-doi")]
+    /// Print the DOI uniting all versions of the Cranko software package.
+    CrankoConceptDoi(ShowCrankoConceptDoiCommand),
+
     #[structopt(name = "if-released")]
     /// Report if a project was just released
     IfReleased(ShowIfReleasedCommand),
@@ -714,11 +722,33 @@ enum ShowCommands {
 impl Command for ShowCommand {
     fn execute(self) -> Result<i32> {
         match self.command {
+            ShowCommands::CrankoVersionDoi(o) => o.execute(),
+            ShowCommands::CrankoConceptDoi(o) => o.execute(),
             ShowCommands::IfReleased(o) => o.execute(),
             ShowCommands::TcTag(o) => o.execute(),
             ShowCommands::Toposort(o) => o.execute(),
             ShowCommands::Version(o) => o.execute(),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ShowCrankoVersionDoiCommand {}
+
+impl Command for ShowCrankoVersionDoiCommand {
+    fn execute(self) -> Result<i32> {
+        println!("xx.xxxx/dev-build.cranko.version");
+        Ok(0)
+    }
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ShowCrankoConceptDoiCommand {}
+
+impl Command for ShowCrankoConceptDoiCommand {
+    fn execute(self) -> Result<i32> {
+        println!("xx.xxxx/dev-build.cranko.concept");
+        Ok(0)
     }
 }
 
