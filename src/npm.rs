@@ -15,7 +15,6 @@ use std::{
     env,
     ffi::OsString,
     fs::{File, OpenOptions},
-    io::Write,
     process,
 };
 use structopt::StructOpt;

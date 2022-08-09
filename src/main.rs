@@ -1137,15 +1137,17 @@ fn search_directories() -> Vec<PathBuf> {
 #[cfg(not(windows))]
 #[macro_export]
 macro_rules! write_crlf {
-    ($stream:expr, $format:literal $($rest:tt)*) => {
+    ($stream:expr, $format:literal $($rest:tt)*) => {{
+        use std::io::Write;
         write!($stream, $format $($rest)*).and_then(|_x| write!($stream, "\n"))
-    }
+    }}
 }
 
 #[cfg(windows)]
 #[macro_export]
 macro_rules! write_crlf {
-    ($stream:expr, $format:literal $($rest:tt)*) => {
+    ($stream:expr, $format:literal $($rest:tt)*) => {{
+        use std::io::Write;
         write!($stream, $format $($rest)*).and_then(|_x| write!($stream, "\r\n"))
-    }
+    }}
 }
