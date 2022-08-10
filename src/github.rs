@@ -1,4 +1,4 @@
-// Copyright 2020 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2020-2022 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the MIT License.
 
 //! Release automation utilities related to the GitHub service.
@@ -6,40 +6,18 @@
 use anyhow::{anyhow, Context};
 use json::{object, JsonValue};
 use log::{error, info, warn};
-use std::{env, fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf};
 use structopt::StructOpt;
 
 use super::Command;
 use crate::{
     app::{AppBuilder, AppSession},
+    env::require_var,
     errors::Result,
     graph,
     project::Project,
     repository::{CommitId, ReleasedProjectInfo},
 };
-
-fn maybe_var(key: &str) -> Result<Option<String>> {
-    if let Some(os_str) = env::var_os(key) {
-        if let Ok(s) = os_str.into_string() {
-            if !s.is_empty() {
-                Ok(Some(s))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Err(anyhow!(
-                "could not parse environment variable {} as Unicode",
-                key
-            ))
-        }
-    } else {
-        Ok(None)
-    }
-}
-
-fn require_var(key: &str) -> Result<String> {
-    maybe_var(key)?.ok_or_else(|| anyhow!("environment variable {} must be provided", key))
-}
 
 struct GitHubInformation {
     slug: String,

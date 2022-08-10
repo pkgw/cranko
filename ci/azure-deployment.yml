@@ -2,9 +2,17 @@
 # branches. NB: right now we do nothing on `master`! (But we need a dummy job to
 # keep Pipelines happy.) That could change.
 
+parameters:
+- name: isMainDev
+  type: boolean
+  default: false
+- name: isRelease
+  type: boolean
+  default: false
+
 jobs:
 
-- ${{ if ne(variables['Build.SourceBranchName'], 'rc') }}:
+- ${{ if parameters.isMainDev }}:
   - job: dummy_setup_only
     pool:
       vmImage: ubuntu-latest
@@ -13,7 +21,7 @@ jobs:
       parameters:
         setupGit: false
 
-- ${{ if eq(variables['Build.SourceBranchName'], 'rc') }}:
+- ${{ if parameters.isRelease }}:
   - job: branch_and_tag
     pool:
       vmImage: ubuntu-latest
@@ -24,7 +32,7 @@ jobs:
       parameters:
         setupGit: true
     - bash: |
-        set -xeou pipefail
+        set -xeuo pipefail
         ./cranko release-workflow tag
         git push --tags origin release:release
       displayName: Tag and push
@@ -39,7 +47,7 @@ jobs:
     steps:
     - template: azure-deployment-setup.yml
     - bash: |
-        set -xeou pipefail
+        set -xeuo pipefail
         # If `./cranko` isn't moved, Cargo will complain about the dirty
         # working directory.
         mv ./cranko /tmp/
@@ -59,12 +67,39 @@ jobs:
       parameters:
         setupGit: true
     - bash: |
-        set -xeou pipefail
+        set -xeuo pipefail
         ./cranko github create-releases
         ./cranko github upload-artifacts cranko $(Pipeline.Workspace)/binary-*/*
       displayName: Create GitHub releases
       env:
         GITHUB_TOKEN: $(GITHUB_TOKEN)
+
+  - job: zenodo_publish
+    pool:
+      vmImage: ubuntu-latest
+    variables:
+    - group: Deployment Credentials
+    steps:
+    - template: azure-deployment-setup.yml
+
+    - bash: |
+        set -xeuo pipefail
+        vname="cranko-$(./cranko show version cranko)"
+        git archive --prefix="$vname/" -o cranko-$vname.tar.gz HEAD
+        ./cranko zenodo upload-artifacts --metadata=ci/zenodo.json5 cranko-$vname.tar.gz
+      displayName: Upload source tarball
+      env:
+        ZENODO_TOKEN: $(ZENODO_TOKEN)
+
+    - bash: ./cranko zenodo upload-artifacts --metadata=ci/zenodo.json5 $(Pipeline.Workspace)/binary-*/*
+      displayName: Upload binaries
+      env:
+        ZENODO_TOKEN: $(ZENODO_TOKEN)
+
+    - bash: ./cranko zenodo publish --metadata=ci/zenodo.json5
+      displayName: Publish to Zenodo
+      env:
+        ZENODO_TOKEN: $(ZENODO_TOKEN)
 
   - job: update_website
     pool:
@@ -76,7 +111,7 @@ jobs:
       parameters:
         setupGit: true
     - bash: |
-        set -xeou pipefail
+        set -xeuo pipefail
         git fetch $(Pipeline.Workspace)/git-gh-pages/gh-pages.bundle gh-pages
         git branch -f gh-pages FETCH_HEAD
         git push --force origin gh-pages:gh-pages

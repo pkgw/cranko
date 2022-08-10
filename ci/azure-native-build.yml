@@ -1,0 +1,30 @@
+# Do a native build
+
+parameters:
+- name: canaryBuild
+  type: boolean
+  default: false
+
+steps:
+- template: azure-job-setup.yml
+
+- bash: cargo build --all --release
+  displayName: "cargo build (release)"
+
+- bash: cargo test --all --release
+  displayName: "cargo test (release)"
+
+# For non-canary builds, generate and export artifacts.
+
+- ${{ if eq(parameters.canaryBuild, false) }}:
+  - bash: |
+      artifact_dir="$(Build.ArtifactStagingDirectory)/binary-$TARGET"
+      mkdir -p "$artifact_dir"
+      cargo run --release -- cargo package-released-binaries -t $TARGET $artifact_dir -- build --release
+    displayName: "Package binaries"
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish packaged binary artifact
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/binary-$(TARGET)'
+      artifactName: binary-$(TARGET)

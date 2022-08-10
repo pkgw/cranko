@@ -1,6 +1,6 @@
 [package]
 name = "cranko"
-version = "0.11.0"
+version = "0.12.0"
 authors = ["Peter Williams <peter@newton.cx>"]
 edition = "2018"
 license = "MIT"
@@ -19,7 +19,7 @@ exclude = [
 
 [dependencies]
 anyhow = "^1"
-atomicwrites = "^0.2"
+atomicwrites = "^0.3"
 base64 = "^0.12"
 cargo_metadata = "^0.10"
 chrono = "^0.4"
@@ -31,14 +31,16 @@ flate2 = "^1.0"
 git-url-parse = "^0.2"
 git2 = "^0.13"
 json = "^0.12"
+json5 = "^0.4"
 lazy_static = "^1.4"
 log = "^0.4"
-lru = "^0.6"
+lru = "^0.7"
 nom = "^5"
+percent-encoding = "^2"
 petgraph = "^0.5"
 quick-xml = "^0.22"
 rand = "^0.8"
-reqwest = { version = "^0.10", features = ["blocking"] }
+reqwest = { version = "^0.11", features = ["blocking"] }
 semver = "^0.9"
 serde = { version = "^1.0", features = ["derive"] }
 serde_json = "^1.0"
