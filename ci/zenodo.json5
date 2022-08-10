@@ -1,9 +1,9 @@
 // See https://developers.zenodo.org/#representation for definition of
-// deposition metadata. The documentation there should trusted more than any
+// deposition metadata. The documentation there should be trusted more than any
 // remarks in this file.
 
 {
-  conceptrecid: 'new-for:0.12.1',
+  conceptrecid: 'new-for:0.12.2',
 
   metadata: {
     upload_type: 'software',

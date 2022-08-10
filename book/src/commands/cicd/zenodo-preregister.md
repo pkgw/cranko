@@ -38,17 +38,19 @@ metadata file used by this command.
 [zint]: ../../integrations/zenodo.md
 [zconfig]: ../../configuration/zenodo.md
 
-This command requires that the environment variable `ZENODO_TOKEN` has been set
-to a Zenodo API token, *except during pull request processing*. During pull
-request processing, you should make sure **not** to provide this parameter, so
-that it is not accessible to malicious submissions.
-
 This command can be run during pull requests, not just during formal releases.
 In that case, fake DOIs will be used for the rewrite steps. These are guaranteed
 to start with the text `"xx.xxxx/"`, unlike real DOIs which always start with
 `10.`. The DOIs should be obviously fake to any user that sees them, but if you
 have code that embeds or outputs those DOIs, you may wish to add tests that
 check for these fake values and issue warnings as appropriate.
+
+This command requires that the environment variable `ZENODO_TOKEN` has been set
+to a Zenodo API token, *during release processing only*. During pull request
+processing, you should make sure **not** to provide this parameter, so that it
+is not accessible to malicious submissions. As a precaution, in the latter
+circumstance, the command will exit with an error if the environment variable is
+non-empty.
 
 #### See also
 

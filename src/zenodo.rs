@@ -45,6 +45,7 @@ impl ZenodoService {
 
         Ok(reqwest::blocking::Client::builder()
             .default_headers(headers)
+            .timeout(None) // default is 30s; Zenodo is slow
             .build()?)
     }
 

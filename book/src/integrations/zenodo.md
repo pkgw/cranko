@@ -88,11 +88,13 @@ While you should see the [Zenodo Metadata Files][zmeta] page for the full
 details of the file format, the short version is that it has two main fields.
 The first, `"metadata"`, contains the metadata that will describe your Zenodo
 deposition. See [the Zenodo developer documentation][mdformat] for a precise
-definition of all of the fields that can be used here. *The contents here are
-things you need to decide for yourself,* including, most importantly, the author
-list that you want to associate with your project.
+definition of all of the fields that can be used here, or check out [Cranko’s
+own version of the file][cmetafile] for inspiration. *The contents of this file
+are things you need to decide for yourself,* including, most importantly, the
+author list that you want to associate with your project.
 
 [mdformat]: https://developers.zenodo.org/#deposit-metadata
+[cmetafile]: https://github.com/pkgw/cranko/blob/master/ci/zenodo.json5
 
 The second field, `"conceptrecid"`, will be used to ensure that successive
 releases of your project are all tied together with the same concept DOI. When
@@ -130,14 +132,17 @@ This insertion happens during the ['cranko zenodo preregister`][prereg] command,
 which will rewrite any files whose paths you pass to it on the command line.
 The following rewrite rules are followed:
 
+- The text `xx.xxxx/dev-build.$project.version`, where `$project` is the name of
+  the Cranko project being released, is replaced with the version DOI. To be
+  explicit, for Cranko itself the template to be replaced would be
+  `xx.xxxx/dev-build.cranko.version`.
 - The text `xx.xxxx/dev-build.$project.concept`, where `$project` is the name of
   the Cranko project being released, is replaced with the concept DOI.
-- The text `xx.xxxx/dev-build.$project.version`, where `$project` is the name of
-  the Cranko project being released, is replaced with the version DOI.
 
 If you’re feeling extra-clever, you can include these templates in your
 `CHANGELOG.md` entry, and your final changelog will include the DOIs of the
-release that it describes.
+release that it describes. (If you do this, you’ll need to pass the path to
+`CHANGELOG.md` as an argument to [`cranko zenodo preregister`][prereg].)
 
 If you’re building out of source control, these replacements won't happen, of
 course. If a pull request is being built, fake DOIs with similar forms will be
@@ -156,7 +161,7 @@ to work.
 [zdev]: https://developers.zenodo.org/
 [ztok]: https://zenodo.org/account/settings/applications/tokens/new/
 
-The ['cranko zenodo preregister`][prereg] command(s) should be run at the
+The [`cranko zenodo preregister`][prereg] command(s) should be run at the
 beginning of your CI/CD workflow, before [`cranko release-workflow commit`].
 After it runs, you should `git add` your modified files to make sure they get
 included in the release commit.
