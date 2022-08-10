@@ -3,7 +3,7 @@
 // remarks in this file.
 
 {
-  conceptrecid: 'new-for:0.12.0',
+  conceptrecid: 'new-for:0.12.1',
 
   metadata: {
     upload_type: 'software',
