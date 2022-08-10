@@ -726,13 +726,21 @@ impl Command for PublishCommand {
         let svc = ZenodoService::new()?;
         let client = svc.make_blocking_client()?;
 
-        // Tests indicate that we need to update `state` here:
+        // Tests indicate that we need to update `state` at this point. Zenodo
+        // won't let us update only that field; we need to include the
+        // "metadata" section as well.
+
+        let md_body = atry!(
+            serde_json::to_string(&md.metadata);
+            ["failed to serialize Zenodo metadata to JSON"]
+        );
+        let body = format!("{{\"metadata\":{}, \"state\": \"done\"}}", md_body);
 
         let url = svc.api_url(&format!("deposit/depositions/{}", &md.version_rec_id));
         let resp = client
-            .post(&url)
+            .put(&url)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .body(r#"{"state": "done"}"#)
+            .body(body)
             .send()?;
         let status = resp.status();
         let parsed = json::parse(&resp.text()?)?;
