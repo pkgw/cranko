@@ -1,3 +1,19 @@
+# cranko 0.12.1 (2022-08-10)
+
+The new functionality in the previous release did indeed need a small tweak.
+
+- Fix preconditions of `zenodo update-artifacts` and `zenodo publish` commands:
+  they require "release" mode, not "rc" (#36, @pkgw).
+
+The DOIs associated with the 0.12.0 release are not valid because the automated
+Zenodo publication step didn't complete. With this fix, hopefully this time it
+will.
+
+The DOI of this release is [10.5281/zenodo.6981564][cdoi].
+
+[cdoi]: https://doi.org/10.5281/zenodo.6981564
+
+
 # cranko 0.12.0 (2022-08-10)
 
 This release of Cranko adds support for safe, automated registration of
