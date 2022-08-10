@@ -35,7 +35,7 @@ jobs:
   - bash: |
       cargo run --release -- zenodo preregister --metadata=ci/zenodo.json5 cranko src/main.rs CHANGELOG.md
     displayName: "cranko zenodo preregister (bootstrap)"
-    ${{ if eq(variables['Build.SourceBranchName'], 'rc') }}:
+    ${{ if and(eq(variables['Build.SourceBranchName'], 'rc'), ne(variables['build.reason'], 'PullRequest')) }}:
       variables:
       - group: Deployment Credentials
       env:

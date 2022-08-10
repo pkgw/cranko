@@ -12,6 +12,7 @@ parameters:
     default:
     - name: linux_stable
       vmImage: ubuntu-latest
+      params: {}
       vars:
         TARGET: x86_64-unknown-linux-gnu
         TOOLCHAIN: stable
