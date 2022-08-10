@@ -40,7 +40,14 @@ This command requires that the environment variable `ZENODO_TOKEN` has been
 set to a Zenodo API token.
 
 This command should only be run during formal releases, and not during pull
-requests.
+requests. Note also that you can choose to *not* run this command in your CI/CD
+pipeline, and instead manually publish your Zenodo deposit after review by a
+human. That may be tempting, because Zenodo deposits cannot be changed once they
+are published. However, our experience is that it is more reliable and more
+convenient to fully automate the publication process and fix bugs in that
+automation as they arise, rather than including a human in the loop. If releases
+and deposits are “cheap”, there’s no problem with superseding them when one
+turns out to have a problem.
 
 #### See also
 

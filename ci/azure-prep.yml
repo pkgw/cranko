@@ -6,6 +6,10 @@ jobs:
   pool:
     vmImage: ubuntu-latest
 
+  ${{ if and(eq(variables['Build.SourceBranchName'], 'rc'), ne(variables['build.reason'], 'PullRequest')) }}:
+    variables:
+    - group: Deployment Credentials
+
   steps:
   - checkout: self
 
@@ -38,8 +42,6 @@ jobs:
       cargo run --release -- zenodo preregister --metadata=ci/zenodo.json5 cranko src/main.rs CHANGELOG.md
     displayName: "cranko zenodo preregister (bootstrap)"
     ${{ if and(eq(variables['Build.SourceBranchName'], 'rc'), ne(variables['build.reason'], 'PullRequest')) }}:
-      variables:
-      - group: Deployment Credentials
       env:
           ZENODO_TOKEN: $(ZENODO_TOKEN)
 
