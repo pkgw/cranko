@@ -20,7 +20,7 @@ stages:
   - template: azure-build-and-test.yml
 
 - stage: Deploy
-  condition: and(succeeded('MainBuild'), ne(variables['build.reason'], 'PullRequest'))
+  condition: and(succeeded('BuildAndTest'), ne(variables['build.reason'], 'PullRequest'))
   jobs:
   - template: azure-deployment.yml
     parameters:
