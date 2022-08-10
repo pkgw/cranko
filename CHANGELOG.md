@@ -1,5 +1,65 @@
 # rc: minor bump
 
+This release of Cranko adds support for safe, automated registration of
+software [DOI]s using [Zenodo]!
+
+[DOI]: https://www.doi.org/
+[Zenodo]: https://zenodo.org/
+
+While these release notes are not the place to explain in detail why you might
+want to register DOIs for your software releases, it's worth spending a few
+sentences on the subject. At a nuts-and-bolts level, “depositing” a new software
+release with Zenodo is like creating a [GitHub release][ghrel]: you provide
+metadata, upload files, and “publish” the package for long-term archiving. The
+only important difference is that Zenodo will register a DOI for you. Who cares?
+Not everyone! But if you’re an academic, having a DOI makes it possible to “talk
+about” your software as a piece of scholarly output, and Zenodo’s publication
+process registers information about your software with [Crossref] and the
+broader scholarly-publishing information ecosystem. In particular, DOI
+registration allows you to associate an author list and [ORCID iDs] with a piece
+of software, so you can get credit for your work!
+
+[ghrel]: https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases
+[Crossref]: https://www.crossref.org/
+[ORCID iDs]: https://orcid.org/
+
+It’s possible to create Zenodo deposits manually, just as it’s possible to
+create software releases manually. As ever, the “Cranko perspective” is that
+it’s *a total game-changer* to automate these processes. Automation changes
+these things from things that happen when you have the time, to things that
+“just happen”.
+
+In particular, Cranko’s Zenodo integration provides an incredibly useful piece
+of functionality that would be incredibly tedious to implement manually. It uses
+Zenodo’s “preregistration” capability to know what DOI your release will have
+*before you publish it*, so that your software can *know its own DOI*. You can
+use this feature to, for instance, provide a “BibTeX” command that reliably
+provides users with the correct citation information for the exact version of
+your software that they’re running.
+
+Specifically, at the beginning of your CI/CD pipeline, you can run a new command
+`cranko zenodo preregister` that will preregister your Zenodo release — with
+sensible behavior for non-release builds. The `preregister` command can rewrite
+your source files to insert the preregistered DOI wherever you need it. Once a
+release is verified and finalized, you can use `cranko zenodo upload-artifacts`
+to associate files with the deposit, and `cranko zenodo publish` to finally
+publish it. To set up this support, you need to put a `zenodo.json5` file
+somewhere that contains the Zenodo metadata, and export a Zenodo API token in
+your CI/CD environment under the name `ZENODO_TOKEN` when needed. See
+[the Cranko book][book] for detailed documentation.
+
+[book]: https://pkgw.github.io/cranko/book/latest/
+
+We are still testing out the new workflow with Cranko itself, so it’s possible
+that this release will shortly be superseded as we work out the kinks!
+
+The DOI of this release is [xx.xxxx/dev-build.cranko.version][doi].
+
+[doi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+
+
+# cranko 0.11.0 (2022-04-04)
+
 - Add the ability to ignore projects discovered during the autodetection phase.
   Specifically, the `.config/cranko/config.toml` file now supports a
   `projects.$qname.ignore = true` key that does this, [as documented in the

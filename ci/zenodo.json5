@@ -1,0 +1,42 @@
+// See https://developers.zenodo.org/#representation for definition of
+// deposition metadata. The documentation there should trusted more than any
+// remarks in this file.
+
+{
+  conceptrecid: 'new-for:0.12.0',
+
+  metadata: {
+    upload_type: 'software',
+    //publication_type: only applicable for upload_type = 'publication'
+    //image_type: only applicable for upload_type = 'image'
+    language: 'eng', // Main language of *this record* as an ISO 639-2 or 639-3 code
+
+    //title: filled in by Cranko
+    //publication_date: filled in by Cranko to today's date
+    //version: filled in by Cranko
+    creators: [
+      {
+        affiliation: 'Center for Astrophysics | Harvard & Smithsonian',
+        name: 'Williams, Peter K. G.',
+        orcid: '0000-0003-3734-3587',
+      }
+    ],
+    // "contributors" can also list people who helped create the deposition
+
+    // Subset of HTML allowed here:
+    description: 'Cranko is a release automation tool implementing the \
+just-in-time versioning workflow. It is cross-platform, installable \
+as a single executable, supports multiple languages and packaging \
+systems, and is designed from the ground up to work with monorepos. \
+Learn more at <a href="https://pkgw.github.io/cranko/">the Cranko website</a>.',
+
+    access_right: 'open',
+    license: 'MIT', // see https://spdx.org/licenses/
+
+    // Keywords use an uncontrolled vocabulary (and so are of limited usefulness):
+    keywords: [
+      'release-automation',
+      'rust',
+    ],
+  },
+}
