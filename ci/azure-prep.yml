@@ -1,0 +1,80 @@
+# Preparatory stage -- build a local version of Cranko, assign versions, prep
+# Zenodo, etc.
+
+jobs:
+- job: main
+  pool:
+    vmImage: ubuntu-latest
+
+  steps:
+  - checkout: self
+
+  - bash: |
+      set -e
+      rustup set profile minimal
+      rustup component remove --toolchain=$TOOLCHAIN rust-docs || echo "already removed"
+      rustup update --no-self-update $TOOLCHAIN
+      rustup default $TOOLCHAIN
+      # Log versions
+      set -ex
+      rustup -V
+      rustc -Vv
+      cargo -V
+    displayName: Set up Rust
+    env:
+      TOOLCHAIN: stable
+
+  - bash: cargo build --release
+    displayName: "cargo build (bootstrap)"
+
+  - bash: |
+      cargo run --release -- release-workflow apply-versions
+    displayName: "cranko release-workflow apply-versions (bootstrap)"
+
+  # This step needs to make sure to only supply $ZENODO_TOKEN to trusted builds;
+  # i.e. it should not be present on PR builds. Cranko will error out if you get
+  # this wrong.
+  - bash: |
+      cargo run --release -- zenodo preregister --metadata=ci/zenodo.json5 cranko src/main.rs CHANGELOG.md
+    displayName: "cranko zenodo preregister (bootstrap)"
+    ${{ if and(eq(variables['Build.SourceBranchName'], 'rc'), ne(variables['build.reason'], 'PullRequest')) }}:
+      variables:
+      - group: Deployment Credentials
+      env:
+          ZENODO_TOKEN: $(ZENODO_TOKEN)
+
+  - bash: |
+      set -xeuo pipefail
+      git add .
+      cargo run --release -- release-workflow commit
+      git show
+    displayName: Apply versions and generate release commit
+
+  - bash: |
+      set -xeuo pipefail
+      artifact_dir="$(Build.ArtifactStagingDirectory)/git-release"
+      mkdir -p "$artifact_dir"
+      git bundle create "$artifact_dir/release.bundle" origin/master..HEAD
+    displayName: "Bundle release commit"
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish git bundle artifact
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/git-release'
+      artifactName: git-release
+
+  - bash: cargo build --release
+    displayName: "Rebuild (with versions)"
+
+  - bash: |
+      set -xeuo pipefail
+      artifact_dir="$(Build.ArtifactStagingDirectory)/bootstrap-binary"
+      mkdir -p "$artifact_dir"
+      cp target/release/cranko "${artifact_dir}/"
+    displayName: "Create bootstrapped binary artifact"
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish bootstrapped binary artifact
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)/bootstrap-binary'
+      artifactName: bootstrap-binary

@@ -12,7 +12,7 @@ use anyhow::{anyhow, bail, Context};
 use log::{info, warn};
 use std::{
     collections::BTreeSet,
-    env,
+    env as stdenv,
     ffi::OsString,
     fs,
     io::Write,
@@ -27,6 +27,7 @@ mod cargo;
 mod changelog;
 mod config;
 mod csproj;
+mod env;
 mod errors;
 mod github;
 mod gitutil;
@@ -38,6 +39,7 @@ mod pypa;
 mod repository;
 mod rewriters;
 mod version;
+mod zenodo;
 
 use errors::Result;
 
@@ -119,6 +121,10 @@ enum Commands {
     /// Report release status inside the active repo
     Status(StatusCommand),
 
+    #[structopt(name = "zenodo")]
+    /// Zenodo deposition utilities
+    Zenodo(zenodo::ZenodoCommand),
+
     #[structopt(external_subcommand)]
     External(Vec<String>),
 }
@@ -142,6 +148,7 @@ impl Command for Commands {
             Commands::Show(o) => o.execute(),
             Commands::Stage(o) => o.execute(),
             Commands::Status(o) => o.execute(),
+            Commands::Zenodo(o) => o.execute(),
             Commands::External(args) => do_external(args),
         }
     }
@@ -224,7 +231,7 @@ impl Command for CiUtilEnvToFileCommand {
         use std::fs::OpenOptions;
 
         // Get the variable value.
-        let value = std::env::var_os(&self.var_name).ok_or_else(|| {
+        let value = stdenv::var_os(&self.var_name).ok_or_else(|| {
             anyhow!(
                 "environment variable `{}` not available",
                 &self.var_name.to_string_lossy()
@@ -477,7 +484,7 @@ impl Command for HelpCommand {
             }
 
             Some(cmd) => {
-                CrankoOptions::from_iter(&[&std::env::args().next().unwrap(), cmd, "--help"])
+                CrankoOptions::from_iter(&[&stdenv::args().next().unwrap(), cmd, "--help"])
                     .command
                     .execute()
             }
@@ -687,6 +694,14 @@ struct ShowCommand {
 
 #[derive(Debug, PartialEq, StructOpt)]
 enum ShowCommands {
+    #[structopt(name = "cranko-version-doi")]
+    /// Print the DOI associated with this specific version of Cranko.
+    CrankoVersionDoi(ShowCrankoVersionDoiCommand),
+
+    #[structopt(name = "cranko-concept-doi")]
+    /// Print the DOI uniting all versions of the Cranko software package.
+    CrankoConceptDoi(ShowCrankoConceptDoiCommand),
+
     #[structopt(name = "if-released")]
     /// Report if a project was just released
     IfReleased(ShowIfReleasedCommand),
@@ -707,11 +722,47 @@ enum ShowCommands {
 impl Command for ShowCommand {
     fn execute(self) -> Result<i32> {
         match self.command {
+            ShowCommands::CrankoVersionDoi(o) => o.execute(),
+            ShowCommands::CrankoConceptDoi(o) => o.execute(),
             ShowCommands::IfReleased(o) => o.execute(),
             ShowCommands::TcTag(o) => o.execute(),
             ShowCommands::Toposort(o) => o.execute(),
             ShowCommands::Version(o) => o.execute(),
         }
+    }
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ShowCrankoVersionDoiCommand {}
+
+impl Command for ShowCrankoVersionDoiCommand {
+    fn execute(self) -> Result<i32> {
+        // For releases, this will be rewritten to the real DOI:
+        let doi = "xx.xxxx/dev-build.cranko.version";
+
+        if doi.starts_with("xx.") {
+            warn!("you are running a development build; the printed value is not a real DOI");
+        }
+
+        println!("{}", doi);
+        Ok(0)
+    }
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+struct ShowCrankoConceptDoiCommand {}
+
+impl Command for ShowCrankoConceptDoiCommand {
+    fn execute(self) -> Result<i32> {
+        // For releases, this will be rewritten to the real DOI:
+        let doi = "xx.xxxx/dev-build.cranko.concept";
+
+        if doi.starts_with("xx.") {
+            warn!("you are running a development build; the printed value is not a real DOI");
+        }
+
+        println!("{}", doi);
+        Ok(0)
     }
 }
 
@@ -1016,7 +1067,7 @@ impl Command for StatusCommand {
 fn do_external(all_args: Vec<String>) -> Result<i32> {
     let (cmd, args) = all_args.split_first().unwrap();
 
-    let command_exe = format!("cranko-{}{}", cmd, env::consts::EXE_SUFFIX);
+    let command_exe = format!("cranko-{}{}", cmd, stdenv::consts::EXE_SUFFIX);
     let path = search_directories()
         .iter()
         .map(|dir| dir.join(&command_exe))
@@ -1025,7 +1076,7 @@ fn do_external(all_args: Vec<String>) -> Result<i32> {
     let command = path.ok_or_else(|| {
         anyhow!(
             "no internal or external subcommand `{0}` is available (install `cranko-{0}`?)",
-            cmd.to_owned()
+            cmd
         )
     })?;
     exec_or_spawn(process::Command::new(command).args(args))
@@ -1056,7 +1107,7 @@ fn exec_or_spawn(cmd: &mut process::Command) -> Result<i32> {
 
 fn list_commands() -> BTreeSet<String> {
     let prefix = "cranko-";
-    let suffix = env::consts::EXE_SUFFIX;
+    let suffix = stdenv::consts::EXE_SUFFIX;
     let mut commands = BTreeSet::new();
 
     for dir in search_directories() {
@@ -1117,8 +1168,8 @@ fn is_executable<P: AsRef<Path>>(path: P) -> bool {
 fn search_directories() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
 
-    if let Some(val) = env::var_os("PATH") {
-        dirs.extend(env::split_paths(&val));
+    if let Some(val) = stdenv::var_os("PATH") {
+        dirs.extend(stdenv::split_paths(&val));
     }
     dirs
 }
@@ -1130,15 +1181,17 @@ fn search_directories() -> Vec<PathBuf> {
 #[cfg(not(windows))]
 #[macro_export]
 macro_rules! write_crlf {
-    ($stream:expr, $format:literal $($rest:tt)*) => {
+    ($stream:expr, $format:literal $($rest:tt)*) => {{
+        use std::io::Write;
         write!($stream, $format $($rest)*).and_then(|_x| write!($stream, "\n"))
-    }
+    }}
 }
 
 #[cfg(windows)]
 #[macro_export]
 macro_rules! write_crlf {
-    ($stream:expr, $format:literal $($rest:tt)*) => {
+    ($stream:expr, $format:literal $($rest:tt)*) => {{
+        use std::io::Write;
         write!($stream, $format $($rest)*).and_then(|_x| write!($stream, "\r\n"))
-    }
+    }}
 }

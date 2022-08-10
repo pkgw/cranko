@@ -12,7 +12,7 @@ use std::{
     env,
     ffi::OsString,
     fs::{File, OpenOptions},
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Read},
     process,
 };
 use structopt::StructOpt;

@@ -1,80 +1,155 @@
+# We cannot use Pipeline's matrixing framework because only it works with
+# *runtime variables*, while we want to use templates with *parameters* which
+# are evaluated at *compile time* only. By coding our matrixing data as
+# top-level parameters, we can use them in compile-time template evaluation
+# (`${{ }}` expressions) to achieve a matrixing effect. Only a few variables can
+# be used at compile time: see "Available in templates?" in the table at:
+# https://docs.microsoft.com/en-us/azure/devops/pipelines/build/variables?view=azure-devops&tabs=yaml
+
 parameters:
-- name: canaryBuild
-  type: boolean
-  default: false
-- name: primaryBuild
-  type: boolean
-  default: false
+  - name: builds
+    type: object
+    default:
+    - name: linux_stable
+      vmImage: ubuntu-latest
+      params: {}
+      vars:
+        TARGET: x86_64-unknown-linux-gnu
+        TOOLCHAIN: stable
 
-steps:
-- checkout: self
+    - name: linux_beta
+      vmImage: ubuntu-latest
+      params:
+        canaryBuild: true
+      vars:
+        TARGET: x86_64-unknown-linux-gnu
+        TOOLCHAIN: beta
 
-- bash: |
-    set -e
-    rustup set profile minimal
-    rustup component remove --toolchain=$TOOLCHAIN rust-docs || echo "already removed"
-    rustup update --no-self-update $TOOLCHAIN
-    rustup default $TOOLCHAIN
-    # Log versions
-    set -ex
-    rustup -V
-    rustc -Vv
-    cargo -V
-  displayName: Set up Rust
+    - name: linux_nightly
+      vmImage: ubuntu-latest
+      params:
+        canaryBuild: true
+      vars:
+        TARGET: x86_64-unknown-linux-gnu
+        TOOLCHAIN: nightly
 
-# Bootstrap a binary for the buildhost arch with the unmodified checkout at
-# 0.0.0 versions. We're going to have to build everything in release mode
-# eventually, so it saves a bit of time to do that from the start.
+    - name: windows_msvc
+      vmImage: windows-2019
+      params: {}
+      vars:
+        TARGET: x86_64-pc-windows-msvc
+        TOOLCHAIN: stable-x86_64-pc-windows-msvc
 
-- bash: cargo build --all --release
-  displayName: "cargo build (bootstrap)"
+    - name: windows_gnu
+      vmImage: windows-2019
+      params: {}
+      vars:
+        TARGET: x86_64-pc-windows-gnu
+        TOOLCHAIN: stable-x86_64-pc-windows-gnu
 
-- bash: |
-    git status  # temp: Windows builds intermittently report changed files here??
-    cargo run --release -- release-workflow apply-versions
-  displayName: "cranko release-workflow apply-versions (using bootstrapped build)"
+    - name: macos
+      vmImage: macos-latest
+      params: {}
+      vars:
+        TARGET: x86_64-apple-darwin
+        TOOLCHAIN: stable
 
-# Now that we've applied versions, mainline test workflow
+  - name: crossBuilds
+    type: object
+    default:
+    - name: aarch64_unknown_linux_gnu
+      vars:
+        TARGET: aarch64-unknown-linux-gnu
 
-- bash: cargo build --all --release
-  displayName: "cargo build (release)"
+    - name: powerpc64le_unknown_linux_gnu
+      vars:
+        TARGET: powerpc64le-unknown-linux-gnu
 
-- bash: cargo test --all --release
-  displayName: "cargo test (release)"
+jobs:
 
-# For non-canary builds, generate and export artifacts.
+# Main builds
+- ${{ each build in parameters.builds }}:
+  - job: ${{ format('build_{0}', build.name) }}
+    pool:
+      vmImage: ${{ build.vmImage }}
+    steps:
+    - template: azure-native-build.yml
+      parameters:
+        ${{ insert }}: ${{ build.params }}
+    variables:
+      ${{ insert }}: ${{ build.vars }}
 
-- ${{ if eq(parameters.canaryBuild, false) }}:
+# Cross builds
+- ${{ each build in parameters.crossBuilds }}:
+  - job: ${{ format('cross_{0}', build.name) }}
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - template: azure-cross-build.yml
+    variables:
+      ${{ insert }}: ${{ build.vars }}
+
+# rustfmt check
+- job: rustfmt
+  pool:
+    vmImage: ubuntu-latest
+  steps:
+  - template: azure-job-setup.yml
+  - bash: rustup component add rustfmt
+    displayName: "Install rustfmt"
+  - bash: cargo fmt --all -- --check
+    displayName: "Check rustfmt (cargo)"
+  variables:
+    TOOLCHAIN: stable
+
+# clippy check
+- job: clippy
+  pool:
+    vmImage: ubuntu-latest
+  steps:
+  - template: azure-job-setup.yml
+  - bash: rustup component add clippy
+    displayName: "Install clippy"
+  - bash: cargo clippy --all --all-targets --all-features -- --deny warnings
+    displayName: "Check clippy (cargo)"
+  variables:
+    TOOLCHAIN: stable
+
+# website/book build
+- job: website
+  pool:
+    vmImage: ubuntu-latest
+  steps:
+  - template: azure-job-setup.yml
+
   - bash: |
-      git add .
-      cargo run --release -- release-workflow commit
-      git show HEAD
-    displayName: "Make release commit"
+      set -xeuo pipefail
+      fn="mdbook-v$(MDBOOK_VERSION)-x86_64-unknown-linux-gnu.tar.gz"
+      url="https://github.com/rust-lang/mdBook/releases/download/v$(MDBOOK_VERSION)/$fn"
+      wget -q --progress=dot "$url"
+      tar xzf "$fn"
+      rm -f "$fn"
+      # See build.sh below:
+      mkdir -p target/debug
+      mv mdbook target/debug/
+    displayName: Install mdbook $(MDBOOK_VERSION)
+
+  - bash: cargo build --bin cranko
+    displayName: "cargo build"
+
+  - bash: PATH="$(pwd)/target/debug:$PATH" www/build.sh
+    displayName: "Build website content"
 
   - bash: |
-      artifact_dir="$(Build.ArtifactStagingDirectory)/binary-$TARGET"
+      set -xeuo pipefail
+      cargo run -- git-util reboot-branch gh-pages www/content
+      artifact_dir="$(Build.ArtifactStagingDirectory)/git-gh-pages"
       mkdir -p "$artifact_dir"
-      cargo run --release -- cargo package-released-binaries -t $TARGET $artifact_dir -- build --release
-    displayName: "Package binaries"
+      git bundle create "$artifact_dir/gh-pages.bundle" gh-pages
+    displayName: "Prep new gh-pages branch"
 
   - task: PublishPipelineArtifact@1
-    displayName: Publish packaged binary artifact
+    displayName: Publish git bundle artifact
     inputs:
-      targetPath: '$(Build.ArtifactStagingDirectory)/binary-$(TARGET)'
-      artifactName: binary-$(TARGET)
-
-  # If, further, we're the primary build on the `rc` branch, export our release
-  # commit as the canonical one.
-
-  - ${{ if and(eq(parameters.primaryBuild, true), eq(variables['Build.SourceBranchName'], 'rc')) }}:
-    - bash: |
-        artifact_dir="$(Build.ArtifactStagingDirectory)/git-release"
-        mkdir -p "$artifact_dir"
-        git bundle create "$artifact_dir/release.bundle" origin/master..HEAD
-      displayName: "Bundle release commit"
-
-    - task: PublishPipelineArtifact@1
-      displayName: Publish git bundle artifact
-      inputs:
-        targetPath: '$(Build.ArtifactStagingDirectory)/git-release'
-        artifactName: git-release
+      targetPath: '$(Build.ArtifactStagingDirectory)/git-gh-pages'
+      artifactName: git-gh-pages

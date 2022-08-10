@@ -11,7 +11,7 @@ use quick_xml::{events::Event, Reader};
 use std::{
     collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader},
 };
 
 use crate::{
