@@ -6,9 +6,7 @@
 use anyhow::{anyhow, bail, ensure};
 use chrono::prelude::*;
 use json::JsonValue;
-use json5;
 use log::{error, info, warn};
-use percent_encoding;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Map, Value};
 use std::{
@@ -124,7 +122,7 @@ impl<'a> ZenodoWorkflow<'a> {
         // one.
 
         let new_concept = match &self.mode {
-            &ZenodoMode::Development => {
+            ZenodoMode::Development => {
                 md.concept_doi =
                     format!("xx.xxxx/dev-build.{}.concept", &self.proj.user_facing_name);
                 md.version_rec_id = format!(
@@ -138,12 +136,12 @@ impl<'a> ZenodoWorkflow<'a> {
                 false
             }
 
-            &ZenodoMode::Release(ref svc) => {
+            ZenodoMode::Release(ref svc) => {
                 if let Some(target_version) = md.concept_rec_id.strip_prefix("new-for:") {
                     // Registering a wholly new project, not an updated version in a
                     // series. Make sure that we're not accidentally doing that.
 
-                    if target_version != &self.proj.version.to_string() {
+                    if target_version != self.proj.version.to_string() {
                         error!("the Zenodo metadata file specifies that a new \"concept DOI\" should be created");
                         error!(
                             "... but for version `{}`, while this run is for version `{}`",

@@ -1062,7 +1062,7 @@ fn do_external(all_args: Vec<String>) -> Result<i32> {
     let command = path.ok_or_else(|| {
         anyhow!(
             "no internal or external subcommand `{0}` is available (install `cranko-{0}`?)",
-            cmd.to_owned()
+            cmd
         )
     })?;
     exec_or_spawn(process::Command::new(command).args(args))
