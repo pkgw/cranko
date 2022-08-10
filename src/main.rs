@@ -737,7 +737,14 @@ struct ShowCrankoVersionDoiCommand {}
 
 impl Command for ShowCrankoVersionDoiCommand {
     fn execute(self) -> Result<i32> {
-        println!("xx.xxxx/dev-build.cranko.version");
+        // For releases, this will be rewritten to the real DOI:
+        let doi = "xx.xxxx/dev-build.cranko.version";
+
+        if doi.starts_with("xx.") {
+            warn!("you are running a development build; the printed value is not a real DOI");
+        }
+
+        println!("{}", doi);
         Ok(0)
     }
 }
@@ -747,7 +754,14 @@ struct ShowCrankoConceptDoiCommand {}
 
 impl Command for ShowCrankoConceptDoiCommand {
     fn execute(self) -> Result<i32> {
-        println!("xx.xxxx/dev-build.cranko.concept");
+        // For releases, this will be rewritten to the real DOI:
+        let doi = "xx.xxxx/dev-build.cranko.concept";
+
+        if doi.starts_with("xx.") {
+            warn!("you are running a development build; the printed value is not a real DOI");
+        }
+
+        println!("{}", doi);
         Ok(0)
     }
 }
