@@ -1,5 +1,18 @@
 # rc: micro bump
 
+No code changes from the previous release.
+
+This release will test out Cranko’s support for creating new versions of
+existing Zenodo deposits, so that the resulting deposits are linked by
+a shared “concept DOI”.
+
+The DOI of this release is [xx.xxxx/dev-build.cranko.version][cdoi].
+
+[cdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+
+
+# cranko 0.12.2 (2022-08-10)
+
 Another fix needed on the road to getting Zenodo to work reliably:
 
 - Remove Zenodo HTTP timeouts, because `zenodo update-artifacts` was
@@ -10,9 +23,9 @@ because their Zenodo publication processes did not complete automatically. (I
 could complete it manually, but I want to validate that this process can work
 with full automation, and no one's going to use the old artifacts.)
 
-The DOI of this release is [xx.xxxx/dev-build.cranko.version][cdoi].
+The DOI of this release is [10.5281/zenodo.6981680][cdoi].
 
-[cdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+[cdoi]: https://doi.org/10.5281/zenodo.6981680
 
 
 # cranko 0.12.1 (2022-08-10)
