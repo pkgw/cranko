@@ -1,3 +1,16 @@
+# cranko 0.12.3 (2022-08-10)
+
+No code changes from the previous release.
+
+This release will test out Cranko’s support for creating new versions of
+existing Zenodo deposits, so that the resulting deposits are linked by
+a shared “concept DOI”.
+
+The DOI of this release is [10.5281/zenodo.6981786][cdoi].
+
+[cdoi]: https://doi.org/10.5281/zenodo.6981786
+
+
 # cranko 0.12.2 (2022-08-10)
 
 Another fix needed on the road to getting Zenodo to work reliably:

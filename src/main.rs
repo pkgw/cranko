@@ -738,7 +738,7 @@ struct ShowCrankoVersionDoiCommand {}
 impl Command for ShowCrankoVersionDoiCommand {
     fn execute(self) -> Result<i32> {
         // For releases, this will be rewritten to the real DOI:
-        let doi = "10.5281/zenodo.6981680";
+        let doi = "10.5281/zenodo.6981786";
 
         if doi.starts_with("xx.") {
             warn!("you are running a development build; the printed value is not a real DOI");

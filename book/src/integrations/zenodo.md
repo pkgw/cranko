@@ -113,7 +113,7 @@ assigned DOIs.
 
 ## Rewrites
 
-The ['cranko zenodo preregister`][prereg] command can insert the DOIs that *will
+The [`cranko zenodo preregister`][prereg] command can insert the DOIs that *will
 be* registered into your source code. You can use this functionality to create
 software releases that *know their own DOIs*.
 
@@ -128,7 +128,7 @@ understandable to users.
 [`cranko show cranko-version-doi`]: ../commands/util/show.md#cranko-show-cranko-version-doi
 [`cranko show cranko-concept-doi`]: ../commands/util/show.md#cranko-show-cranko-concept-doi
 
-This insertion happens during the ['cranko zenodo preregister`][prereg] command,
+This insertion happens during the [`cranko zenodo preregister`][prereg] command,
 which will rewrite any files whose paths you pass to it on the command line.
 The following rewrite rules are followed:
 
@@ -169,8 +169,8 @@ included in the release commit.
 [`cranko release-workflow commit`]: ./release-workflow-commit.md
 
 At the end of your CI/CD workflow, if you are actually making real releases, you
-should run ['cranko zenodo upload-artifacts`][upload] as needed, then finally
-['cranko zenodo publish`][publish] to publish your new deposits.
+should run [`cranko zenodo upload-artifacts`][upload] as needed, then finally
+[`cranko zenodo publish`][publish] to publish your new deposits.
 
 
 ## Continued Releases
@@ -179,7 +179,7 @@ After your first successful Zenodo deposit, you should update your
 `zenodo.json5` file and replace the special `"conceptrecid"` field with the
 Zenodo record ID corresponding to the “concept” of your software package. This
 is easily findable in the concept DOI, and is also printed by
-['cranko zenodo preregister`][prereg].
+[`cranko zenodo preregister`][prereg].
 
 Going forward, you should review the `zenodo.json5` file periodically and update
 as needed — in particular, you should be attentive to the author list. As with
