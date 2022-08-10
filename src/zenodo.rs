@@ -20,7 +20,7 @@ use structopt::StructOpt;
 
 use super::Command;
 use crate::{
-    app::AppSession, atry, env::require_var, errors::Result, project::Project, write_crlf,
+    a_ok_or, app::AppSession, atry, env::require_var, errors::Result, project::Project, write_crlf,
 };
 
 /// A type for interacting with the Zenodo REST API.
@@ -160,7 +160,7 @@ impl<'a> ZenodoWorkflow<'a> {
                     self.preregister_new_concept(svc, &mut md)?;
                     true
                 } else {
-                    info!("NEWVERSION");
+                    self.preregister_existing_concept(svc, &mut md)?;
                     false
                 }
             }
@@ -230,7 +230,119 @@ impl<'a> ZenodoWorkflow<'a> {
     }
 
     fn preregister_new_concept(&self, svc: &ZenodoService, md: &mut ZenodoMetadata) -> Result<()> {
-        // We have the metadata, so get those ready.
+        let client = svc.make_blocking_client()?;
+        let url = svc.api_url("deposit/depositions");
+        self.send_metadata_and_slurp(&client, &url, true, md)
+            .map(|_info| ())
+    }
+
+    fn preregister_existing_concept(
+        &self,
+        svc: &ZenodoService,
+        md: &mut ZenodoMetadata,
+    ) -> Result<()> {
+        // The first thing we need to do is find the record_id of the most
+        // recent version, which we can get from the concept record.
+
+        let client = svc.make_blocking_client()?;
+        let url = svc.api_url(&format!("records/{}", &md.concept_rec_id));
+
+        let resp = client.get(&url).send()?;
+        let status = resp.status();
+        let mut parsed = json::parse(&resp.text()?)?;
+
+        ensure!(
+            status.is_success(),
+            "query of concept record `{}` failed: {}",
+            &md.concept_rec_id,
+            parsed
+        );
+
+        let last_rec_id = match parsed["id"].take() {
+            JsonValue::String(s) => s,
+            JsonValue::Short(s) => s.as_str().to_owned(),
+            JsonValue::Number(n) => n.to_string(),
+            _ => {
+                error!("Zenodo response: {}", parsed);
+                bail!("queried Zenodo concept record but got no `id`");
+            }
+        };
+
+        info!(
+            "resolved concept rec-id {} to latest release {}",
+            &md.concept_rec_id, &last_rec_id
+        );
+
+        // Now we can issue a request to create a new version for the DOI. For
+        // whatever reason, this request has to be associated with the most
+        // recent version, not the concept. The response to this request is also
+        // info about that version, not the new version.
+
+        let url = svc.api_url(&format!(
+            "deposit/depositions/{}/actions/newversion",
+            &last_rec_id
+        ));
+        let resp = client.post(&url).send()?;
+        let status = resp.status();
+        let mut parsed = json::parse(&resp.text()?)?;
+
+        ensure!(
+            status.is_success(),
+            "request for new version failed: {}",
+            parsed
+        );
+
+        let new_rec_url = a_ok_or!(
+            parsed["links"]["latest_draft"].take_string();
+            ["Zenodo new version request seems to have worked, but no `links.latest_draft` available: {}", parsed]
+        );
+        info!("URL of new version: {}", &new_rec_url);
+
+        // Apply the new metadata and parse the info we need.
+        //
+        // We have a weakness here because Zenodo propagates metadata from
+        // previous versions, so if a field is supposed to be deleted in this
+        // new version, I believe that it will linger.
+
+        let mut info = self.send_metadata_and_slurp(&client, &new_rec_url, false, md)?;
+
+        // Continuing the theme of the above: artifacts associated with previous
+        // versions will linger too. We emphatically do not want that, so let's
+        // delete them.
+
+        if let JsonValue::Array(mut files) = info["files"].take() {
+            for mut fileinfo in files.drain(..) {
+                let name = fileinfo["filename"]
+                    .take_string()
+                    .unwrap_or_else(|| "(unknown name)".to_owned());
+
+                if let Some(url) = fileinfo["links"]["self"].take_string() {
+                    info!("deleting propagated artifact file `{}` ...", name);
+                    let resp = client.delete(&url).send()?;
+                    let status = resp.status();
+                    if !status.is_success() {
+                        let t = resp.text().unwrap_or_else(|_e| {
+                            "(unable to parse server response body)".to_owned()
+                        });
+                        warn!("failed to delete {}: {}", url, t);
+                    }
+                } else {
+                    info!("not deleting propagated artifact file `{}` because `links.self` was not specified", name);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn send_metadata_and_slurp(
+        &self,
+        client: &reqwest::blocking::Client,
+        url: &str,
+        do_post: bool,
+        md: &mut ZenodoMetadata,
+    ) -> Result<JsonValue> {
+        // Prep body from metadata.
 
         let md_body = atry!(
             serde_json::to_string(&md.metadata);
@@ -240,11 +352,12 @@ impl<'a> ZenodoWorkflow<'a> {
 
         // Send the request.
 
-        let client = svc.make_blocking_client()?;
-        let url = svc.api_url("deposit/depositions");
-
-        let resp = client
-            .post(&url)
+        let req = if do_post {
+            client.post(url)
+        } else {
+            client.put(url)
+        };
+        let resp = req
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .body(body)
             .send()?;
@@ -302,18 +415,23 @@ impl<'a> ZenodoWorkflow<'a> {
             );
         }
 
-        // As far as I can tell, when we're preregistering in this mode, the concept
-        // DOI is not yet known or registered. But we need it now so that it can
-        // be rewritten into the source code for display to users. Fortunately (?)
-        // Zenodo DOIs are currently simple functions of Zenodo record IDs, even
-        // though this is absolutely not something we can rely on in general. So
-        // let's be naughty:
+        // As far as I can tell, when we're preregistering in new-concept mode,
+        // the concept DOI is not yet known or registered at this point. But we
+        // need it now so that it can be rewritten into the source code for
+        // display to users. Fortunately (?) Zenodo DOIs are currently simple
+        // functions of Zenodo record IDs, even though this is absolutely not
+        // something we can rely on in general. So let's be naughty:
 
-        warn!("fabricating Zenodo concept DOI for first-time registration");
-        warn!("... it could be incorrect if Zenodo changes their DOI implementation");
-        md.concept_doi = format!("10.5281/zenodo.{}", &md.concept_rec_id);
+        let mut maybe_concept_doi = parsed["conceptdoi"].take_string().unwrap_or_default();
 
-        Ok(())
+        if maybe_concept_doi.is_empty() {
+            warn!("fabricating Zenodo concept DOI for first-time registration");
+            warn!("... it could be incorrect if Zenodo changes their DOI implementation");
+            maybe_concept_doi = format!("10.5281/zenodo.{}", &md.concept_rec_id);
+        }
+
+        md.concept_doi = maybe_concept_doi;
+        Ok(parsed)
     }
 
     fn rewrite_file<P: AsRef<Path>>(&self, path: P, rewrites: &[(String, String)]) -> Result<()> {
