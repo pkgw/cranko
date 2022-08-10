@@ -135,6 +135,10 @@ The following rewrite rules are followed:
 - The text `xx.xxxx/dev-build.$project.version`, where `$project` is the name of
   the Cranko project being released, is replaced with the version DOI.
 
+If you’re feeling extra-clever, you can include these templates in your
+`CHANGELOG.md` entry, and your final changelog will include the DOIs of the
+release that it describes.
+
 If you’re building out of source control, these replacements won't happen, of
 course. If a pull request is being built, fake DOIs with similar forms will be
 substituted in. You can add checks in your code to see whether the DOIs start
