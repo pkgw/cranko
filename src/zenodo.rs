@@ -74,6 +74,19 @@ impl<'a> ZenodoWorkflow<'a> {
                 "faking Zenodo workflow for project `{}` in development mode",
                 &proj.user_facing_name
             );
+
+            // Make sure that $ZENODO_TOKEN is *not* available in the environment, since
+            // this command should be run during both pull-request processing (where the
+            // input is untrusted) and release processing (where it is).
+            if std::env::var_os("ZENODO_TOKEN").is_some() {
+                error!(
+                    "the environment variable ZENODO_TOKEN is set during this development-mode job"
+                );
+                error!("... this could be a security risk given a malicious pull request");
+                error!("... if this is a CI job, fix your configuration to only provide the variable for trusted release jobs");
+                bail!("refusing to proceed");
+            }
+
             ZenodoMode::Development
         } else {
             info!(
