@@ -19,7 +19,7 @@ exclude = [
 
 [dependencies]
 anyhow = "^1"
-atomicwrites = "^0.2"
+atomicwrites = "^0.3"
 base64 = "^0.12"
 cargo_metadata = "^0.10"
 chrono = "^0.4"
