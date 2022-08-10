@@ -718,7 +718,7 @@ pub struct PublishCommand {
 impl Command for PublishCommand {
     fn execute(self) -> Result<i32> {
         let sess = AppSession::initialize_default()?;
-        let (dev_mode, _rci) = sess.ensure_ci_rc_mode(self.force)?;
+        let (dev_mode, _rel_info) = sess.ensure_ci_release_mode()?;
 
         if dev_mode {
             if self.force {
@@ -808,7 +808,7 @@ pub struct UploadArtifactsCommand {
 impl Command for UploadArtifactsCommand {
     fn execute(self) -> Result<i32> {
         let sess = AppSession::initialize_default()?;
-        let (dev_mode, _rci) = sess.ensure_ci_rc_mode(self.force)?;
+        let (dev_mode, _rel_info) = sess.ensure_ci_release_mode()?;
 
         if dev_mode {
             if self.force {
