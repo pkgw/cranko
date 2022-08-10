@@ -6,6 +6,10 @@ trigger:
     - master
     - rc
 
+variables:
+  CROSS_VERSION: 0.2.1
+  MDBOOK_VERSION: 0.4.2
+
 stages:
 - stage: Prep
   jobs:

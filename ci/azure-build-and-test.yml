@@ -64,10 +64,6 @@ parameters:
       vars:
         TARGET: powerpc64le-unknown-linux-gnu
 
-variables:
-  CROSS_VERSION: 0.2.1
-  MDBOOK_VERSION: 0.4.2
-
 jobs:
 
 # Main builds
