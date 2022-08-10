@@ -11,6 +11,7 @@
   - [Azure Pipelines](integrations/azure-pipelines.md)
   - [Python](integrations/python.md)
   - [Visual Studio C# Projects](integrations/csproj.md)
+  - [Zenodo](integrations/zenodo.md)
 
 # Reference Material
 
@@ -20,6 +21,7 @@
   - [Releases](concepts/releases.md)
   - [Versions](concepts/versions.md)
 - [Configuration](configuration/index.md)
+  - [Zenodo Metadata Files](configuration/zenodo.md)
 
 # CLI Commands
 
@@ -47,6 +49,9 @@
   - [cranko release-workflow apply-versions](commands/cicd/release-workflow-apply-versions.md)
   - [cranko release-workflow commit](commands/cicd/release-workflow-commit.md)
   - [cranko release-workflow tag](commands/cicd/release-workflow-tag.md)
+  - [cranko zenodo preregister](commands/cicd/zenodo-preregister.md)
+  - [cranko zenodo publish](commands/cicd/zenodo-publish.md)
+  - [cranko zenodo upload-artifacts](commands/cicd/zenodo-upload-artifacts.md)
 - [Utility Commands]()
   - [cranko git-util reboot-branch](commands/util/git-util-reboot-branch.md)
   - [cranko help](commands/util/help.md)

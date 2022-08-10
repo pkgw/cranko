@@ -4,10 +4,55 @@ The `cranko show` command displays various potentially useful pieces of
 information about Cranko, its execution environment, and so on. It provides
 several subcommands:
 
+- [`cranko show cranko-concept-doi`](#cranko-show-cranko-concept-doi)
+- [`cranko show cranko-version-doi`](#cranko-show-cranko-version-doi)
 - [`cranko show if-released`](#cranko-show-if-released)
 - [`cranko show tctag`](#cranko-show-tctag)
 - [`cranko show toposort`](#cranko-show-toposort)
 - [`cranko show version`](#cranko-show-version)
+
+
+## `cranko show cranko-concept-doi`
+
+This commands prints the [concept DOI](https://help.zenodo.org/) associated with
+the Cranko software package.
+
+#### Usage
+
+```
+cranko show cranko-concept-doi
+```
+
+#### Remarks
+
+The printed [DOI](https://www.doi.org/) is a citeable identifier associated with
+Cranko that will never change. Each individual release of Cranko is also
+associated with a “version DOI”, which you can use to log the specific version
+of Cranko that you used in a particular workflow. Citation metadata link the
+different version DOIs through the concept DOI.
+
+You are unlikely to need this command in everyday workflows.
+
+
+## `cranko show cranko-version-doi`
+
+This commands prints the [DOI](https://www.doi.org/) associated with the currently
+running version of Cranko.
+
+#### Usage
+
+```
+cranko show cranko-version-doi
+```
+
+#### Remarks
+
+Each release of Cranko should have a unique version number as well as a unique
+version DOI. While most DOIs resolve to scholarly publications, Cranko version
+DOIs “resolve” to a specific release of Cranko, logged with associated metadata
+and digital artifacts. If you wish to record the exact version of Cranko that
+you used in a workflow in the context of a scholarly citation system, use this
+DOI.
 
 
 ## `cranko show if-released`
