@@ -1,3 +1,20 @@
+# cranko 0.12.2 (2022-08-10)
+
+Another fix needed on the road to getting Zenodo to work reliably:
+
+- Remove Zenodo HTTP timeouts, because `zenodo update-artifacts` was
+  timing out with even modestly-sized uploads (#37, @pkgw).
+
+The DOIs associated with previous releases in the 0.12.x series remain invalid
+because their Zenodo publication processes did not complete automatically. (I
+could complete it manually, but I want to validate that this process can work
+with full automation, and no one's going to use the old artifacts.)
+
+The DOI of this release is [10.5281/zenodo.6981680][cdoi].
+
+[cdoi]: https://doi.org/10.5281/zenodo.6981680
+
+
 # cranko 0.12.1 (2022-08-10)
 
 The new functionality in the previous release did indeed need a small tweak.

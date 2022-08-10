@@ -1,5 +1,5 @@
 {
-  "conceptrecid": "6981563",
+  "conceptrecid": "6981679",
   "metadata": {
     "access_right": "open",
     "creators": [
@@ -17,12 +17,12 @@
     "language": "eng",
     "license": "MIT",
     "publication_date": "2022-08-10",
-    "title": "cranko 0.12.1",
+    "title": "cranko 0.12.2",
     "upload_type": "software",
-    "version": "0.12.1"
+    "version": "0.12.2"
   },
-  "conceptdoi": "10.5281/zenodo.6981563",
-  "record_id": "6981564",
-  "doi": "10.5281/zenodo.6981564",
-  "bucket_link": "https://zenodo.org/api/files/b676ace1-b8eb-4571-89df-e1676e4882a8"
+  "conceptdoi": "10.5281/zenodo.6981679",
+  "record_id": "6981680",
+  "doi": "10.5281/zenodo.6981680",
+  "bucket_link": "https://zenodo.org/api/files/a69070d7-3b67-4209-8721-1690e1eb58f2"
 }

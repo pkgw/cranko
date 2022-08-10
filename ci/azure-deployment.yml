@@ -85,8 +85,8 @@ jobs:
     - bash: |
         set -xeuo pipefail
         vname="cranko-$(./cranko show version cranko)"
-        git archive --prefix="$vname/" -o cranko-$vname.tar.gz HEAD
-        ./cranko zenodo upload-artifacts --metadata=ci/zenodo.json5 cranko-$vname.tar.gz
+        git archive --prefix="$vname/" -o "$vname.tar.gz" HEAD
+        ./cranko zenodo upload-artifacts --metadata=ci/zenodo.json5 "$vname.tar.gz"
       displayName: Upload source tarball
       env:
         ZENODO_TOKEN: $(ZENODO_TOKEN)
