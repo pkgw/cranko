@@ -21,6 +21,8 @@ jobs:
       rustc -Vv
       cargo -V
     displayName: Set up Rust
+    env:
+      TOOLCHAIN: stable
 
   - bash: cargo build --release
     displayName: "cargo build (bootstrap)"

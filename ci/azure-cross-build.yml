@@ -4,7 +4,7 @@
 # - $CROSS_VERSION
 
 steps:
-- checkout: self
+- template: azure-job-setup.yml
 
 - bash: rustup target add $TARGET
   displayName: Add target $(TARGET)
