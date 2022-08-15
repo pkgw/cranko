@@ -423,7 +423,7 @@ impl Rewriter for CargoRewriter {
 }
 
 /// Cargo-specific CLI utilities.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub enum CargoCommands {
     #[structopt(name = "foreach-released")]
     /// Run a "cargo" command for each released Cargo project.
@@ -434,7 +434,7 @@ pub enum CargoCommands {
     PackageReleasedBinaries(PackageReleasedBinariesCommand),
 }
 
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct CargoCommand {
     #[structopt(subcommand)]
     command: CargoCommands,
@@ -450,7 +450,7 @@ impl Command for CargoCommand {
 }
 
 /// `cranko cargo foreach-released`
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct ForeachReleasedCommand {
     #[structopt(
         long = "command-name",
@@ -517,7 +517,7 @@ impl Command for ForeachReleasedCommand {
 }
 
 /// `cranko cargo package-released-binaries`
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct PackageReleasedBinariesCommand {
     #[structopt(
         long = "command-name",
