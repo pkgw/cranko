@@ -69,7 +69,7 @@ enum ZenodoMode {
 }
 
 impl<'a> ZenodoWorkflow<'a> {
-    fn new(proj: &'a Project, dev_mode: bool) -> Result<Self> {
+    fn new(proj: &'a Project, dev_mode: bool, proj_is_released: bool) -> Result<Self> {
         let mode = if dev_mode {
             info!(
                 "faking Zenodo workflow for project `{}` in development mode",
@@ -87,6 +87,29 @@ impl<'a> ZenodoWorkflow<'a> {
                 error!("... if this is a CI job, fix your configuration to only provide the variable for trusted release jobs");
                 bail!("refusing to proceed");
             }
+
+            ZenodoMode::Development
+        } else if !proj_is_released {
+            // We should get here if we're in a monorepo and we're processing a
+            // real release request, but this particular project isn't being
+            // released. To make life easier for developers, we shouldn't force
+            // them to skip the preregister step, but we shouldn't actually
+            // preregister the DOI! We should NOT complain if $ZENODO_TOKEN is
+            // set because it needs to be available for the cases where this
+            // package *is* being released.
+            //
+            // In principle, we should rewrite using the actual DOI of the most
+            // recent release here, in the same way that we'll rewrite using the
+            // *version number* of the most recent release. But in order to do
+            // that, we'd need to dig the DOI metadata out of the JSON file in
+            // the `release` commit, and that seems like a hassle. Unlike
+            // version numbers, internal dependencies shouldn't care about DOIs,
+            // so I feel OK with dodging all that and just using the dev-mode
+            // path.
+            info!(
+                "faking Zenodo workflow for project `{}`: it is not being released",
+                &proj.user_facing_name
+            );
 
             ZenodoMode::Development
         } else {
@@ -673,23 +696,8 @@ impl Command for PreregisterCommand {
             .ok_or_else(|| anyhow!("no such project `{}`", self.proj_name))?;
 
         let proj = sess.graph().lookup(ident);
-
-        if rci.lookup_project(proj).is_none() {
-            if self.force {
-                warn!(
-                    "project `{}` does not seem to be freshly released; ignoring due to --force mode",
-                    self.proj_name
-                );
-            } else {
-                error!(
-                    "project `{}` does not seem to be freshly released",
-                    self.proj_name
-                );
-                bail!("refusing to proceed (use `--force` to override)",);
-            }
-        }
-
-        let wf = ZenodoWorkflow::new(proj, dev_mode)?;
+        let proj_is_released = rci.lookup_project(proj).is_some();
+        let wf = ZenodoWorkflow::new(proj, dev_mode, proj_is_released)?;
 
         // Go!
 
