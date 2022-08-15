@@ -11,7 +11,7 @@ use super::Command;
 use crate::errors::Result;
 
 /// Force-create an ancestor-less branch containing a directory tree.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct RebootBranchCommand {
     #[structopt(
         long = "message",
@@ -69,14 +69,14 @@ impl Command for RebootBranchCommand {
     }
 }
 
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub enum GitUtilCommands {
     #[structopt(name = "reboot-branch")]
     /// Force-create an ancestor-less branch
     RebootBranch(RebootBranchCommand),
 }
 
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct GitUtilCommand {
     #[structopt(subcommand)]
     command: GitUtilCommands,

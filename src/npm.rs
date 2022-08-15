@@ -358,7 +358,7 @@ impl Rewriter for PackageJsonRewriter {
 }
 
 /// Npm-specific CLI utilities.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub enum NpmCommands {
     #[structopt(name = "foreach-released")]
     /// Run a command for each released NPM project.
@@ -374,7 +374,7 @@ pub enum NpmCommands {
     LernaWorkaround(LernaWorkaroundCommand),
 }
 
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct NpmCommand {
     #[structopt(subcommand)]
     command: NpmCommands,
@@ -391,7 +391,7 @@ impl Command for NpmCommand {
 }
 
 /// `cranko npm foreach-released`
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct ForeachReleasedCommand {
     #[structopt(help = "The command to run", required = true)]
     command: Vec<OsString>,
@@ -453,7 +453,7 @@ impl Command for ForeachReleasedCommand {
 }
 
 /// `cranko npm install-token`
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct InstallTokenCommand {
     #[structopt(
         long = "registry",
@@ -489,7 +489,7 @@ impl Command for InstallTokenCommand {
 }
 
 /// `cranko npm lerna-workaround`
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct LernaWorkaroundCommand {}
 
 impl Command for LernaWorkaroundCommand {

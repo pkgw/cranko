@@ -1418,7 +1418,7 @@ impl ChangeList {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RepoHistory {
     commits: Vec<CommitId>,
     release_commit: Option<CommitId>,

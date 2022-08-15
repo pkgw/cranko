@@ -714,7 +714,7 @@ impl Rewriter for PythonRewriter {
 }
 
 /// Python-specific CLI utilities.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub enum PythonCommands {
     #[structopt(name = "foreach-released")]
     /// Run a command for each released PyPA project.
@@ -725,7 +725,7 @@ pub enum PythonCommands {
     InstallToken(InstallTokenCommand),
 }
 
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct PythonCommand {
     #[structopt(subcommand)]
     command: PythonCommands,
@@ -741,7 +741,7 @@ impl Command for PythonCommand {
 }
 
 /// `cranko python foreach-released`
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct ForeachReleasedCommand {
     #[structopt(help = "The command to run", required = true)]
     command: Vec<OsString>,
@@ -803,7 +803,7 @@ impl Command for ForeachReleasedCommand {
 }
 
 /// `cranko python install-token`
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct InstallTokenCommand {
     #[structopt(
         long = "repository",
