@@ -145,10 +145,11 @@ release that it describes. (If you do this, you’ll need to pass the path to
 `CHANGELOG.md` as an argument to [`cranko zenodo preregister`][prereg].)
 
 If you’re building out of source control, these replacements won't happen, of
-course. If a pull request is being built, fake DOIs with similar forms will be
-substituted in. You can add checks in your code to see whether the DOIs start
-with the universal DOI prefix, `"10."`, to know whether your DOIs are real or
-fake.
+course. If a pull request or other non-release build is being processed, or if
+you’re in a monorepo and the package in question isn’t being released, fake DOIs
+with similar forms will be substituted in. You can add checks in your code to
+see whether the DOIs start with the universal DOI prefix, `"10."`, to know
+whether your DOIs are real or fake.
 
 
 ## CI/CD Workflow
@@ -162,15 +163,25 @@ to work.
 [ztok]: https://zenodo.org/account/settings/applications/tokens/new/
 
 The [`cranko zenodo preregister`][prereg] command(s) should be run at the
-beginning of your CI/CD workflow, before [`cranko release-workflow commit`].
-After it runs, you should `git add` your modified files to make sure they get
-included in the release commit.
+beginning of your CI/CD workflow, before [`cranko release-workflow commit`]. As
+described above, the command inserts placeholders for non-release builds, so you
+can run it in all of your workflows without worrying about needing to detect
+whether the current build is for a project release. If you’re using a monorepo
+with multiple projects that get Zenodo deposits, run the command as many times
+as needed. After all invocations are done, you should `git add` your modified
+files to make sure they get included in the release commit.
 
 [`cranko release-workflow commit`]: ./release-workflow-commit.md
 
 At the end of your CI/CD workflow, if you are actually making real releases, you
 should run [`cranko zenodo upload-artifacts`][upload] as needed, then finally
-[`cranko zenodo publish`][publish] to publish your new deposits.
+[`cranko zenodo publish`][publish] to publish your new deposits. Once again, in
+a monorepo scenario, these commands should be run as many times as needed — with
+filters in place to only execute them if the projects in question have actually
+been released. This can be accomplished with [`cranko show if-released
+--exit-code`][csifec].
+
+[csifec]: ../commands/util/show.md#cranko-show-if-released
 
 
 ## Continued Releases

@@ -31,7 +31,7 @@ pub struct BootstrapProjectInfo {
 }
 
 /// The `bootstrap` commands.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct BootstrapCommand {
     #[structopt(
         short = "f",
