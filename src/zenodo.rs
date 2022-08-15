@@ -620,7 +620,7 @@ impl ZenodoMetadata {
 }
 
 /// The `zenodo` subcommands.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub enum ZenodoCommands {
     /// Pre-register a deposition, obtaining DOIs and applying them to the source.
     Preregister(PreregisterCommand),
@@ -633,7 +633,7 @@ pub enum ZenodoCommands {
     UploadArtifacts(UploadArtifactsCommand),
 }
 
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct ZenodoCommand {
     #[structopt(subcommand)]
     command: ZenodoCommands,
@@ -650,7 +650,7 @@ impl Command for ZenodoCommand {
 }
 
 /// Pre-register a deposition, obtaining DOIs and applying them to the source.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct PreregisterCommand {
     #[structopt(
         short = "f",
@@ -707,7 +707,7 @@ impl Command for PreregisterCommand {
 }
 
 /// Publish a deposition, registering the DOI(s).
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct PublishCommand {
     #[structopt(
         short = "f",
@@ -794,7 +794,7 @@ impl Command for PublishCommand {
 }
 
 /// Upload one or more files as artifacts associated with a Zenodo deposit.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct UploadArtifactsCommand {
     #[structopt(
         short = "f",

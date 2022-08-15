@@ -177,7 +177,7 @@ impl GitHubInformation {
 }
 
 /// The `github` subcommands.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub enum GithubCommands {
     #[structopt(name = "create-custom-release")]
     /// Create a single, customized GitHub release
@@ -204,7 +204,7 @@ pub enum GithubCommands {
     UploadArtifacts(UploadArtifactsCommand),
 }
 
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct GithubCommand {
     #[structopt(subcommand)]
     command: GithubCommands,
@@ -224,7 +224,7 @@ impl Command for GithubCommand {
 }
 
 /// Create a single custom GitHub release.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct CreateCustomReleaseCommand {
     #[structopt(long = "name", help = "The user-facing name for the release")]
     release_name: String,
@@ -267,7 +267,7 @@ impl Command for CreateCustomReleaseCommand {
 }
 
 /// Create new release(s) on GitHub.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct CreateReleasesCommand {
     #[structopt(help = "Name(s) of the project(s) to release on GitHub")]
     proj_names: Vec<String>,
@@ -338,7 +338,7 @@ impl Command for CreateReleasesCommand {
 }
 
 /// hidden Git credential helper command
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct CredentialHelperCommand {
     #[structopt(help = "The operation")]
     operation: String,
@@ -359,7 +359,7 @@ impl Command for CredentialHelperCommand {
 }
 
 /// Delete a release from GitHub.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct DeleteReleaseCommand {
     #[structopt(help = "Name of the release's tag on GitHub")]
     tag_name: String,
@@ -380,7 +380,7 @@ impl Command for DeleteReleaseCommand {
 }
 
 /// Install as a Git credential helper
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct InstallCredentialHelperCommand {}
 
 impl Command for InstallCredentialHelperCommand {
@@ -404,7 +404,7 @@ impl Command for InstallCredentialHelperCommand {
 }
 
 /// Upload one or more artifact files to a GitHub release.
-#[derive(Debug, PartialEq, StructOpt)]
+#[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct UploadArtifactsCommand {
     #[structopt(
         long = "overwrite",
