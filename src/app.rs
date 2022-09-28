@@ -373,7 +373,7 @@ impl AppSession {
         let toposorted_idents: Vec<_> = self.graph.toposorted().collect();
         let mut unsatisfied_deps = Vec::new();
 
-        for ident in (&toposorted_idents[..]).iter().copied() {
+        for ident in (toposorted_idents[..]).iter().copied() {
             // We can't conveniently navigate the deps while holding a mutable
             // ref to depending project, so do some lifetime futzing and buffer
             // up modifications to its dep info.
@@ -480,7 +480,7 @@ impl AppSession {
     pub fn fake_internal_deps(&mut self) {
         let toposorted_idents: Vec<_> = self.graph.toposorted().collect();
 
-        for ident in (&toposorted_idents[..]).iter().copied() {
+        for ident in (toposorted_idents[..]).iter().copied() {
             let mut resolved_versions = {
                 let proj = self.graph.lookup(ident);
                 let mut resolved_versions = Vec::new();

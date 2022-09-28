@@ -1312,14 +1312,10 @@ impl ReleaseCommitInfo {
     /// Information may be missing if the project was only added to the
     /// repository after this information was recorded.
     pub fn lookup_project(&self, proj: &Project) -> Option<&ReleasedProjectInfo> {
-        for rpi in &self.projects {
-            if rpi.qnames == *proj.qualified_names() {
-                return Some(rpi);
-            }
-        }
-
         // TODO: any more sophisticated search to try?
-        None
+        self.projects
+            .iter()
+            .find(|&rpi| rpi.qnames == *proj.qualified_names())
     }
 
     /// Find information about a project release if it occurred at this moment.
@@ -1370,15 +1366,10 @@ impl RcCommitInfo {
     /// Attempt to find info for a release request for the specified project.
     pub fn lookup_project(&self, proj: &Project) -> Option<&RcProjectInfo> {
         // TODO: redundant with ReleaseCommitInfo::lookup_project()
-
-        for rci in &self.projects {
-            if rci.qnames == *proj.qualified_names() {
-                return Some(rci);
-            }
-        }
-
         // TODO: any more sophisticated search to try?
-        None
+        self.projects
+            .iter()
+            .find(|&rci| rci.qnames == *proj.qualified_names())
     }
 }
 
