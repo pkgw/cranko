@@ -484,6 +484,26 @@ impl Repository {
                 }
 
                 if !is_ok {
+                    // Issue #41: on Windows we sometimes think that things are
+                    // dirty when they're not actually. As far as I can tell,
+                    // this appears to be due to an issue with CRLF processing
+                    // when different builds of Git are being invoked on the
+                    // same machine, which can happen in Azure Pipelines agents
+                    // if you mix and match the pure-Windows environments and
+                    // bash scripts. Running a `git status` to refresh the index
+                    // can make it go away, but I don't want CI scripts to have
+                    // to rely on that kind of thing. Setting up a
+                    // .gitattributes seems to fix it even though it seems like
+                    // it's just codifying default behavior?
+                    if cfg!(windows) {
+                        warn!("detected a dirty repository while running on Windows");
+                        warn!("if this appears to be spurious, you may need to add a `.gitattributes` file");
+                        warn!("to your repo with the contents `* text=auto`, to work around issues related");
+                        warn!(
+                            "to newline processing; see https://github.com/pkgw/cranko/issues/41"
+                        );
+                    }
+
                     return Ok(Some(repo_path.to_owned()));
                 }
             }
