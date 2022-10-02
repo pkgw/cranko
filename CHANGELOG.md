@@ -1,3 +1,14 @@
+# cranko 0.13.0 (2022-10-02)
+
+- Add the `--pause` option to `cranko cargo foreach-published` (#43, @pkgw). The
+  hope is that this will help robustness when publishing a group of crates to
+  Crates.io if one of the new releases requires another.
+
+The DOI of this release is [10.5281/zenodo.7135550][cdoi].
+
+[cdoi]: https://doi.org/10.5281/zenodo.7135550
+
+
 # cranko 0.12.5 (2022-10-02)
 
 - Provide context if the `cargo metadata` command fails, because otherwise the
