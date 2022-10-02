@@ -51,7 +51,9 @@ jobs:
         # If `./cranko` isn't moved, Cargo will complain about the dirty
         # working directory.
         mv ./cranko /tmp/
-        /tmp/cranko cargo foreach-released -- publish --no-verify
+        # We don't need the --pause with just one crate, but it seems like
+        # we should set a good example, and check that the arg parses.
+        /tmp/cranko cargo foreach-released --pause=30 -- publish --no-verify
       displayName: Publish updated Cargo crates
       env:
         CARGO_REGISTRY_TOKEN: $(CARGO_REGISTRY_TOKEN)

@@ -15,7 +15,7 @@ use std::{
     fs::File,
     io::{BufReader, Read, Write},
     path::{Path, PathBuf},
-    process,
+    process, thread, time,
 };
 use structopt::StructOpt;
 use toml_edit::{Document, Item, Table};
@@ -463,6 +463,13 @@ pub struct ForeachReleasedCommand {
     )]
     command_name: String,
 
+    #[structopt(
+        long = "pause",
+        help = "Pause a number of seconds between command invocations",
+        default_value = "0"
+    )]
+    pause: u64,
+
     #[structopt(help = "Arguments to the `cargo` command", required = true)]
     cargo_args: Vec<OsString>,
 }
@@ -488,6 +495,7 @@ impl Command for ForeachReleasedCommand {
         cmd.args(&self.cargo_args[..]);
 
         let print_which = idents.len() > 1;
+        let pause_dur = time::Duration::from_secs(self.pause);
         let mut first = true;
 
         for ident in &idents {
@@ -495,13 +503,21 @@ impl Command for ForeachReleasedCommand {
             let dir = sess.repo.resolve_workdir(proj.prefix());
             cmd.current_dir(&dir);
 
+            if self.pause != 0 && !first {
+                println!("### pausing for {} seconds", self.pause);
+                thread::sleep(pause_dur);
+            }
+
             if print_which {
-                if first {
-                    first = false;
-                } else {
+                if !first {
                     println!();
                 }
+
                 println!("### in `{}`:", dir.display());
+            }
+
+            if first {
+                first = false;
             }
 
             let status = cmd.status().context(format!(
