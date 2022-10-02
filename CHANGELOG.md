@@ -1,3 +1,21 @@
+# cranko 0.12.5 (2022-10-02)
+
+- Provide context if the `cargo metadata` command fails, because otherwise the
+  error message would be basically uniformative.
+- Possibly finally deal with the spurious dirtiness issue on Windows? In my CI
+  pipelines, on Windows Cranko would sometimes report the repository as dirty
+  when it was not actually. I think that I now mostly understand what's causing
+  the problem -- differences in the idea of what Git's index should contain
+  based on different line-ending conventions. I haven't figured out a good way
+  to wholly prevent the problem in Cranko, but it does seem that it can be
+  addressed by adding a simple `.gitattributes` file to a repo. See issue #41 on
+  GitHub for further analysis and discussion.
+
+The DOI of this release is [10.5281/zenodo.7133851][cdoi].
+
+[cdoi]: https://doi.org/10.5281/zenodo.7133851
+
+
 # cranko 0.12.4 (2022-08-15)
 
 - Fix an oversight in the Zenodo monorepo behavior (#39, @pkgw). Before, Cranko

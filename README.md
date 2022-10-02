@@ -43,7 +43,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://pkgw.github.io/cranko/fetch-latest.
 On Windows systems, the following command will do the same in a PowerShell window:
 
 ```pwsh
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager::SecurityProtocol -bor 3072
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
 iex ((New-Object System.Net.WebClient).DownloadString('https://pkgw.github.io/cranko/fetch-latest.ps1'))
 ```
 

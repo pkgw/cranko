@@ -24,6 +24,7 @@ use super::Command;
 
 use crate::{
     app::{AppBuilder, AppSession},
+    atry,
     config::ProjectConfiguration,
     errors::Result,
     graph::GraphQueryBuilder,
@@ -85,7 +86,10 @@ impl CargoLoader {
         let mut cmd = MetadataCommand::new();
         cmd.manifest_path(&toml_path);
         cmd.features(cargo_metadata::CargoOpt::AllFeatures);
-        let cargo_meta = cmd.exec()?;
+        let cargo_meta = atry!(
+            cmd.exec();
+            ["failed to fetch Cargo metadata using the `cargo metadata` command"]
+        );
 
         // Fill in the packages
 
