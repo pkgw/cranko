@@ -14,7 +14,7 @@ There are several installation options:
   way, this is the recommended installation command.
 - On Windows, the following PowerShell commands will do the same:
   ```powershell
-  [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager::SecurityProtocol -bor 3072
+  [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
   iex ((New-Object System.Net.WebClient).DownloadString('https://pkgw.github.io/cranko/fetch-latest.ps1'))
   ```
 - You can manually download precompiled binaries from the Cranko [GitHub release
