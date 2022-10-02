@@ -1,4 +1,15 @@
-# rc: micro bump
+# rc: minor bump
+
+- Add the `--pause` option to `cranko cargo foreach-published` (#43, @pkgw). The
+  hope is that this will help robustness when publishing a group of crates to
+  Crates.io if one of the new releases requires another.
+
+The DOI of this release is [xx.xxxx/dev-build.cranko.version][cdoi].
+
+[cdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+
+
+# cranko 0.12.5 (2022-10-02)
 
 - Provide context if the `cargo metadata` command fails, because otherwise the
   error message would be basically uniformative.
@@ -11,9 +22,9 @@
   addressed by adding a simple `.gitattributes` file to a repo. See issue #41 on
   GitHub for further analysis and discussion.
 
-The DOI of this release is [xx.xxxx/dev-build.cranko.version][cdoi].
+The DOI of this release is [10.5281/zenodo.7133851][cdoi].
 
-[cdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+[cdoi]: https://doi.org/10.5281/zenodo.7133851
 
 
 # cranko 0.12.4 (2022-08-15)
