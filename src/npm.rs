@@ -234,7 +234,18 @@ impl Rewriter for PackageJsonRewriter {
 
                 DepRequirement::Commit(_) => {
                     if let Some(ref v) = dep.resolved_version {
-                        format!("^{}", v)
+                        // Hack: For versions before 1.0, semver treats minor
+                        // versions as incompatible: ^0.1 is not compatible with
+                        // 0.2. This busts our paradigm. We can work around by
+                        // using explicit greater-than expressions, but
+                        // unfortunately in Yarn workspace expressions it seems
+                        // that we can't add an upper "<1" constraint too.
+                        let v = v.to_string();
+                        if v.starts_with("0.") {
+                            format!(">={}", v)
+                        } else {
+                            format!("^{}", v)
+                        }
                     } else {
                         continue;
                     }
