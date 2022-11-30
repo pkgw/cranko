@@ -96,6 +96,7 @@ impl Version {
     ///
     /// Not all bump schemes are compatible with all versioning styles, which is
     /// why this operation depends on the version template and is fallible.
+    #[allow(clippy::result_large_err)]
     pub fn parse_bump_scheme(
         &self,
         text: &str,

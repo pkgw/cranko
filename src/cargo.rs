@@ -241,7 +241,7 @@ impl Rewriter for CargoRewriter {
 
                 DepRequirement::Commit(_) => {
                     if let Some(ref v) = dep.resolved_version {
-                        // Hack: For versions before 1.0, Cargo treats minor
+                        // Hack: For versions before 1.0, semver treats minor
                         // versions as incompatible: ^0.1 is not compatible with
                         // 0.2. This busts our paradigm. We can work around by
                         // using explicit greater-than expressions.

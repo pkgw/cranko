@@ -58,12 +58,25 @@ parameters:
     type: object
     default:
     - name: aarch64_unknown_linux_gnu
+      vmImage: ubuntu-latest
+      params: {}
       vars:
         TARGET: aarch64-unknown-linux-gnu
 
     - name: powerpc64le_unknown_linux_gnu
+      vmImage: ubuntu-latest
+      params: {}
       vars:
         TARGET: powerpc64le-unknown-linux-gnu
+
+    - name: aarch64_apple_darwin
+      vmImage: macos-latest
+      params:
+        hostTriple: "x86_64-apple-darwin"
+        qemuAndTest: false
+        extraPackageArgs: ""
+      vars:
+        TARGET: aarch64-apple-darwin
 
 jobs:
 
@@ -83,11 +96,14 @@ jobs:
 - ${{ each build in parameters.crossBuilds }}:
   - job: ${{ format('cross_{0}', build.name) }}
     pool:
-      vmImage: ubuntu-latest
+      vmImage: ${{ build.vmImage }}
     steps:
     - template: azure-cross-build.yml
+      parameters:
+        ${{ insert }}: ${{ build.params }}
     variables:
       ${{ insert }}: ${{ build.vars }}
+
 
 # rustfmt check
 - job: rustfmt
