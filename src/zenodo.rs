@@ -474,13 +474,13 @@ impl<'a> ZenodoWorkflow<'a> {
         let mut did_anything = false;
 
         let cur_f = atry!(
-            File::open(&path);
+            File::open(path);
             ["failed to open file `{}` for reading", path.display()]
         );
         let cur_reader = BufReader::new(cur_f);
 
         let new_af =
-            atomicwrites::AtomicFile::new(&path, atomicwrites::OverwriteBehavior::AllowOverwrite);
+            atomicwrites::AtomicFile::new(path, atomicwrites::OverwriteBehavior::AllowOverwrite);
 
         let r = new_af.write(|new_f| {
             for line in cur_reader.lines() {

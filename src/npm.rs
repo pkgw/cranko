@@ -234,7 +234,31 @@ impl Rewriter for PackageJsonRewriter {
 
                 DepRequirement::Commit(_) => {
                     if let Some(ref v) = dep.resolved_version {
-                        format!("^{}", v)
+                        // The user can configure a custom resolution protocol
+                        // to prepend to the version. This capability basically
+                        // exists to let us prepend a `workspace:` when using
+                        // Yarn workspaces, which helps ensure that we always
+                        // resolve internal deps internally.
+
+                        let (protocol, sep) = app
+                            .npm_config
+                            .internal_dep_protocol
+                            .as_ref()
+                            .map(|p| (p.as_ref(), ":"))
+                            .unwrap_or(("", ""));
+
+                        // Hack: For versions before 1.0, semver treats minor
+                        // versions as incompatible: ^0.1 is not compatible with
+                        // 0.2. This busts our paradigm. We can work around by
+                        // using explicit greater-than expressions, but
+                        // unfortunately in Yarn workspace expressions it seems
+                        // that we can't add an upper "<1" constraint too.
+                        let v = v.to_string();
+                        if v.starts_with("0.") {
+                            format!("{}{}>={}", protocol, sep, v)
+                        } else {
+                            format!("{}{}^{}", protocol, sep, v)
+                        }
                     } else {
                         continue;
                     }

@@ -43,7 +43,7 @@ impl Command for RebootBranchCommand {
 
         index.clear().context("couldn't clear index")?;
         index
-            .add_all(&["*"], git2::IndexAddOption::FORCE, None)
+            .add_all(["*"], git2::IndexAddOption::FORCE, None)
             .context("couldn't add new tree to index")?;
         let tree_id = index
             .write_tree()
