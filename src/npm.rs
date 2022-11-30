@@ -389,7 +389,7 @@ pub enum NpmCommands {
     ForeachReleased(ForeachReleasedCommand),
 
     #[structopt(name = "install-token")]
-    /// Install $NPM_TOKEN in the user's .npmrc
+    /// Install $NPM_TOKEN in the user's .npmrc or .yarnrc.yml
     InstallToken(InstallTokenCommand),
 
     #[structopt(name = "lerna-workaround")]
@@ -479,12 +479,11 @@ impl Command for ForeachReleasedCommand {
 /// `cranko npm install-token`
 #[derive(Debug, Eq, PartialEq, StructOpt)]
 pub struct InstallTokenCommand {
-    #[structopt(
-        long = "registry",
-        default_value = "//registry.npmjs.org/",
-        help = "The registry base URL."
-    )]
-    registry: String,
+    #[structopt(long)]
+    yarn: bool,
+
+    #[structopt(long = "registry", help = "The registry base URL.")]
+    registry: Option<String>,
 }
 
 impl Command for InstallTokenCommand {
@@ -496,17 +495,48 @@ impl Command for InstallTokenCommand {
 
         let mut p =
             dirs::home_dir().ok_or_else(|| anyhow!("cannot determine user's home directory"))?;
-        p.push(".npmrc");
 
-        let mut file = atry!(
-            OpenOptions::new().write(true).create(true).append(true).open(&p);
-            ["failed to open file `{}` for appending", p.display()]
-        );
+        if self.yarn {
+            let registry = self
+                .registry
+                .unwrap_or_else(|| "https://registry.yarnpkg.com/".to_owned());
 
-        atry!(
-            write_crlf!(file, "{}:_authToken={}", self.registry, token);
-            ["failed to write token data to file `{}`", p.display()]
-        );
+            p.push(".yarnrc.yml");
+
+            let mut file = atry!(
+                OpenOptions::new().write(true).create(true).append(true).open(&p);
+                ["failed to open file `{}` for appending", p.display()]
+            );
+
+            atry!(
+                write_crlf!(file, "npmRegistries:");
+                ["failed to write token data to file `{}`", p.display()]
+            );
+            atry!(
+                write_crlf!(file, "  \"{}\":", registry);
+                ["failed to write token data to file `{}`", p.display()]
+            );
+            atry!(
+                write_crlf!(file, "    npmAuthToken: {}", token);
+                ["failed to write token data to file `{}`", p.display()]
+            );
+        } else {
+            let registry = self
+                .registry
+                .unwrap_or_else(|| "//registry.npmjs.org/".to_owned());
+
+            p.push(".npmrc");
+
+            let mut file = atry!(
+                OpenOptions::new().write(true).create(true).append(true).open(&p);
+                ["failed to open file `{}` for appending", p.display()]
+            );
+
+            atry!(
+                write_crlf!(file, "{}:_authToken={}", registry, token);
+                ["failed to write token data to file `{}`", p.display()]
+            );
+        }
 
         Ok(0)
     }
