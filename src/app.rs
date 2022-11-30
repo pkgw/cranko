@@ -10,7 +10,7 @@ use thiserror::Error as ThisError;
 
 use crate::{
     atry,
-    config::ConfigurationFile,
+    config::{ConfigurationFile, NpmConfiguration},
     errors::Result,
     graph::{ProjectGraph, ProjectGraphBuilder, RepoHistories},
     project::{DepRequirement, ProjectId},
@@ -25,6 +25,7 @@ use crate::{
 pub struct AppBuilder {
     pub repo: Repository,
     pub graph: ProjectGraphBuilder,
+
     ci_info: ci_info::types::CiInfo,
     populate_graph: bool,
 }
@@ -115,6 +116,7 @@ impl AppBuilder {
         Ok(AppSession {
             repo: self.repo,
             graph,
+            npm_config: config.npm,
             ci_info: self.ci_info,
         })
     }
@@ -131,6 +133,9 @@ pub struct UnsatisfiedInternalRequirementError(pub String, pub String);
 pub struct AppSession {
     /// The backing repository.
     pub repo: Repository,
+
+    /// It feels hacky to have this here, but this is where we need it.
+    pub npm_config: NpmConfiguration,
 
     /// The graph of projects contained within the repo.
     graph: ProjectGraph,

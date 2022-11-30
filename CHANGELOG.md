@@ -1,12 +1,30 @@
 # rc: minor bump
 
+- Improve handling of Yarn workspaces (#45, @pkgw). First, pre-1.0 version
+  constraints for internal dependencies now use `>=` rather than `^` as an
+  operator, since semver treats the latter as only matching identical minor
+  versions. Second, add a new configuration option `npm.internal_dep_protocol`,
+  which allows users to specify a Yarn "resolution protocol" to be used with
+  internal dependency version constraints. The useful setting here is
+  `"workspace"`, which forces Yarn to resolve the dependency within a monorepo,
+  which can detect incorrectly-specified internal dependency version constraints.
+- Add an official binary build for the `aarch64-apple-darwin` (Apple Silicon)
+  platform (#44, @pkgw).
+
+The DOI of this release is [xx.xxxx/dev-build.cranko.version][vdoi].
+
+[vdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+
+
+# cranko 0.13.0 (2022-10-02)
+
 - Add the `--pause` option to `cranko cargo foreach-published` (#43, @pkgw). The
   hope is that this will help robustness when publishing a group of crates to
   Crates.io if one of the new releases requires another.
 
-The DOI of this release is [xx.xxxx/dev-build.cranko.version][cdoi].
+The DOI of this release is [10.5281/zenodo.7135550][cdoi].
 
-[cdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+[cdoi]: https://doi.org/10.5281/zenodo.7135550
 
 
 # cranko 0.12.5 (2022-10-02)

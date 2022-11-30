@@ -27,6 +27,8 @@ The `config.toml` file may contain the following items:
   - [`upstream_urls`](#the-upstream_urls-field) — How the upstream remote is recognized
 - [`[projects]`](#the-projects-section) — Configuration relating to individual projects
   - [`ignore`](#the-ignore-field) — Flagging projects to be ignored
+- [`[npm]`](#the-npm-section) — Configuration relating to the NPM integration
+  - [`internal_dep_protocol`](#the-internal_dep_protocol-field) — A resolver protocol to use for internal dependencies
 
 As mentioned above, additional items are planned to be added as the need arises.
 
@@ -107,3 +109,19 @@ that you never intend to release. This setting allows you to pretend that such a
 project simply doesn’t exist. The setting is applied in the repository-wide
 configuration file, not in project metadata, in case the project is imported
 from a vendor source that doesn’t include Cranko metadata.
+
+### The `[npm]` section
+
+This section contains configuration pertaining to Cranko’s NPM integration.
+
+### The `internal_dep_protocol` field
+
+This optional string field specifies a Yarn [resolution protocol] to insert into
+the requirements lines for dependencies internal to a monorepo. If you are using
+Yarn as your package manager, setting this to [`"workspace"`] will force Yarn to
+always resolve the dependency to one within the workspace. This should help
+ensure that your internal dependency version specifications are correct and
+self-consistent.
+
+[resolution protocol]: https://yarnpkg.com/features/protocols
+[`"workspace"`]: https://yarnpkg.com/features/protocols#workspace
