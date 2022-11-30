@@ -1,5 +1,18 @@
 # rc: minor bump
 
+- Add a new `--yarn` option to the `cranko npm install-token` command (#46,
+  @pkgw). This gives a mechanism to set up authentication to publish packages
+  using `yarn npm publish`. The environment variable used to obtain the token is
+  still called `NPM_TOKEN`, and the same value will still work (if you're using
+  the default registries); it's just that a different file needs to be set up.
+
+The DOI of this release is [xx.xxxx/dev-build.cranko.version][vdoi].
+
+[vdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+
+
+# cranko 0.14.0 (2022-11-30)
+
 - Improve handling of Yarn workspaces (#45, @pkgw). First, pre-1.0 version
   constraints for internal dependencies now use `>=` rather than `^` as an
   operator, since semver treats the latter as only matching identical minor
@@ -11,9 +24,9 @@
 - Add an official binary build for the `aarch64-apple-darwin` (Apple Silicon)
   platform (#44, @pkgw).
 
-The DOI of this release is [xx.xxxx/dev-build.cranko.version][vdoi].
+The DOI of this release is [10.5281/zenodo.7379147][vdoi].
 
-[vdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+[vdoi]: https://doi.org/10.5281/zenodo.7379147
 
 
 # cranko 0.13.0 (2022-10-02)
