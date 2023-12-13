@@ -282,7 +282,7 @@ impl<'a> ZenodoWorkflow<'a> {
         let client = svc.make_blocking_client()?;
         let url = svc.api_url(&format!("records/{}", &md.concept_rec_id));
 
-        let resp = client.get(&url).send()?;
+        let resp = client.get(url).send()?;
         let status = resp.status();
         let mut parsed = json::parse(&resp.text()?)?;
 
@@ -317,7 +317,7 @@ impl<'a> ZenodoWorkflow<'a> {
             "deposit/depositions/{}/actions/newversion",
             &last_rec_id
         ));
-        let resp = client.post(&url).send()?;
+        let resp = client.post(url).send()?;
         let status = resp.status();
         let mut parsed = json::parse(&resp.text()?)?;
 
@@ -758,7 +758,7 @@ impl Command for PublishCommand {
 
         let url = svc.api_url(&format!("deposit/depositions/{}", &md.version_rec_id));
         let resp = client
-            .put(&url)
+            .put(url)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .body(body)
             .send()?;
@@ -776,7 +776,7 @@ impl Command for PublishCommand {
             "deposit/depositions/{}/actions/publish",
             &md.version_rec_id
         ));
-        let resp = client.post(&url).send()?;
+        let resp = client.post(url).send()?;
         let status = resp.status();
         let parsed = json::parse(&resp.text()?)?;
 

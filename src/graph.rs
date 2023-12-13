@@ -674,7 +674,7 @@ mod tests {
         for (qnames, user_facing) in spec {
             let qnames = qnames.iter().map(|s| (*s).to_owned()).collect();
             let projid = graph.try_add_project(qnames, &empty_config).unwrap();
-            let mut b = graph.lookup_mut(projid);
+            let b = graph.lookup_mut(projid);
             b.version = Some(Version::Semver(semver::Version::new(0, 0, 0)));
             b.prefix = Some(RepoPathBuf::new(b""));
             ids.insert(projid, user_facing);

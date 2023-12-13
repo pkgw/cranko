@@ -85,7 +85,7 @@ pub trait Changelog: std::fmt::Debug {
 ///
 /// This uses the Markdown format.
 pub fn default() -> Box<dyn Changelog> {
-    Box::new(MarkdownChangelog::default())
+    Box::<MarkdownChangelog>::default()
 }
 
 /// An error returned when a changelog file does not obey the special structure
@@ -161,7 +161,7 @@ impl MarkdownChangelog {
         let changelog_path = self.changelog_path(proj, &sess.repo);
 
         let new_af = atomicwrites::AtomicFile::new(
-            &changelog_path,
+            changelog_path,
             atomicwrites::OverwriteBehavior::AllowOverwrite,
         );
 
