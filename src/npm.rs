@@ -117,7 +117,7 @@ impl NpmLoader {
         let qnames = vec![name.to_owned(), "npm".to_owned()];
 
         if let Some(ident) = graph.try_add_project(qnames, pconfig) {
-            let mut proj = graph.lookup_mut(ident);
+            let proj = graph.lookup_mut(ident);
             proj.prefix = Some(dirname.to_owned());
             proj.version = Some(Version::Semver(version));
 

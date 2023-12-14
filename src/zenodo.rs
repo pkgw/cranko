@@ -42,6 +42,10 @@ impl ZenodoService {
             header::HeaderValue::from_str(&format!("Bearer {}", self.token))?,
         );
         headers.insert(header::USER_AGENT, header::HeaderValue::from_str("cranko")?);
+        headers.insert(
+            header::REFERER,
+            header::HeaderValue::from_str("https://pkgw.github.io/cranko/")?,
+        );
 
         Ok(reqwest::blocking::Client::builder()
             .default_headers(headers)
@@ -282,7 +286,7 @@ impl<'a> ZenodoWorkflow<'a> {
         let client = svc.make_blocking_client()?;
         let url = svc.api_url(&format!("records/{}", &md.concept_rec_id));
 
-        let resp = client.get(&url).send()?;
+        let resp = client.get(url).send()?;
         let status = resp.status();
         let mut parsed = json::parse(&resp.text()?)?;
 
@@ -317,7 +321,7 @@ impl<'a> ZenodoWorkflow<'a> {
             "deposit/depositions/{}/actions/newversion",
             &last_rec_id
         ));
-        let resp = client.post(&url).send()?;
+        let resp = client.post(url).send()?;
         let status = resp.status();
         let mut parsed = json::parse(&resp.text()?)?;
 
@@ -754,11 +758,11 @@ impl Command for PublishCommand {
             serde_json::to_string(&md.metadata);
             ["failed to serialize Zenodo metadata to JSON"]
         );
-        let body = format!("{{\"metadata\":{}, \"state\": \"done\"}}", md_body);
+        let body = format!("{{\"metadata\":{}}}", md_body);
 
         let url = svc.api_url(&format!("deposit/depositions/{}", &md.version_rec_id));
         let resp = client
-            .put(&url)
+            .put(url)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .body(body)
             .send()?;
@@ -776,7 +780,7 @@ impl Command for PublishCommand {
             "deposit/depositions/{}/actions/publish",
             &md.version_rec_id
         ));
-        let resp = client.post(&url).send()?;
+        let resp = client.post(url).send()?;
         let status = resp.status();
         let parsed = json::parse(&resp.text()?)?;
 
