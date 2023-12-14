@@ -1,3 +1,17 @@
+# cranko 0.16.0 (2023-12-14)
+
+- Update to work with Zenodo after their [October 2023
+  upgrade](https://blog.zenodo.org/2023/10/19/2023-10-19-upgrade-issues/) (#48,
+  @pkgw). Due to changes in the Zenodo API, the Zenodo integration as
+  implemented in previous versions of Cranko stopped working.
+- General dependency updates, including a fix for a weird class seen only in
+  recent release builds (#49, @pkgw).
+
+The DOI of this release is [10.5281/zenodo.10382647][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.10382647
+
+
 # cranko 0.15.0 (2022-11-30)
 
 - Add a new `--yarn` option to the `cranko npm install-token` command (#46,

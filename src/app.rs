@@ -520,7 +520,7 @@ impl AppSession {
         let latest_info = self.repo.get_latest_release_info()?;
 
         self.solve_internal_deps(|_repo, graph, ident| {
-            let mut proj = graph.lookup_mut(ident);
+            let proj = graph.lookup_mut(ident);
 
             // Set the baseline version to the last release.
 
