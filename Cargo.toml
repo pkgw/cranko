@@ -55,5 +55,9 @@ zip = { version = "^0.5", default-features = false, features = [
   "time",
 ] }
 
+# https://github.com/jan-auer/dynfmt/pull/9
+[patch.crates-io]
+dynfmt = { git = "https://github.com/jqnatividad/dynfmt", branch = "2021-clippy_ptr_as_ptr-bumpdeps" }
+
 [features]
 vendored-openssl = ["git2/vendored-openssl"]
