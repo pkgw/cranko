@@ -51,13 +51,13 @@ impl CsProjLoader {
     ) -> Result<()> {
         if basename.ends_with(b".csproj") {
             let dir = dirname.to_owned();
-            let mut e = self.dirs_of_interest.entry(dir).or_default();
+            let e = self.dirs_of_interest.entry(dir).or_default();
             e.csproj = Some(repopath.to_owned());
         } else if basename.as_ref() == b"AssemblyInfo.cs" {
             // Hardcode the assumption that we should walk up one directory:
             let (dir, _base) = dirname.pop_sep().split_basename();
             let dir = dir.to_owned();
-            let mut e = self.dirs_of_interest.entry(dir).or_default();
+            let e = self.dirs_of_interest.entry(dir).or_default();
             e.assembly_info = Some(repopath.to_owned());
         } else if basename.ends_with(b".vdproj") {
             self.vdproj_files.push(repopath.to_owned());
@@ -186,9 +186,9 @@ impl CsProjLoader {
             }
 
             loop {
-                match xml.read_event(&mut buf) {
+                match xml.read_event_into(&mut buf) {
                     Ok(Event::Start(ref e)) => {
-                        state = match e.name() {
+                        state = match e.name().0 {
                             b"ProjectGuid" => State::GuidText,
                             b"AssemblyName" => State::NameText,
                             b"Project" => {
@@ -207,9 +207,10 @@ impl CsProjLoader {
                     Ok(Event::Text(ref t)) => match state {
                         State::GuidText => {
                             let mut g = atry!(
-                                t.unescape_and_decode_without_bom(&xml);
+                                t.unescape();
                                 ["unable to decode XML text in ProjectGuid of `{}`", p.display()]
-                            );
+                            )
+                            .into_owned();
                             g.make_ascii_lowercase();
                             guid = Some(g);
                             state = State::Scanning;
@@ -217,17 +218,18 @@ impl CsProjLoader {
 
                         State::NameText => {
                             name = Some(atry!(
-                                t.unescape_and_decode_without_bom(&xml);
+                                t.unescape();
                                 ["unable to decode XML text in AssemblyName of `{}`", p.display()]
-                            ));
+                            ).into_owned());
                             state = State::Scanning;
                         }
 
                         State::DepGuidText => {
                             let mut g = atry!(
-                                t.unescape_and_decode_without_bom(&xml);
+                                t.unescape();
                                 ["unable to decode XML text in <Project> of `{}`", p.display()]
-                            );
+                            )
+                            .into_owned();
                             g.make_ascii_lowercase();
                             dep_guids.push(g);
                             state = State::Scanning;
@@ -235,7 +237,7 @@ impl CsProjLoader {
 
                         State::DepReqText => {
                             let r = atry!(
-                                t.unescape_and_decode_without_bom(&xml);
+                                t.unescape();
                                 ["unable to decode XML text in CrankoInternalDepVersion of `{}`", p.display()]
                             );
                             let (guid, reqtext) = a_ok_or!(
@@ -379,7 +381,7 @@ impl CsProjLoader {
             let qnames = vec![name.to_owned(), "csproj".to_owned()];
 
             if let Some(ident) = app.graph.try_add_project(qnames, pconfig) {
-                let mut proj = app.graph.lookup_mut(ident);
+                let proj = app.graph.lookup_mut(ident);
                 proj.prefix = Some(repodir.to_owned());
                 proj.version = Some(version);
 

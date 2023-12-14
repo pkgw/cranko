@@ -284,7 +284,7 @@ impl PypaLoader {
 
             if let Some(ident) = app.graph.try_add_project(qnames, pconfig) {
                 {
-                    let mut proj = app.graph.lookup_mut(ident);
+                    let proj = app.graph.lookup_mut(ident);
 
                     proj.version = Some(Version::Pep440(version));
                     proj.prefix = Some(dirname.to_owned());

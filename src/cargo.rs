@@ -107,7 +107,7 @@ impl CargoLoader {
             let qnames = vec![pkg.name.to_owned(), "cargo".to_owned()];
 
             if let Some(ident) = app.graph.try_add_project(qnames, pconfig) {
-                let mut proj = app.graph.lookup_mut(ident);
+                let proj = app.graph.lookup_mut(ident);
 
                 // Q: should we include a registry name as a qualifier?
                 proj.version = Some(Version::Semver(pkg.version.clone()));

@@ -1,14 +1,27 @@
 # rc: minor bump
 
+- Update to work with [the October 2023 Zenodo
+  upgrade](https://blog.zenodo.org/2023/10/19/2023-10-19-upgrade-issues/) (#48,
+  @pkgw). Due to changes in the Zenodo API, the Zenodo integration as
+  implemented in previous versions of Cranko stopped working.
+- General dependency updates.
+
+The DOI of this release is [xx.xxxx/dev-build.cranko.version][vdoi].
+
+[vdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+
+
+# cranko 0.15.0 (2022-11-30)
+
 - Add a new `--yarn` option to the `cranko npm install-token` command (#46,
   @pkgw). This gives a mechanism to set up authentication to publish packages
   using `yarn npm publish`. The environment variable used to obtain the token is
   still called `NPM_TOKEN`, and the same value will still work (if you're using
   the default registries); it's just that a different file needs to be set up.
 
-The DOI of this release is [xx.xxxx/dev-build.cranko.version][vdoi].
+The DOI of this release is [10.5281/zenodo.7383887][vdoi].
 
-[vdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+[vdoi]: https://doi.org/10.5281/zenodo.7383887
 
 
 # cranko 0.14.0 (2022-11-30)

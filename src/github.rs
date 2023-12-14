@@ -61,7 +61,7 @@ impl GitHubInformation {
     fn delete_release(&self, tag_name: &str, client: &mut reqwest::blocking::Client) -> Result<()> {
         let query_url = self.api_url(&format!("releases/tags/{}", tag_name));
 
-        let resp = client.get(&query_url).send()?;
+        let resp = client.get(query_url).send()?;
         if !resp.status().is_success() {
             return Err(anyhow!(
                 "no GitHub release for tag `{}`: {}",
@@ -75,7 +75,7 @@ impl GitHubInformation {
         let id = metadata["id"].to_string();
 
         let delete_url = self.api_url(&format!("releases/{}", id));
-        let resp = client.delete(&delete_url).send()?;
+        let resp = client.delete(delete_url).send()?;
         if !resp.status().is_success() {
             return Err(anyhow!(
                 "could not delete GitHub release for tag `{}`: {}",
@@ -96,7 +96,7 @@ impl GitHubInformation {
     ) -> Result<JsonValue> {
         let query_url = self.api_url(&format!("releases/tags/{}", tag_name));
 
-        let resp = client.get(&query_url).send()?;
+        let resp = client.get(query_url).send()?;
         if resp.status().is_success() {
             Ok(json::parse(&resp.text()?)?)
         } else {
@@ -142,7 +142,7 @@ impl GitHubInformation {
 
         let create_url = self.api_url("releases");
         let resp = client
-            .post(&create_url)
+            .post(create_url)
             .body(json::stringify(release_info))
             .send()?;
         let status = resp.status();
