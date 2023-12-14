@@ -42,6 +42,10 @@ impl ZenodoService {
             header::HeaderValue::from_str(&format!("Bearer {}", self.token))?,
         );
         headers.insert(header::USER_AGENT, header::HeaderValue::from_str("cranko")?);
+        headers.insert(
+            header::REFERER,
+            header::HeaderValue::from_str("https://pkgw.github.io/cranko/")?,
+        );
 
         Ok(reqwest::blocking::Client::builder()
             .default_headers(headers)
@@ -754,7 +758,7 @@ impl Command for PublishCommand {
             serde_json::to_string(&md.metadata);
             ["failed to serialize Zenodo metadata to JSON"]
         );
-        let body = format!("{{\"metadata\":{}, \"state\": \"done\"}}", md_body);
+        let body = format!("{{\"metadata\":{}}}", md_body);
 
         let url = svc.api_url(&format!("deposit/depositions/{}", &md.version_rec_id));
         let resp = client
