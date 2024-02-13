@@ -178,8 +178,7 @@ impl CargoLoader {
                         if req.is_none() {
                             warn!(
                                 "missing or invalid key `internal_dep_versions.{}` in `{}`",
-                                &dep.name,
-                                pkg.manifest_path.display()
+                                &dep.name, pkg.manifest_path
                             );
                             warn!("... this is needed to specify the oldest version of `{}` compatible with `{}`",
                                 &dep.name, &pkg.name);
@@ -624,7 +623,7 @@ impl Command for PackageReleasedBinariesCommand {
                                 prefixed.push(p);
                                 PathBuf::from(prefixed)
                             } else {
-                                p
+                                p.into_std_path_buf()
                             });
                         }
                     }
