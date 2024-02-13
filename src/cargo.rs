@@ -342,7 +342,7 @@ impl Rewriter for CargoRewriter {
 
         {
             let mut f = File::create(&toml_path)?;
-            write!(f, "{}", doc.to_string())?;
+            write!(f, "{}", doc)?;
             changes.add_path(&self.toml_path);
         }
 
@@ -424,7 +424,7 @@ impl Rewriter for CargoRewriter {
 
         {
             let mut f = File::create(&toml_path)?;
-            write!(f, "{}", doc.to_string())?;
+            write!(f, "{}", doc)?;
             changes.add_path(&self.toml_path);
         }
 
