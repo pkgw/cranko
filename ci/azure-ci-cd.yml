@@ -7,8 +7,8 @@ trigger:
     - rc
 
 variables:
-  CROSS_VERSION: 0.2.4
-  MDBOOK_VERSION: 0.4.2
+  CROSS_VERSION: 0.2.5
+  MDBOOK_VERSION: 0.4.37
 
 stages:
 - stage: Prep
