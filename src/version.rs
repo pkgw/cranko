@@ -65,11 +65,8 @@ impl Version {
                 v.major = 0;
                 v.minor = 0;
                 v.patch = 0;
-                v.pre.clear();
-                v.pre
-                    .push(semver::Identifier::AlphaNumeric("dev".to_string()));
-                v.pre.push(semver::Identifier::Numeric(0));
-                v.build.clear();
+                v.pre = semver::Prerelease::new("dev.0").unwrap();
+                v.build = semver::BuildMetadata::EMPTY;
             }
 
             Version::Pep440(v) => {
@@ -172,7 +169,7 @@ impl VersionBumpScheme {
             match version {
                 Version::Semver(v) => {
                     let code = format!("{:04}{:02}{:02}", local.year(), local.month(), local.day());
-                    v.build.push(semver::Identifier::AlphaNumeric(code));
+                    v.build = semver::BuildMetadata::new(&code).unwrap();
                 }
 
                 Version::Pep440(v) => {
@@ -200,8 +197,8 @@ impl VersionBumpScheme {
         fn apply_micro_bump(version: &mut Version) -> Result<()> {
             match version {
                 Version::Semver(v) => {
-                    v.pre.clear();
-                    v.build.clear();
+                    v.pre = semver::Prerelease::EMPTY;
+                    v.build = semver::BuildMetadata::EMPTY;
                     v.patch += 1;
                 }
 
@@ -232,8 +229,8 @@ impl VersionBumpScheme {
         fn apply_minor_bump(version: &mut Version) -> Result<()> {
             match version {
                 Version::Semver(v) => {
-                    v.pre.clear();
-                    v.build.clear();
+                    v.pre = semver::Prerelease::EMPTY;
+                    v.build = semver::BuildMetadata::EMPTY;
                     v.patch = 0;
                     v.minor += 1;
                 }
@@ -267,8 +264,8 @@ impl VersionBumpScheme {
         fn apply_major_bump(version: &mut Version) -> Result<()> {
             match version {
                 Version::Semver(v) => {
-                    v.pre.clear();
-                    v.build.clear();
+                    v.pre = semver::Prerelease::EMPTY;
+                    v.build = semver::BuildMetadata::EMPTY;
                     v.patch = 0;
                     v.minor = 0;
                     v.major += 1;

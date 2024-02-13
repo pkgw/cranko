@@ -178,8 +178,7 @@ impl CargoLoader {
                         if req.is_none() {
                             warn!(
                                 "missing or invalid key `internal_dep_versions.{}` in `{}`",
-                                &dep.name,
-                                pkg.manifest_path.display()
+                                &dep.name, pkg.manifest_path
                             );
                             warn!("... this is needed to specify the oldest version of `{}` compatible with `{}`",
                                 &dep.name, &pkg.name);
@@ -270,9 +269,9 @@ impl Rewriter for CargoRewriter {
         {
             let ct_root = doc.as_table_mut();
             let ct_package = ct_root
-                .entry("package")
-                .as_table_mut()
-                .ok_or_else(|| anyhow!("no [package] section in {}?!", self.toml_path.escaped()))?;
+                .get_mut("package")
+                .and_then(|i| i.as_table_mut())
+                .ok_or_else(|| anyhow!("no [package] section in {}!?", self.toml_path.escaped()))?;
 
             ct_package["version"] = toml_edit::value(proj.version.to_string());
 
@@ -281,12 +280,12 @@ impl Rewriter for CargoRewriter {
             // tables.
 
             for tblname in &["dependencies", "dev-dependencies", "build-dependencies"] {
-                if let Some(tbl) = ct_root.entry(tblname).as_table_mut() {
+                if let Some(tbl) = ct_root.get_mut(tblname).and_then(|i| i.as_table_mut()) {
                     rewrite_deptable(&internal_reqs, tbl)?;
                 }
             }
 
-            if let Some(ct_target) = ct_root.entry("target").as_table_mut() {
+            if let Some(ct_target) = ct_root.get_mut("target").and_then(|i| i.as_table_mut()) {
                 // As far as I can tell, no way to iterate over the table while mutating
                 // its values?
                 let target_specs = ct_target
@@ -295,7 +294,10 @@ impl Rewriter for CargoRewriter {
                     .collect::<Vec<_>>();
 
                 for target_spec in &target_specs[..] {
-                    if let Some(tbl) = ct_target.entry(target_spec).as_table_mut() {
+                    if let Some(tbl) = ct_target
+                        .get_mut(target_spec)
+                        .and_then(|i| i.as_table_mut())
+                    {
                         rewrite_deptable(&internal_reqs, tbl)?;
                     }
                 }
@@ -313,9 +315,11 @@ impl Rewriter for CargoRewriter {
                 // from cargo-metadata when we load everything.
 
                 if let Some(req_text) = internal_reqs.get(dep) {
-                    if let Some(dep_tbl) = tbl.entry(dep).as_table_mut() {
+                    if let Some(dep_tbl) = tbl.get_mut(dep).and_then(|i| i.as_table_mut()) {
                         dep_tbl["version"] = toml_edit::value(req_text.clone());
-                    } else if let Some(dep_tbl) = tbl.entry(dep).as_inline_table_mut() {
+                    } else if let Some(dep_tbl) =
+                        tbl.get_mut(dep).and_then(|i| i.as_inline_table_mut())
+                    {
                         // Can't just index inline tables???
                         if let Some(val) = dep_tbl.get_mut("version") {
                             *val = req_text.clone().into();
@@ -325,7 +329,7 @@ impl Rewriter for CargoRewriter {
                     } else {
                         return Err(anyhow!(
                             "unexpected internal dependency item in a Cargo.toml: {:?}",
-                            tbl.entry(dep)
+                            tbl.get(dep)
                         ));
                     }
                 }
@@ -338,7 +342,7 @@ impl Rewriter for CargoRewriter {
 
         {
             let mut f = File::create(&toml_path)?;
-            write!(f, "{}", doc.to_string_in_original_order())?;
+            write!(f, "{}", doc)?;
             changes.add_path(&self.toml_path);
         }
 
@@ -374,29 +378,31 @@ impl Rewriter for CargoRewriter {
         {
             let ct_root = doc.as_table_mut();
             let ct_package = ct_root
-                .entry("package")
-                .as_table_mut()
+                .get_mut("package")
+                .and_then(|i| i.as_table_mut())
                 .ok_or_else(|| anyhow!("no [package] section in {}?!", self.toml_path.escaped()))?;
 
-            let tbl = ct_package.entry("metadata");
-            let tbl = match tbl.as_table_mut() {
-                Some(t) => t,
+            let tbl = ct_package
+                .entry("metadata")
+                .or_insert_with(|| Item::Table(Table::new()))
+                .as_table_mut()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "no [package.metadata] section in {}?!",
+                        self.toml_path.escaped()
+                    )
+                })?;
 
-                None => {
-                    *tbl = Item::Table(Table::new());
-                    tbl.as_table_mut().unwrap()
-                }
-            };
-
-            let tbl = tbl.entry("internal_dep_versions");
-            let tbl = match tbl.as_table_mut() {
-                Some(t) => t,
-
-                None => {
-                    *tbl = Item::Table(Table::new());
-                    tbl.as_table_mut().unwrap()
-                }
-            };
+            let tbl = tbl
+                .entry("internal_dep_versions")
+                .or_insert_with(|| Item::Table(Table::new()))
+                .as_table_mut()
+                .ok_or_else(|| {
+                    anyhow!(
+                        "no [package.metadata.internal_dep_versions] section in {}?!",
+                        self.toml_path.escaped()
+                    )
+                })?;
 
             let graph = app.graph();
             let proj = graph.lookup(self.proj_id);
@@ -418,7 +424,7 @@ impl Rewriter for CargoRewriter {
 
         {
             let mut f = File::create(&toml_path)?;
-            write!(f, "{}", doc.to_string_in_original_order())?;
+            write!(f, "{}", doc)?;
             changes.add_path(&self.toml_path);
         }
 
@@ -624,7 +630,7 @@ impl Command for PackageReleasedBinariesCommand {
                                 prefixed.push(p);
                                 PathBuf::from(prefixed)
                             } else {
-                                p
+                                p.into_std_path_buf()
                             });
                         }
                     }

@@ -504,7 +504,7 @@ impl Command for InstallTokenCommand {
             p.push(".yarnrc.yml");
 
             let mut file = atry!(
-                OpenOptions::new().write(true).create(true).append(true).open(&p);
+                OpenOptions::new().create(true).append(true).open(&p);
                 ["failed to open file `{}` for appending", p.display()]
             );
 
@@ -528,7 +528,7 @@ impl Command for InstallTokenCommand {
             p.push(".npmrc");
 
             let mut file = atry!(
-                OpenOptions::new().write(true).create(true).append(true).open(&p);
+                OpenOptions::new().create(true).append(true).open(&p);
                 ["failed to open file `{}` for appending", p.display()]
             );
 

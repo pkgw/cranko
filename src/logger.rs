@@ -99,7 +99,7 @@ impl Logger {
         let msg = msg.to_string();
         let mut first = true;
 
-        for line in textwrap::wrap_iter(&msg, get_wrap_width() - 6) {
+        for line in textwrap::wrap(&msg, get_wrap_width() - 6) {
             if first {
                 first = false;
 

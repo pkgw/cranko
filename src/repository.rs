@@ -839,8 +839,8 @@ impl Repository {
         // efficient. (I haven't done any testing to see how much the caching
         // helps, though ...)
 
-        let mut commit_data = lru::LruCache::new(512);
-        let mut trees = lru::LruCache::new(3);
+        let mut commit_data = lru::LruCache::new(std::num::NonZeroUsize::new(512).unwrap());
+        let mut trees = lru::LruCache::new(std::num::NonZeroUsize::new(3).unwrap());
 
         let mut dopts = git2::DiffOptions::new();
         dopts.include_typechange(true);
