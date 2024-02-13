@@ -16,7 +16,7 @@ exclude = ["book", "ci", "www"]
 [dependencies]
 anyhow = "^1"
 atomicwrites = "^0.3"
-base64 = "^0.12"
+base64 = "^0.21"
 cargo_metadata = "^0.18"
 chrono = "^0.4"
 ci_info = "^0.10"

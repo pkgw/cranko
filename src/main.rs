@@ -9,6 +9,7 @@
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
 use anyhow::{anyhow, bail, Context};
+use base64::prelude::*;
 use log::{info, warn};
 use std::{
     collections::BTreeSet,
@@ -275,7 +276,7 @@ impl Command for CiUtilEnvToFileCommand {
         let b = match self.decode_mode {
             EnvDecodingMode::Text => value.into_bytes(),
 
-            EnvDecodingMode::Base64 => base64::decode(&value).with_context(|| {
+            EnvDecodingMode::Base64 => BASE64_STANDARD.decode(&value).with_context(|| {
                 format!(
                     "failed to decode value of environment variable `{}` as BASE64",
                     self.var_name.to_string_lossy()
