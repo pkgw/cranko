@@ -547,7 +547,7 @@ impl Rewriter for VdprojRewriter {
 
         let proj = app.graph().lookup(self.proj_id);
 
-        let mut pcode = uuid::Uuid::new_v4().to_hyphenated().to_string();
+        let mut pcode = uuid::Uuid::new_v4().hyphenated().to_string();
         pcode.make_ascii_uppercase();
         let pcode = format!("{{{}}}", pcode);
         info!(
