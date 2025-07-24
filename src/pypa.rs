@@ -605,7 +605,7 @@ impl Rewriter for PythonRewriter {
 
                 DepRequirement::Commit(_) => {
                     if let Some(ref v) = dep.resolved_version {
-                        format!("^{}", v)
+                        format!("^{v}")
                     } else {
                         continue;
                     }

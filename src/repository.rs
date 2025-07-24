@@ -1622,7 +1622,7 @@ impl RepoPath {
         // include the separating items, which we want.
         let basename = self.0.rsplit(|c| *c == b'/').next().unwrap();
         let ndir = self.0.len() - basename.len();
-        return (self.0[..ndir].as_ref(), basename.as_ref());
+        (self.0[..ndir].as_ref(), basename.as_ref())
     }
 
     /// Return this path with a trailing directory separator removed, if one is

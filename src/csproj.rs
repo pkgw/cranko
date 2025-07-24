@@ -549,7 +549,7 @@ impl Rewriter for VdprojRewriter {
 
         let mut pcode = uuid::Uuid::new_v4().hyphenated().to_string();
         pcode.make_ascii_uppercase();
-        let pcode = format!("{{{}}}", pcode);
+        let pcode = format!("{{{pcode}}}");
         info!(
             "new Product/PackageCode UUID for `{}`: {}",
             self.vdproj_path.escaped(),
