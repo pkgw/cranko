@@ -1374,6 +1374,7 @@ pub struct ReleasedProjectInfo {
 #[derive(Clone, Debug, Default)]
 pub struct RcCommitInfo {
     /// The Git commit-ish that this object describes.
+    #[allow(dead_code)]
     pub commit: Option<CommitId>,
 
     /// A list of projects and their "rc" information as of this commit. This
@@ -1454,11 +1455,11 @@ impl RepoHistory {
 
         let release_commit = repo.repo.find_commit(rcid.0)?;
         let rc_commit = a_ok_or!(
-            release_commit.parents().last();
+            release_commit.parents().next_back();
             ["release commit has no parents?"]
         );
         let main_commit = a_ok_or!(
-            rc_commit.parents().last();
+            rc_commit.parents().next_back();
             ["rc commit has no parents?"]
         );
 
