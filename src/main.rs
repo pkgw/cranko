@@ -159,7 +159,7 @@ fn main() {
     let opts = CrankoOptions::from_args();
 
     if let Err(e) = logger::Logger::init() {
-        eprintln!("error: cannot initialize logging backend: {}", e);
+        eprintln!("error: cannot initialize logging backend: {e}");
         process::exit(1);
     }
     log::set_max_level(log::LevelFilter::Info);
@@ -379,7 +379,7 @@ impl Command for ConfirmCommand {
                         DepRequirement::Commit(_) => {
                             format!(">= {}", dep.resolved_version.as_ref().unwrap())
                         }
-                        DepRequirement::Manual(t) => format!("{} (manual)", t),
+                        DepRequirement::Manual(t) => format!("{t} (manual)"),
                         DepRequirement::Unavailable => {
                             "** version requirement unavailable **".to_owned()
                         }
@@ -503,7 +503,7 @@ impl Command for ListCommandsCommand {
         println!("Currently available \"cranko\" subcommands:\n");
 
         for command in list_commands() {
-            println!("    {}", command);
+            println!("    {command}");
         }
 
         Ok(0)
@@ -745,7 +745,7 @@ impl Command for ShowCrankoVersionDoiCommand {
             warn!("you are running a development build; the printed value is not a real DOI");
         }
 
-        println!("{}", doi);
+        println!("{doi}");
         Ok(0)
     }
 }
@@ -762,7 +762,7 @@ impl Command for ShowCrankoConceptDoiCommand {
             warn!("you are running a development build; the printed value is not a real DOI");
         }
 
-        println!("{}", doi);
+        println!("{doi}");
         Ok(0)
     }
 }

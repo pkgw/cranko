@@ -246,9 +246,9 @@ impl Rewriter for CargoRewriter {
                         // using explicit greater-than expressions.
                         let v = v.to_string();
                         if v.starts_with("0.") {
-                            format!(">={},<1", v)
+                            format!(">={v},<1")
                         } else {
-                            format!("^{}", v)
+                            format!("^{v}")
                         }
                     } else {
                         continue;
@@ -342,7 +342,7 @@ impl Rewriter for CargoRewriter {
 
         {
             let mut f = File::create(&toml_path)?;
-            write!(f, "{}", doc)?;
+            write!(f, "{doc}")?;
             changes.add_path(&self.toml_path);
         }
 
@@ -412,7 +412,7 @@ impl Rewriter for CargoRewriter {
 
                 let spec = match &dep.cranko_requirement {
                     DepRequirement::Commit(cid) => cid.to_string(),
-                    DepRequirement::Manual(t) => format!("manual:{}", t),
+                    DepRequirement::Manual(t) => format!("manual:{t}"),
                     DepRequirement::Unavailable => continue,
                 };
 
@@ -424,7 +424,7 @@ impl Rewriter for CargoRewriter {
 
         {
             let mut f = File::create(&toml_path)?;
-            write!(f, "{}", doc)?;
+            write!(f, "{doc}")?;
             changes.add_path(&self.toml_path);
         }
 
@@ -612,7 +612,7 @@ impl Command for PackageReleasedBinariesCommand {
 
             let mut child = cmd
                 .spawn()
-                .with_context(|| format!("failed to spawn subcommand: {:?}", cmd))?;
+                .with_context(|| format!("failed to spawn subcommand: {cmd:?}"))?;
             let reader = BufReader::new(child.stdout.take().unwrap());
 
             let mut binaries = Vec::new();
@@ -620,7 +620,7 @@ impl Command for PackageReleasedBinariesCommand {
             for message in Message::parse_stream(reader) {
                 match message.unwrap() {
                     Message::CompilerMessage(msg) => {
-                        println!("{}", msg);
+                        println!("{msg}");
                     }
 
                     Message::CompilerArtifact(artifact) => {

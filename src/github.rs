@@ -59,7 +59,7 @@ impl GitHubInformation {
 
     /// Delete an existing release.
     fn delete_release(&self, tag_name: &str, client: &mut reqwest::blocking::Client) -> Result<()> {
-        let query_url = self.api_url(&format!("releases/tags/{}", tag_name));
+        let query_url = self.api_url(&format!("releases/tags/{tag_name}"));
 
         let resp = client.get(query_url).send()?;
         if !resp.status().is_success() {
@@ -74,7 +74,7 @@ impl GitHubInformation {
         let metadata = json::parse(&resp.text()?)?;
         let id = metadata["id"].to_string();
 
-        let delete_url = self.api_url(&format!("releases/{}", id));
+        let delete_url = self.api_url(&format!("releases/{id}"));
         let resp = client.delete(delete_url).send()?;
         if !resp.status().is_success() {
             return Err(anyhow!(
@@ -94,7 +94,7 @@ impl GitHubInformation {
         tag_name: &str,
         client: &mut reqwest::blocking::Client,
     ) -> Result<JsonValue> {
-        let query_url = self.api_url(&format!("releases/tags/{}", tag_name));
+        let query_url = self.api_url(&format!("releases/tags/{tag_name}"));
 
         let resp = client.get(query_url).send()?;
         if resp.status().is_success() {
@@ -351,7 +351,7 @@ impl Command for CredentialHelperCommand {
         } else {
             let token = require_var("GITHUB_TOKEN")?;
             println!("username=token");
-            println!("password={}", token);
+            println!("password={token}");
         }
 
         Ok(0)
@@ -396,7 +396,7 @@ impl Command for InstallCredentialHelperCommand {
         let mut cfg = git2::Config::open_default().context("cannot open Git configuration")?;
         cfg.set_str(
             "credential.helper",
-            &format!("{} github _credential-helper", this_exe),
+            &format!("{this_exe} github _credential-helper"),
         )
         .context("cannot update Git configuration setting `credential.helper`")?;
         Ok(0)
