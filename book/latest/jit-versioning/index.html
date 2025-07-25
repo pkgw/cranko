@@ -1,0 +1,379 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Just-in-Time Versioning - The Cranko Manual</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="A manual for the Cranko release automation tool.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">Overview</a></li><li class="chapter-item expanded "><a href="../installation/index.html"><strong aria-hidden="true">1.</strong> Installation</a></li><li class="chapter-item expanded "><a href="../getting-started/index.html"><strong aria-hidden="true">2.</strong> Getting Started</a></li><li class="chapter-item expanded "><a href="../jit-versioning/index.html" class="active"><strong aria-hidden="true">3.</strong> Just-in-Time Versioning</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">4.</strong> Workflows</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../workflows-bootstrap/index.html"><strong aria-hidden="true">4.1.</strong> Bootstrapping</a></li><li class="chapter-item expanded "><a href="../workflows-dev/index.html"><strong aria-hidden="true">4.2.</strong> Everyday Development</a></li><li class="chapter-item expanded "><a href="../workflows-cicd/index.html"><strong aria-hidden="true">4.3.</strong> CI/CD</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Integrations</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../integrations/azure-pipelines.html"><strong aria-hidden="true">5.1.</strong> Azure Pipelines</a></li><li class="chapter-item expanded "><a href="../integrations/python.html"><strong aria-hidden="true">5.2.</strong> Python</a></li><li class="chapter-item expanded "><a href="../integrations/csproj.html"><strong aria-hidden="true">5.3.</strong> Visual Studio C# Projects</a></li><li class="chapter-item expanded "><a href="../integrations/zenodo.html"><strong aria-hidden="true">5.4.</strong> Zenodo</a></li></ol></li><li class="chapter-item expanded "><li class="part-title">Reference Material</li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.</strong> Concepts</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../concepts/internal-dependencies.html"><strong aria-hidden="true">6.1.</strong> Internal Dependencies</a></li><li class="chapter-item expanded "><a href="../concepts/projects.html"><strong aria-hidden="true">6.2.</strong> Projects</a></li><li class="chapter-item expanded "><a href="../concepts/releases.html"><strong aria-hidden="true">6.3.</strong> Releases</a></li><li class="chapter-item expanded "><a href="../concepts/versions.html"><strong aria-hidden="true">6.4.</strong> Versions</a></li></ol></li><li class="chapter-item expanded "><a href="../configuration/index.html"><strong aria-hidden="true">7.</strong> Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../configuration/zenodo.html"><strong aria-hidden="true">7.1.</strong> Zenodo Metadata Files</a></li></ol></li><li class="chapter-item expanded "><li class="part-title">CLI Commands</li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Developer Commands</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../commands/dev/bootstrap.html"><strong aria-hidden="true">8.1.</strong> cranko bootstrap</a></li><li class="chapter-item expanded "><a href="../commands/dev/confirm.html"><strong aria-hidden="true">8.2.</strong> cranko confirm</a></li><li class="chapter-item expanded "><a href="../commands/dev/diff.html"><strong aria-hidden="true">8.3.</strong> cranko diff</a></li><li class="chapter-item expanded "><a href="../commands/dev/log.html"><strong aria-hidden="true">8.4.</strong> cranko log</a></li><li class="chapter-item expanded "><a href="../commands/dev/stage.html"><strong aria-hidden="true">8.5.</strong> cranko stage</a></li><li class="chapter-item expanded "><a href="../commands/dev/status.html"><strong aria-hidden="true">8.6.</strong> cranko status</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> CI/CD Commands</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../commands/cicd/cargo-foreach-released.html"><strong aria-hidden="true">9.1.</strong> cranko cargo foreach-released</a></li><li class="chapter-item expanded "><a href="../commands/cicd/cargo-package-released-binaries.html"><strong aria-hidden="true">9.2.</strong> cranko cargo package-released-binaries</a></li><li class="chapter-item expanded "><a href="../commands/cicd/ci-util-env-to-file.html"><strong aria-hidden="true">9.3.</strong> cranko ci-util env-to-file</a></li><li class="chapter-item expanded "><a href="../commands/cicd/github-create-custom-release.html"><strong aria-hidden="true">9.4.</strong> cranko github create-custom-release</a></li><li class="chapter-item expanded "><a href="../commands/cicd/github-create-releases.html"><strong aria-hidden="true">9.5.</strong> cranko github create-releases</a></li><li class="chapter-item expanded "><a href="../commands/cicd/github-delete-release.html"><strong aria-hidden="true">9.6.</strong> cranko github delete-release</a></li><li class="chapter-item expanded "><a href="../commands/cicd/github-install-credential-helper.html"><strong aria-hidden="true">9.7.</strong> cranko github install-credential-helper</a></li><li class="chapter-item expanded "><a href="../commands/cicd/github-upload-artifacts.html"><strong aria-hidden="true">9.8.</strong> cranko github upload-artifacts</a></li><li class="chapter-item expanded "><a href="../commands/cicd/npm-foreach-released.html"><strong aria-hidden="true">9.9.</strong> cranko npm foreach-released</a></li><li class="chapter-item expanded "><a href="../commands/cicd/npm-install-token.html"><strong aria-hidden="true">9.10.</strong> cranko npm install-token</a></li><li class="chapter-item expanded "><a href="../commands/cicd/npm-lerna-workaround.html"><strong aria-hidden="true">9.11.</strong> cranko npm lerna-workaround</a></li><li class="chapter-item expanded "><a href="../commands/cicd/python-foreach-released.html"><strong aria-hidden="true">9.12.</strong> cranko python foreach-released</a></li><li class="chapter-item expanded "><a href="../commands/cicd/python-install-token.html"><strong aria-hidden="true">9.13.</strong> cranko python install-token</a></li><li class="chapter-item expanded "><a href="../commands/cicd/release-workflow-apply-versions.html"><strong aria-hidden="true">9.14.</strong> cranko release-workflow apply-versions</a></li><li class="chapter-item expanded "><a href="../commands/cicd/release-workflow-commit.html"><strong aria-hidden="true">9.15.</strong> cranko release-workflow commit</a></li><li class="chapter-item expanded "><a href="../commands/cicd/release-workflow-tag.html"><strong aria-hidden="true">9.16.</strong> cranko release-workflow tag</a></li><li class="chapter-item expanded "><a href="../commands/cicd/zenodo-preregister.html"><strong aria-hidden="true">9.17.</strong> cranko zenodo preregister</a></li><li class="chapter-item expanded "><a href="../commands/cicd/zenodo-publish.html"><strong aria-hidden="true">9.18.</strong> cranko zenodo publish</a></li><li class="chapter-item expanded "><a href="../commands/cicd/zenodo-upload-artifacts.html"><strong aria-hidden="true">9.19.</strong> cranko zenodo upload-artifacts</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Utility Commands</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../commands/util/git-util-reboot-branch.html"><strong aria-hidden="true">10.1.</strong> cranko git-util reboot-branch</a></li><li class="chapter-item expanded "><a href="../commands/util/help.html"><strong aria-hidden="true">10.2.</strong> cranko help</a></li><li class="chapter-item expanded "><a href="../commands/util/list-commands.html"><strong aria-hidden="true">10.3.</strong> cranko list-commands</a></li><li class="chapter-item expanded "><a href="../commands/util/show.html"><strong aria-hidden="true">10.4.</strong> cranko show</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">The Cranko Manual</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/pkgw/cranko" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="just-in-time-versioning"><a class="header" href="#just-in-time-versioning">Just-in-Time Versioning</a></h1>
+<p>Cranko implements a release workflow that we call <strong>just-in-time versioning</strong>.
+This workflow solves several tricky problems that might bother you about
+traditional release processes. On the other hand, they might not! People release
+software every day with standard techniques, after all. But if you’ve been
+bothered by the lack of rigor in some of your release workflows, just-in-time
+versioning might be what you've been looking for.</p>
+<p>Just-in-time versioning addresses two particular areas where traditional
+practices introduce a bit of sloppiness:</p>
+<ol>
+<li>In a typical release workflow, you assign a version number to a particular
+commit, publish it to CI, and then deploy it if tests are successful. But
+this is backwards: we shouldn’t bless a commit with a release version until
+<em>after</em> it has passed the CI suite.</li>
+<li>Virtually every software packaging system has some kind of metadata file in
+which you describe your software, including its version number —
+<code>package.json</code>, <code>Cargo.toml</code>, etc. Because these files must be checked into
+your version control system, you are effectively forced to assign a version
+number to <em>every</em> commit, not just the commits that correspond to releases.
+What version number is appropriate for these “in-between” commits?</li>
+</ol>
+<p>The discussion below will assume good familiarity with the way that the Git
+version control system stores revision history. If you haven’t tried to wrestle
+with thinking about your history as a <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">directed acyclic graph</a>, it might
+be helpful to have some references handy.</p>
+<h2 id="the-core-ideas"><a class="header" href="#the-core-ideas">The core ideas</a></h2>
+<p>Say that you agree that the two points above are indeed problems. How do we
+address them?</p>
+<p>To address <strong>issue #1</strong>, there’s only one possible course of action: if we want
+to make a release, we have to “propose” a commit to the CI system, and only
+bless it as a release <em>after</em> it passes the test suite.</p>
+<p>In a practical workflow we’re probably not going to want to propose every single
+commit from the main development branch (which we’ll call <code>main</code> here). For our
+purposes, it doesn’t particularly matter how commits from <code>main</code> are chosen to
+be proposed — just that it happens.</p>
+<p>Once a commit has been proposed, future proposals should only come from later in
+the development history: we don’t want to releases to move backwards. So, the
+release proposals are a series of commits … that only moves forward … that’s a
+branch! Let’s call it the <code>rc</code> branch, for “release candidate”.</p>
+<p>Say that we propose releases by pushing to an <code>rc</code> branch. Some (hopefully
+most!) of those proposals are accepted, and result in releases. How do we
+synchronize with the <code>main</code> branch and keep everything coherent, especially in
+light of <strong>issue #2</strong>?</p>
+<p>Just-in-time versioning says: don’t! On the <code>main</code> branch, assign
+everything a version number of 0.0.0, and never change it. When your CI system
+runs on the <code>rc</code> branch, before you do anything else, edit your metadata files
+to assign the actual version numbers. If the build succeeds, commit those
+changes and tag them as your release.</p>
+<p>One final elaboration. Because the commits with released version numbers are
+never merged back into <code>main</code>, they form a series of “stubs” forking off from
+the mainline development history. But these releases also form a sequence that,
+logically speaking, only moves forward, so it would be nice to preserve them in
+some branch-like format as well. In the Git formalism, this is possible if we’re
+not afraid to construct our own merge commits. Let’s push each release commit to
+a branch called <code>release</code>, merging <code>rc</code> into <code>release</code> but discarding the
+<code>release</code> file tree in favor of <code>rc</code>:</p>
+<pre><code>  main:     rc:          release:
+
+   M8           /---------R2 (v0.3.0)
+   |           /          |
+   M7 /------C3           |
+   | /       |            |
+   M6 /------C2 (failed)  |
+   | /       |            |
+   M5        |            R1 (v0.2.0)
+   |         |           /
+   M4 /------C1---------/
+   | /       |
+   M3        |
+   |         |
+   M2        |
+   |         /
+   M1-------/
+</code></pre>
+<p>This tactic isn’t strictly necessary for just-in-time versioning concept,
+because in principle we can preserve the release commits through Git tags alone.
+But it becomes very useful for navigating the release history.</p>
+<h2 id="the-workflow-in-practice"><a class="header" href="#the-workflow-in-practice">The workflow in practice</a></h2>
+<p>In practice, the just-in-time versioning workflow involves only a handful of
+special steps. When a project’s CI/CD pipeline has been set up to support the
+workflow, the developer’s workflow for proposing releases is trivial:</p>
+<ol>
+<li>Choose a commit from <code>main</code> and propose it to <code>rc</code>.</li>
+</ol>
+<p>In the very simplest implementation, this step could as straightforward as
+running <code>git push origin $COMMIT:rc</code>. For reasons described below, Cranko
+implements it with two commands: <a href="../commands/dev/stage.html"><code>cranko stage</code></a> and
+<a href="../commands/dev/confirm.html"><code>cranko confirm</code></a>.</p>
+<p>In the CI/CD pipeline, things are hardly more complicated:</p>
+<ol>
+<li>The first step in any such pipeline is to apply version numbers and create a
+release commit. In Cranko, this is performed with <a href="../commands/cicd/release-workflow-apply-versions.html"><code>cranko release-workflow apply-versions</code></a> and
+<a href="../commands/cicd/release-workflow-commit.html"><code>cranko release-workflow commit</code></a>.</li>
+<li>If the CI passes, the release is “locked in” by pushing to <code>release</code>.
+If not, the release commit is discarded.</li>
+</ol>
+<p>Cranko provides a lot of other infrastructure to make your life easier, but the
+core of the just-in-time versioning workflow is this simple. Importantly: you
+don’t need to completely rebuild your development and CI/CD pipelines in order
+to adopt Cranko. There are only a small number of new steps, and existing setups
+can largely be preserved.</p>
+<h2 id="the-monorepo-wrinkle"><a class="header" href="#the-monorepo-wrinkle">The monorepo wrinkle</a></h2>
+<p>The above discussion is written as if your repository contains one project with
+one version number. Cranko was written from the ground up, however, to support
+<strong>monorepos</strong> (<a href="https://en.wikipedia.org/wiki/Monorepo">monolithic repositories</a>), which we will define as any
+repository that (somewhat confusingly) contains <em>more than one</em> independently
+versioned project. People argue about whether monorepos or, um, single-repos are
+better, but, empirically, there are numerous high-profile projects that have
+adopted a monorepo model, and once you’ve figured out how to deal with
+monorepos, you’ve also solved single-repos.</p>
+<p>Fortunately, virtually everything described above can be “parallelized” over
+multiple projects in a single repository. (Here, a “project” is any item in a
+repository that has versioned releases.) Most of the work needed to support
+monorepos involves making sure that things like GitHub release entries and tag
+names are correctly treated in a per-project fashion, rather than a
+per-repository fashion.</p>
+<p>In principle, you might be tempted to have one <code>rc</code> branch and one <code>release</code>
+branch for each project in a monorepo. This has an appeal, but it comes with two
+problems. First, as the number of projects gets large, so does the number of
+branches, which is a bit ugly. Second and more important, separating out
+releases by each individual project makes it hard to coordinate releases — and
+if multiple projects are being tracked in the same repository it is very likely
+<em>because</em> releases should be coordinated.</p>
+<p>Cranko solves this problem by adding more sophistication to the <code>rc</code> and
+<code>release</code> processing. Pushes to the <code>rc</code> branch include metadata that specify a
+<em>set</em> of projects that are being requested for release. (This is what the
+<code>cranko stage</code> and <code>cranko confirm</code> commands do.) Likewise, updates to <code>release</code>
+include information about which projects actually were released. It turns out
+that pushes to <code>rc</code> need to contain metadata anyway, to allow the developer to
+specify how the version number(s) should be bumped and release-notes content.</p>
+<p>There is one more problem that’s more subtle. If a repo contains multiple
+projects, some of them probably depend on one another. If everything on the
+<code>main</code> branch is versioned at 0.0.0, how do we express the version requirements
+of these internal dependencies? We can’t just record those versions in the usual
+packaging metadata files, because any tools that need to process these internal
+dependencies will reject the version constraints (<code>foo_cli requires foo_lib &gt; 1.20.0, but found foo_lib = 0.0.0</code>).</p>
+<p>Cranko solves this problem by asking your <code>main</code> branch to include a bit of
+extra metadata expressing these version requirements as <em>commit identifiers</em>
+rather than version numbers. The underlying idea is that, because projects are
+tracked in the same repository, it should <em>really</em> be true that at any given
+commit, all of the projects within the repo are mutually compatible. Upon
+release time, the required commit identifiers are translated into actual version
+number requirements. Part of the stage-and-confirm process implemented by Cranko
+ensures that you don’t try to release a new version of a depender project
+(<code>foo_cli</code> above) that requires an as-yet-unreleased version of its dependee
+(<code>foo_lib</code>). Cranko even has a special mechanism allowing you to make a single
+commit that simulataneouly updates <code>foo_cli</code> <em>and</em> <code>foo_lib</code> <em>and</em> expresses
+that “<code>foo_cli</code> now depends on the version of <code>foo_lib</code> from the Git commit that
+is being made right now”.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../getting-started/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../workflows-bootstrap/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../getting-started/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../workflows-bootstrap/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

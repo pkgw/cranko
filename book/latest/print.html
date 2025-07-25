@@ -1,0 +1,2383 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>The Cranko Manual</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="A manual for the Cranko release automation tool.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="index.html">Overview</a></li><li class="chapter-item expanded "><a href="installation/index.html"><strong aria-hidden="true">1.</strong> Installation</a></li><li class="chapter-item expanded "><a href="getting-started/index.html"><strong aria-hidden="true">2.</strong> Getting Started</a></li><li class="chapter-item expanded "><a href="jit-versioning/index.html"><strong aria-hidden="true">3.</strong> Just-in-Time Versioning</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">4.</strong> Workflows</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="workflows-bootstrap/index.html"><strong aria-hidden="true">4.1.</strong> Bootstrapping</a></li><li class="chapter-item expanded "><a href="workflows-dev/index.html"><strong aria-hidden="true">4.2.</strong> Everyday Development</a></li><li class="chapter-item expanded "><a href="workflows-cicd/index.html"><strong aria-hidden="true">4.3.</strong> CI/CD</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Integrations</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="integrations/azure-pipelines.html"><strong aria-hidden="true">5.1.</strong> Azure Pipelines</a></li><li class="chapter-item expanded "><a href="integrations/python.html"><strong aria-hidden="true">5.2.</strong> Python</a></li><li class="chapter-item expanded "><a href="integrations/csproj.html"><strong aria-hidden="true">5.3.</strong> Visual Studio C# Projects</a></li><li class="chapter-item expanded "><a href="integrations/zenodo.html"><strong aria-hidden="true">5.4.</strong> Zenodo</a></li></ol></li><li class="chapter-item expanded "><li class="part-title">Reference Material</li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.</strong> Concepts</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="concepts/internal-dependencies.html"><strong aria-hidden="true">6.1.</strong> Internal Dependencies</a></li><li class="chapter-item expanded "><a href="concepts/projects.html"><strong aria-hidden="true">6.2.</strong> Projects</a></li><li class="chapter-item expanded "><a href="concepts/releases.html"><strong aria-hidden="true">6.3.</strong> Releases</a></li><li class="chapter-item expanded "><a href="concepts/versions.html"><strong aria-hidden="true">6.4.</strong> Versions</a></li></ol></li><li class="chapter-item expanded "><a href="configuration/index.html"><strong aria-hidden="true">7.</strong> Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="configuration/zenodo.html"><strong aria-hidden="true">7.1.</strong> Zenodo Metadata Files</a></li></ol></li><li class="chapter-item expanded "><li class="part-title">CLI Commands</li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Developer Commands</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="commands/dev/bootstrap.html"><strong aria-hidden="true">8.1.</strong> cranko bootstrap</a></li><li class="chapter-item expanded "><a href="commands/dev/confirm.html"><strong aria-hidden="true">8.2.</strong> cranko confirm</a></li><li class="chapter-item expanded "><a href="commands/dev/diff.html"><strong aria-hidden="true">8.3.</strong> cranko diff</a></li><li class="chapter-item expanded "><a href="commands/dev/log.html"><strong aria-hidden="true">8.4.</strong> cranko log</a></li><li class="chapter-item expanded "><a href="commands/dev/stage.html"><strong aria-hidden="true">8.5.</strong> cranko stage</a></li><li class="chapter-item expanded "><a href="commands/dev/status.html"><strong aria-hidden="true">8.6.</strong> cranko status</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> CI/CD Commands</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="commands/cicd/cargo-foreach-released.html"><strong aria-hidden="true">9.1.</strong> cranko cargo foreach-released</a></li><li class="chapter-item expanded "><a href="commands/cicd/cargo-package-released-binaries.html"><strong aria-hidden="true">9.2.</strong> cranko cargo package-released-binaries</a></li><li class="chapter-item expanded "><a href="commands/cicd/ci-util-env-to-file.html"><strong aria-hidden="true">9.3.</strong> cranko ci-util env-to-file</a></li><li class="chapter-item expanded "><a href="commands/cicd/github-create-custom-release.html"><strong aria-hidden="true">9.4.</strong> cranko github create-custom-release</a></li><li class="chapter-item expanded "><a href="commands/cicd/github-create-releases.html"><strong aria-hidden="true">9.5.</strong> cranko github create-releases</a></li><li class="chapter-item expanded "><a href="commands/cicd/github-delete-release.html"><strong aria-hidden="true">9.6.</strong> cranko github delete-release</a></li><li class="chapter-item expanded "><a href="commands/cicd/github-install-credential-helper.html"><strong aria-hidden="true">9.7.</strong> cranko github install-credential-helper</a></li><li class="chapter-item expanded "><a href="commands/cicd/github-upload-artifacts.html"><strong aria-hidden="true">9.8.</strong> cranko github upload-artifacts</a></li><li class="chapter-item expanded "><a href="commands/cicd/npm-foreach-released.html"><strong aria-hidden="true">9.9.</strong> cranko npm foreach-released</a></li><li class="chapter-item expanded "><a href="commands/cicd/npm-install-token.html"><strong aria-hidden="true">9.10.</strong> cranko npm install-token</a></li><li class="chapter-item expanded "><a href="commands/cicd/npm-lerna-workaround.html"><strong aria-hidden="true">9.11.</strong> cranko npm lerna-workaround</a></li><li class="chapter-item expanded "><a href="commands/cicd/python-foreach-released.html"><strong aria-hidden="true">9.12.</strong> cranko python foreach-released</a></li><li class="chapter-item expanded "><a href="commands/cicd/python-install-token.html"><strong aria-hidden="true">9.13.</strong> cranko python install-token</a></li><li class="chapter-item expanded "><a href="commands/cicd/release-workflow-apply-versions.html"><strong aria-hidden="true">9.14.</strong> cranko release-workflow apply-versions</a></li><li class="chapter-item expanded "><a href="commands/cicd/release-workflow-commit.html"><strong aria-hidden="true">9.15.</strong> cranko release-workflow commit</a></li><li class="chapter-item expanded "><a href="commands/cicd/release-workflow-tag.html"><strong aria-hidden="true">9.16.</strong> cranko release-workflow tag</a></li><li class="chapter-item expanded "><a href="commands/cicd/zenodo-preregister.html"><strong aria-hidden="true">9.17.</strong> cranko zenodo preregister</a></li><li class="chapter-item expanded "><a href="commands/cicd/zenodo-publish.html"><strong aria-hidden="true">9.18.</strong> cranko zenodo publish</a></li><li class="chapter-item expanded "><a href="commands/cicd/zenodo-upload-artifacts.html"><strong aria-hidden="true">9.19.</strong> cranko zenodo upload-artifacts</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Utility Commands</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="commands/util/git-util-reboot-branch.html"><strong aria-hidden="true">10.1.</strong> cranko git-util reboot-branch</a></li><li class="chapter-item expanded "><a href="commands/util/help.html"><strong aria-hidden="true">10.2.</strong> cranko help</a></li><li class="chapter-item expanded "><a href="commands/util/list-commands.html"><strong aria-hidden="true">10.3.</strong> cranko list-commands</a></li><li class="chapter-item expanded "><a href="commands/util/show.html"><strong aria-hidden="true">10.4.</strong> cranko show</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">The Cranko Manual</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/pkgw/cranko" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="the-cranko-manual"><a class="header" href="#the-cranko-manual">The Cranko Manual</a></h1>
+<p>Cranko is a release automation tool implementing the <a href="jit-versioning/">just-in-time
+versioning</a> workflow. It is cross-platform, installable as a
+single executable, supports multiple languages and packaging systems, and is
+designed from the ground up to work with <a href="https://en.wikipedia.org/wiki/Monorepo">monorepos</a>. Here’s a video that shows
+how it works:</p>
+<!-- This will look bad on mobile; not sure what to do about that :-( -->
+<iframe width="750" height="414" src="https://www.youtube.com/embed/BvKNB_sRj-E"
+  frameborder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowfullscreen>
+</iframe>
+<p>If you’re just getting started, your first step should probably be to
+<a href="./installation/index.html">install cranko</a>. Or, check the table of contents to the left if
+you’d like to skip directly to a topic of interest.</p>
+<h2 id="contributions-are-welcome"><a class="header" href="#contributions-are-welcome">Contributions are welcome!</a></h2>
+<p>This book is a work in progress, and your help is welcomed! The text is written
+in <a href="https://commonmark.org/">Markdown</a> (specifically, CommonMark using <a href="https://crates.io/crates/pulldown-cmark">pulldown-cmark</a>) and rendered
+into HTML using <a href="https://rust-lang-nursery.github.io/mdBook/">mdbook</a>. The source code lives in the <code>book/</code> subdirectory of
+<a href="https://github.com/pkgw/cranko">the main Cranko repository</a>. To make and view changes, all you need to do is
+<a href="https://github.com/rust-lang-nursery/mdBook#installation">install mdbook</a>, then run the command:</p>
+<pre><code class="language-sh">$ mdbook serve
+</code></pre>
+<p>in the <code>book/</code> directory.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
+<p>Because Cranko is delivered as a single standalone executable, it is easy to install.
+This is very intentional!</p>
+<p>There are several installation options:</p>
+<ul>
+<li>On a Unix-like operating system (Linux or macOS), the following command will
+place the latest release of the <code>cranko</code> executable into the current directory:
+<pre><code class="language-shell">curl --proto '=https' --tlsv1.2 -sSf https://pkgw.github.io/cranko/fetch-latest.sh | sh
+</code></pre>
+If your CI/CD environment doesn't make Cranko available in a more standardized
+way, this is the recommended installation command.</li>
+<li>On Windows, the following PowerShell commands will do the same:
+<pre><code class="language-powershell">[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+iex ((New-Object System.Net.WebClient).DownloadString('https://pkgw.github.io/cranko/fetch-latest.ps1'))
+</code></pre>
+</li>
+<li>You can manually download precompiled binaries from the Cranko <a href="https://github.com/pkgw/cranko/releases/latest">GitHub release
+archive</a>.</li>
+<li>If you have a <a href="https://www.rust-lang.org/tools/install">Rust</a> toolchain installed, you can compile and install your own
+version with <code>cargo install cranko</code>.</li>
+<li>Finally, to develop Cranko itself, you can check out <a href="https://github.com/pkgw/cranko/">the source code</a> and
+build using the standard Rust framework: <code>cargo build</code>.</li>
+</ul>
+<p>Note that, to fully implement the <a href="installation/../jit-versioning/index.html">just-in-time
+versioning</a> workflow, the <code>cranko</code> command will need
+to be available both on your development machine and on the nodes powering your
+CI/CD pipeline. The <code>curl</code> and PowerShell commands given above should make
+installation easy on just about any CI/CD system. The code for these installers
+is almost directly ripped off from <a href="https://github.com/rust-lang/rustup/blob/master/rustup-init.sh">Rustup</a> and <a href="https://github.com/chocolatey/chocolatey.org/blob/master/chocolatey/Website/Install.ps1">Chocolatey</a>, respectively
+(thanks!), and will honor some of the environment variables used by those
+installers.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
+<p>The goal of Cranko is to help you implement a clean, reliable <em>workflow</em> for
+making releases of the software that you develop. Because Cranko is a workflow
+tool, there isn’t one single way to “start using” it — the best way to use it
+depends on your <em>current</em> release workflow (or lack thereof) and CI
+infrastructure.</p>
+<p>That being said — once Cranko is integrated into your project, a typical release
+process should look like the following. You might periodically run the <code>cranko status</code> command to report on the history of commits since your latest
+release(s):</p>
+<pre><code class="language-shell">$ cranko status
+cranko: 10 relevant commit(s) since 0.0.3
+</code></pre>
+<p>When you're ready to make a release, you’ll run commands like this:</p>
+<pre><code class="language-shell">$ cranko stage
+cranko: 12 relevant commits
+$ {edit CHANGELOG.md to curate the release notes and set version bump type}
+$ cranko confirm
+info: cranko: micro bump (expected: 0.0.3 =&gt; 0.0.4)
+info: staged rc commit to `rc` branch
+$ git push origin rc
+</code></pre>
+<p>Your Cranko-powered CI pipeline will build the <code>rc</code> branch, publish a new
+release upon success, and update a special <code>release</code> branch. You don't need to
+edit any files on your main branch to “resume development”. Instead, if you
+resynchronize with the origin you’ll now see:</p>
+<pre><code class="language-shell">$ git fetch origin
+[...]
+   9fa82ad..8be356d  release      -&gt; origin/release
+ * [new tag]         cranko@0.0.4 -&gt; cranko@0.0.4
+$ cranko status
+cranko: 0 relevant commit(s) since 0.0.4
+</code></pre>
+<p>Underpinning Cranko’s operation is the <a href="getting-started/../jit-versioning/">just-in-time
+versioning</a> workflow. It’s important to understand how it
+works to understand how you’ll integrate Cranko into your development and
+deployment workflow.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="just-in-time-versioning"><a class="header" href="#just-in-time-versioning">Just-in-Time Versioning</a></h1>
+<p>Cranko implements a release workflow that we call <strong>just-in-time versioning</strong>.
+This workflow solves several tricky problems that might bother you about
+traditional release processes. On the other hand, they might not! People release
+software every day with standard techniques, after all. But if you’ve been
+bothered by the lack of rigor in some of your release workflows, just-in-time
+versioning might be what you've been looking for.</p>
+<p>Just-in-time versioning addresses two particular areas where traditional
+practices introduce a bit of sloppiness:</p>
+<ol>
+<li>In a typical release workflow, you assign a version number to a particular
+commit, publish it to CI, and then deploy it if tests are successful. But
+this is backwards: we shouldn’t bless a commit with a release version until
+<em>after</em> it has passed the CI suite.</li>
+<li>Virtually every software packaging system has some kind of metadata file in
+which you describe your software, including its version number —
+<code>package.json</code>, <code>Cargo.toml</code>, etc. Because these files must be checked into
+your version control system, you are effectively forced to assign a version
+number to <em>every</em> commit, not just the commits that correspond to releases.
+What version number is appropriate for these “in-between” commits?</li>
+</ol>
+<p>The discussion below will assume good familiarity with the way that the Git
+version control system stores revision history. If you haven’t tried to wrestle
+with thinking about your history as a <a href="https://en.wikipedia.org/wiki/Directed_acyclic_graph">directed acyclic graph</a>, it might
+be helpful to have some references handy.</p>
+<h2 id="the-core-ideas"><a class="header" href="#the-core-ideas">The core ideas</a></h2>
+<p>Say that you agree that the two points above are indeed problems. How do we
+address them?</p>
+<p>To address <strong>issue #1</strong>, there’s only one possible course of action: if we want
+to make a release, we have to “propose” a commit to the CI system, and only
+bless it as a release <em>after</em> it passes the test suite.</p>
+<p>In a practical workflow we’re probably not going to want to propose every single
+commit from the main development branch (which we’ll call <code>main</code> here). For our
+purposes, it doesn’t particularly matter how commits from <code>main</code> are chosen to
+be proposed — just that it happens.</p>
+<p>Once a commit has been proposed, future proposals should only come from later in
+the development history: we don’t want to releases to move backwards. So, the
+release proposals are a series of commits … that only moves forward … that’s a
+branch! Let’s call it the <code>rc</code> branch, for “release candidate”.</p>
+<p>Say that we propose releases by pushing to an <code>rc</code> branch. Some (hopefully
+most!) of those proposals are accepted, and result in releases. How do we
+synchronize with the <code>main</code> branch and keep everything coherent, especially in
+light of <strong>issue #2</strong>?</p>
+<p>Just-in-time versioning says: don’t! On the <code>main</code> branch, assign
+everything a version number of 0.0.0, and never change it. When your CI system
+runs on the <code>rc</code> branch, before you do anything else, edit your metadata files
+to assign the actual version numbers. If the build succeeds, commit those
+changes and tag them as your release.</p>
+<p>One final elaboration. Because the commits with released version numbers are
+never merged back into <code>main</code>, they form a series of “stubs” forking off from
+the mainline development history. But these releases also form a sequence that,
+logically speaking, only moves forward, so it would be nice to preserve them in
+some branch-like format as well. In the Git formalism, this is possible if we’re
+not afraid to construct our own merge commits. Let’s push each release commit to
+a branch called <code>release</code>, merging <code>rc</code> into <code>release</code> but discarding the
+<code>release</code> file tree in favor of <code>rc</code>:</p>
+<pre><code>  main:     rc:          release:
+
+   M8           /---------R2 (v0.3.0)
+   |           /          |
+   M7 /------C3           |
+   | /       |            |
+   M6 /------C2 (failed)  |
+   | /       |            |
+   M5        |            R1 (v0.2.0)
+   |         |           /
+   M4 /------C1---------/
+   | /       |
+   M3        |
+   |         |
+   M2        |
+   |         /
+   M1-------/
+</code></pre>
+<p>This tactic isn’t strictly necessary for just-in-time versioning concept,
+because in principle we can preserve the release commits through Git tags alone.
+But it becomes very useful for navigating the release history.</p>
+<h2 id="the-workflow-in-practice"><a class="header" href="#the-workflow-in-practice">The workflow in practice</a></h2>
+<p>In practice, the just-in-time versioning workflow involves only a handful of
+special steps. When a project’s CI/CD pipeline has been set up to support the
+workflow, the developer’s workflow for proposing releases is trivial:</p>
+<ol>
+<li>Choose a commit from <code>main</code> and propose it to <code>rc</code>.</li>
+</ol>
+<p>In the very simplest implementation, this step could as straightforward as
+running <code>git push origin $COMMIT:rc</code>. For reasons described below, Cranko
+implements it with two commands: <a href="jit-versioning/../commands/dev/stage.html"><code>cranko stage</code></a> and
+<a href="jit-versioning/../commands/dev/confirm.html"><code>cranko confirm</code></a>.</p>
+<p>In the CI/CD pipeline, things are hardly more complicated:</p>
+<ol>
+<li>The first step in any such pipeline is to apply version numbers and create a
+release commit. In Cranko, this is performed with <a href="jit-versioning/../commands/cicd/release-workflow-apply-versions.html"><code>cranko release-workflow apply-versions</code></a> and
+<a href="jit-versioning/../commands/cicd/release-workflow-commit.html"><code>cranko release-workflow commit</code></a>.</li>
+<li>If the CI passes, the release is “locked in” by pushing to <code>release</code>.
+If not, the release commit is discarded.</li>
+</ol>
+<p>Cranko provides a lot of other infrastructure to make your life easier, but the
+core of the just-in-time versioning workflow is this simple. Importantly: you
+don’t need to completely rebuild your development and CI/CD pipelines in order
+to adopt Cranko. There are only a small number of new steps, and existing setups
+can largely be preserved.</p>
+<h2 id="the-monorepo-wrinkle"><a class="header" href="#the-monorepo-wrinkle">The monorepo wrinkle</a></h2>
+<p>The above discussion is written as if your repository contains one project with
+one version number. Cranko was written from the ground up, however, to support
+<strong>monorepos</strong> (<a href="https://en.wikipedia.org/wiki/Monorepo">monolithic repositories</a>), which we will define as any
+repository that (somewhat confusingly) contains <em>more than one</em> independently
+versioned project. People argue about whether monorepos or, um, single-repos are
+better, but, empirically, there are numerous high-profile projects that have
+adopted a monorepo model, and once you’ve figured out how to deal with
+monorepos, you’ve also solved single-repos.</p>
+<p>Fortunately, virtually everything described above can be “parallelized” over
+multiple projects in a single repository. (Here, a “project” is any item in a
+repository that has versioned releases.) Most of the work needed to support
+monorepos involves making sure that things like GitHub release entries and tag
+names are correctly treated in a per-project fashion, rather than a
+per-repository fashion.</p>
+<p>In principle, you might be tempted to have one <code>rc</code> branch and one <code>release</code>
+branch for each project in a monorepo. This has an appeal, but it comes with two
+problems. First, as the number of projects gets large, so does the number of
+branches, which is a bit ugly. Second and more important, separating out
+releases by each individual project makes it hard to coordinate releases — and
+if multiple projects are being tracked in the same repository it is very likely
+<em>because</em> releases should be coordinated.</p>
+<p>Cranko solves this problem by adding more sophistication to the <code>rc</code> and
+<code>release</code> processing. Pushes to the <code>rc</code> branch include metadata that specify a
+<em>set</em> of projects that are being requested for release. (This is what the
+<code>cranko stage</code> and <code>cranko confirm</code> commands do.) Likewise, updates to <code>release</code>
+include information about which projects actually were released. It turns out
+that pushes to <code>rc</code> need to contain metadata anyway, to allow the developer to
+specify how the version number(s) should be bumped and release-notes content.</p>
+<p>There is one more problem that’s more subtle. If a repo contains multiple
+projects, some of them probably depend on one another. If everything on the
+<code>main</code> branch is versioned at 0.0.0, how do we express the version requirements
+of these internal dependencies? We can’t just record those versions in the usual
+packaging metadata files, because any tools that need to process these internal
+dependencies will reject the version constraints (<code>foo_cli requires foo_lib &gt; 1.20.0, but found foo_lib = 0.0.0</code>).</p>
+<p>Cranko solves this problem by asking your <code>main</code> branch to include a bit of
+extra metadata expressing these version requirements as <em>commit identifiers</em>
+rather than version numbers. The underlying idea is that, because projects are
+tracked in the same repository, it should <em>really</em> be true that at any given
+commit, all of the projects within the repo are mutually compatible. Upon
+release time, the required commit identifiers are translated into actual version
+number requirements. Part of the stage-and-confirm process implemented by Cranko
+ensures that you don’t try to release a new version of a depender project
+(<code>foo_cli</code> above) that requires an as-yet-unreleased version of its dependee
+(<code>foo_lib</code>). Cranko even has a special mechanism allowing you to make a single
+commit that simulataneouly updates <code>foo_cli</code> <em>and</em> <code>foo_lib</code> <em>and</em> expresses
+that “<code>foo_cli</code> now depends on the version of <code>foo_lib</code> from the Git commit that
+is being made right now”.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="the-cranko-bootstrapping-workflow"><a class="header" href="#the-cranko-bootstrapping-workflow">The Cranko Bootstrapping Workflow</a></h1>
+<p>Cranko provides a special <a href="workflows-bootstrap/../commands/dev/bootstrap.html"><code>cranko bootstrap</code></a>
+command to help you start using Cranko with a preexisting repository.</p>
+<h2 id="invocation"><a class="header" href="#invocation">Invocation</a></h2>
+<p>Ideally, to bootstrap a repository to use Cranko all you need to do is enter its
+working tree and run:</p>
+<pre><code class="language-shell">$ cranko bootstrap
+</code></pre>
+<p>Go ahead and try it! It will try to print out detailed information about what
+it’s doing. Since you must run the program in a Git repository working tree, if
+it does anything that you don’t like you can always reset your working tree to
+throw away the tool’s changes.</p>
+<p>Hopefully the tool won’t crash, but these are early days and everyone’s repo is
+unique. If you have problem not addressed in the text below, <a href="https://github.com/pkgw/cranko/issues/new">file an
+issue</a>.</p>
+<h2 id="guessing-the-upstream"><a class="header" href="#guessing-the-upstream">Guessing the upstream</a></h2>
+<p>Cranko needs to know the identity of your upstream repository, which is defined
+as the one that will perform automated release processing upon updates to its
+<code>rc</code>-like branch. The bootstrapper will begin by attempting to guess the
+identity of upstream by looking for a Git remote named <code>origin</code>, or choosing the
+only remote if there is only one. If this guessing process fails, use the
+<code>--upstream</code> option to specify the name of the upstream explicitly.</p>
+<p>The bootstrapper will save the URL of the upstream remote into <a href="workflows-bootstrap/../configuration/index.html">the main Cranko
+configuration file</a> <code>.config/cranko/config.toml</code>. You
+may want to add additional likely upstream URLs to this configuration file
+(e.g., both HTTPS and SSH GitHub remote URLs). Cranko identifies the upstream
+from its URL, not its Git remote name, since Git remote names can vary
+arbitrarily from one checkout to the next.</p>
+<h2 id="autodetecting-projects"><a class="header" href="#autodetecting-projects">Autodetecting projects</a></h2>
+<p>The bootstrapper will search for recognized projects in the repo and print out a
+summary of what it finds.</p>
+<p><strong>NOTE:</strong> <em>The goal is for Cranko to recognize all sorts of projects, but
+currently it knows a modest group of them: Rust/Cargo, NPM, and Python. If
+you’re giving Cranko a first try this is the limitation that is most likely to
+be a dealbreaker. Please <a href="https://github.com/pkgw/cranko/issues/new">file an
+issue</a> reporting your needs so we
+know what to prioritize.</em></p>
+<p><strong>ALSO:</strong> <em>There is a further goal that one day you’ll be able to manually
+configure projects that aren’t discovered in the autodetection phase, but that
+functionality is also not yet implemented.</em></p>
+<h2 id="resetting-versions"><a class="header" href="#resetting-versions">Resetting versions</a></h2>
+<p>As per the <a href="workflows-bootstrap/../jit-versioning/index.html">just-in-time versioning</a> workflow, on the main development
+branch of your repository, the version numbers of all projects should be set to
+some default “development” value (e.g. <code>0.0.0-dev.0</code>) that is never planned to
+change. Cranko will rewrite all of the metadata files that it recognizes to
+perform this zeroing.</p>
+<p>But you’re presumably not going to want to <em>actually</em> reset the versioning of
+all your projects. The current version numbers will be preserved in a “bootstrap”
+configuration file (<code>.config/cranko/bootstrap.toml</code>) that Cranko will use as a
+basis for assigning new version numbers.</p>
+<h2 id="transforming-internal-dependencies"><a class="header" href="#transforming-internal-dependencies">Transforming internal dependencies</a></h2>
+<p>If your repository contains more than one project, some of those projects
+probably depend on each other. With zeroed-out version numbers, it is not
+generally possible to express the version constraints of those <a href="workflows-bootstrap/../concepts/internal-dependencies.html">internal
+dependencies</a> in existing metadata
+formats. For instance, before bootstrapping,
+you might have had a package <code>foo_cli</code> that depends on <code>foo_lib &gt;= 1.3</code>: it
+works if linked against <code>foo_lib</code> version 1.3.0, but not if linked against
+<code>foo_lib</code> version 1.2.17. That didn’t stop being true just because the version
+numbers in on your main development branch got zeroed out!</p>
+<p>The boostrapping process transfers your preexisting internal dependency version
+requirements into extra Cranko metadata fields so that they will be correctly
+reproduced in new releases. Once you start making releases that depend on newer
+versions of your projects, it is recommended that you transition these “manually”
+coded version requirements to Cranko-native ones based in Git commit identifiers
+(as motivated in the <a href="workflows-bootstrap/../jit-versioning/index.html">just-in-time versioning</a> section).</p>
+<h1 id="next-steps"><a class="header" href="#next-steps">Next steps</a></h1>
+<p>Once the bootstrapper has run, you should review the changes it has made, see if
+they make sense, and try building the code in your repo. You may need to modify
+your build scripts depending on what expectations they have about the version
+numbers assigned in your main development branch.</p>
+<p>After you are happy with Cranko’s changes, commit them, making sure to add the
+new files in <code>.config/cranko/</code>.</p>
+<p>The next step is to modify your CI/CD system to start using the <code>cranko release-workflow</code> commands to start implementing the <a href="workflows-bootstrap/../jit-versioning/index.html">just-in-time
+versioning</a> model — see the <a href="workflows-bootstrap/../workflows-cicd/index.html">CI/CD Workflows</a> section for
+documentation on what to do. This phase generally takes some trial-and-error,
+but in most cases you should only need to insert a few extra commands into your
+CI/CD scripts at first. Generally, it is easiest to start by updating the
+processes that run on updates to the main development branch (e.g. <code>master</code>) and
+on pull requests. If you do this work on a branch other than your main
+development branch, make sure that your Cranko-ified CI/CD scripts will run on
+updates to that branch.</p>
+<p>As you work on the CI/CD configuration for main development work, you probably
+won’t actually need to use any of the Cranko commands described in the <a href="workflows-bootstrap/../workflows-def/index.html">Everyday
+Development</a> section. But once your basic processing is working, you
+should start using those commands to simulate releases and work on setting up
+the CI/CD workflows that run on updates to the new <code>rc</code> branch that you will be
+creating — these are the workflows that will actually run the automated release
+machinery if/when your builds succeed. If you haven’t been using release
+automation before, it can take some patience to set everything up properly. But,
+we hope that you still soon start feeling the warm fuzzies that arise when these
+usually annoying tasks start Just Working!</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-developer-workflows"><a class="header" href="#cranko-developer-workflows">Cranko Developer Workflows</a></h1>
+<p>This section focuses on the workflows that you might use in the “inner loop” of
+your software development process.</p>
+<h2 id="day-to-day-development"><a class="header" href="#day-to-day-development">Day-to-day development</a></h2>
+<p>If your repository uses Cranko, your standard development practices don’t need
+to change. The only thing that’s different is that your version numbers should
+all be set to <code>0.0.0-dev.0</code> or something similar.</p>
+<p>The <a href="workflows-dev/../commands/dev/status.html">cranko status</a> command will analyze your repository’s commit history since
+the last release on the <code>release</code> branch. It might tell you:</p>
+<pre><code class="language-shell">$ cranko status
+tcprint: 2 relevant commit(s) since 0.1.1
+drorg: 5 relevant commit(s) since 0.1.1
+$
+</code></pre>
+<p>Here, relevance is determined using the prefixing scheme described in the
+<a href="workflows-dev/../concepts/index.html">Concepts</a> section. Merge commits are skipped. The <a href="workflows-dev/../commands/dev/log.html">cranko log</a> command will
+print Git history logs for the commits relevant to a specified project, using
+the style of the <code>git log</code> command.</p>
+<p>The most release reference point is determined from your upstream’s release
+branch (likely <code>origin/release</code>), so make sure to <code>git fetch</code> your upstream
+after a release so that Cranko is comparing to the right thing.</p>
+<p>If you are working in a monorepo and one project depends on another, you’ll need
+to maintain Cranko’s extra versioning metadata. <strong>TODO write me!</strong></p>
+<h2 id="requesting-releases"><a class="header" href="#requesting-releases">Requesting releases</a></h2>
+<p>When you’re ready to release one or more projects, it’s a two-step process. The
+<a href="workflows-dev/../commands/dev/stage.html">cranko stage</a> command will mark projects as release candidates. If run without
+arguments, it will use Cranko’s analysis of the repo’s commit history since the
+last release to determine which projects need to be staged:</p>
+<pre><code class="language-shell">$ cranko stage
+tcprint: 2 relevant commits
+drorg: 5 relevant commits
+info: 2 of 2 projects staged
+$
+</code></pre>
+<p>The only actual action taken by this command is to stub each project’s changelog
+with a template version bump command and summaries of the commits affecting each
+project since the last release. In this example, this looks like:</p>
+<pre><code class="language-shell">$ head tcprint/CHANGELOG.md
+# rc: micro bump
+
+- Add an amazing new feature
+- Fix a dastardly bug
+
+# tcprint 0.1.1 (2020-08-27)
+
+</code></pre>
+<p>The placeholder header line <code># rc: micro bump</code> specifies the version bump that
+is being requested. At the moment, this just unilaterally defaults to a bump in
+the “micro” (AKA “patch”) version number. When the release is finalized, this
+placeholder will be replaced with actual release information as seen in the next
+stanza.</p>
+<p>You can edit the bump type and the actual changelog contents. We view it as
+important that the changelog and/or release notes can be reviewed and curated by
+a human.</p>
+<p>After one or more <code>stage</code> operations, you should run <code>cranko confirm</code>:</p>
+<pre><code class="language-shell">$ cranko confirm
+info: tcprint: micro bump (expected: 0.1.1 =&gt; 0.1.2)
+info: drorg: micro bump (expected: 0.1.1 =&gt; 0.1.2)
+info:     internal dep: tcprint &gt;= 0.1.1
+info: staged rc commit to `rc` branch
+$
+</code></pre>
+<p>This will gather up your changelog updates and create a new commit on the <code>rc</code>
+branch. (Note that these changelog updates do <em>not</em> need to be staged into Git
+with <code>git add</code>.) The changelogs in the working directory will be reset to
+whatever HEAD says they should be. The new commit on <code>rc</code> bundles up a <em>release
+request</em>, containing the set of projects intended for release, the way that
+their versions should be bumped, and the changelog / release-notes contents.</p>
+<p>Your CI/CD system should be set up so that you can trigger release process
+simply by running:</p>
+<pre><code class="language-shell">$ git push origin rc
+</code></pre>
+<p>You should never need to force-push to this branch. If a release request fails,
+you should fix the problem on the main development branch, create a new <code>rc</code>
+commit, and try again. <strong>TODO</strong> We should add a command to make it easy to
+re-use the changelogs from the previous <code>rc</code> commit.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-cicd-workflows"><a class="header" href="#cranko-cicd-workflows">Cranko CI/CD Workflows</a></h1>
+<p>This section focuses on the workflows that should be implemented in your
+continuous integration and deployment (CI/CD) system. You can in principle run
+those steps outside of the CI/CD context, but the whole point of Cranko is to
+automate release processes, so the strong assumption is that these steps will
+not be run by humans. In fact, the Cranko commands mentioned in this section
+will generally be need to be forced to run <em>outside</em> of a CI/CD environment,
+which they detect using the <a href="https://crates.io/crates/ci_info">ci_info</a> Rust crate.</p>
+<h2 id="every-build"><a class="header" href="#every-build">Every build</a></h2>
+<p>For virtually every build of your repo in your CI/CD infrastructure, the first
+thing you should do is <a href="workflows-cicd/../installation/index.html">install Cranko</a> (if needed)
+and then apply actual version numbers:</p>
+<pre><code class="language-shell">cranko release-workflow apply-versions
+</code></pre>
+<p>The Cranko architecture is intended so that your repository should be buildable
+without applying versions — because otherwise day-to-day development would be
+incredibly tedious — but it is good to apply versions everywhere in CI/CD to
+make sure that the relevant plumbing stays in excellent working order.</p>
+<p>For pull request builds and merges to the main development branch, you don’t
+<em>need</em> to do anything more. If you have a continuous deployment scheme that
+publishes artifacts with every push to the main branch, you shouldn’t need to
+change it. A key thing to keep in mind is that pushes to the main branch, unlike
+pushes to <code>rc</code>, do not include <code>cranko confirm</code> metadata, and so there are no
+changelogs and no specific list of projects for which releases are requested.
+Intead, <em>all</em> projects have their versions bumped — but with development
+placeholders, not realistic-looking values.</p>
+<h2 id="rc-builds"><a class="header" href="#rc-builds"><code>rc</code> builds</a></h2>
+<p>You will need to handle updates to the <code>rc</code> branch specially. The initial build
+and test process should ideally proceed in exactly the same way as occurs on the
+main branch. However, after that process completes, there needs to be a single
+decision point that gathers all potential release artifacts and evaluates
+whether the build was successful or not. If it failed, there is nothing more to
+do. If it was successful, your release deployment automation needs to kick in.</p>
+<p>We recommend that this workflow proceed in three stages. First, ensure that all
+release artifacts are archived in some fashion. This way, if any later steps
+fail, they can be recreated manually.</p>
+<p>Next, update the <code>release</code> branch, using commands similar to the following:</p>
+<pre><code class="language-shell">$ git add .
+$ cranko release-workflow commit
+$ git push origin release
+</code></pre>
+<p>This “locks in” the release and ensures that any subsequent <code>rc</code> submissions do
+not try to recreate the releases that your pipeline is about to undertake. The
+<code>commit</code> command switches the Git repository’s current branch to be <code>release</code>,
+pointing at the newly created release commit. Commits at the tip of the
+<code>release</code> branch, like those at the tip of <code>rc</code>, contain Cranko metadata. While
+<code>rc</code> commits contain release <em>request</em> metadata, <code>release</code> commits contain
+metadata about which releases were actually made (and not made).</p>
+<p>Finally, perform whichever deployment steps are required: creating GitHub
+releases, publishing packages to NPM, updating websites, etc. These operations
+do not necessarily need to involve the <code>cranko</code> tool at all.</p>
+<p>However, when you’re using a monorepo, it is important to keep in mind that each
+release involves some unpredictable <em>subset</em> of the projects in your repo. The
+<code>cranko</code> tool can be the source of truth about which projects were just released
+and which version numbers they were assigned. Many of the <code>cranko</code> commands
+beyond the core workflow operations are utilities that leverage Cranko’s
+knowledge of the project release graph to ease the implementation of this final
+stage of the release process.</p>
+<h2 id="the-release-branch"><a class="header" href="#the-release-branch">The <code>release</code> branch</a></h2>
+<p>Your CI/CD system should do <em>nothing</em> when the <code>release</code> branch is updated. This
+branch is only for recording the success of <code>rc</code> processing — all of the
+interesting stuff should happen there.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="integrations-azure-pipelines"><a class="header" href="#integrations-azure-pipelines">Integrations: Azure Pipelines</a></h1>
+<p>The <a href="https://azure.microsoft.com/en-us/services/devops/pipelines/">Azure Pipelines</a> CI/CD service is a great match for Cranko because
+its ability to divide builds into <a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/process/stages?view=azure-devops">stages</a> that exchange
+<a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/artifacts/artifacts-overview?view=azure-devops">artifacts</a> works very nicely with Cranko’s model for CI/CD
+processing. This section will go over ways that you can use Cranko in the Azure
+Pipelines framework.</p>
+<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
+<p>Here are some projects that use Cranko in Azure Pipelines:</p>
+<ul>
+<li><a href="https://github.com/pkgw/cranko/tree/master/ci">Cranko itself</a></li>
+<li><a href="https://github.com/pkgw/elfx86exts/tree/master/ci">pkgw/elfx86exts</a>, a simple
+single-crate project</li>
+<li><a href="https://github.com/tectonic-typesetting/tectonic/tree/master/dist">tectonic-typesetting/tectonic</a>,
+with cross-platform Rust builds and complex deployment</li>
+<li><a href="https://github.com/WorldWideTelescope/wwt-webgl-engine/tree/master/ci">WorldWideTelescope/wwt-webgl-engine</a>,
+with an NPM monorepo structure</li>
+</ul>
+<h2 id="general-structure"><a class="header" href="#general-structure">General structure</a></h2>
+<p>For many projects, it works well to adopt an overall pipeline structure with two
+<a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/process/stages?view=azure-devops">stages</a>:</p>
+<pre><code class="language-yaml">trigger:
+  branches:
+    include:
+    - master
+    - rc
+
+stages:
+- stage: BuildAndTest
+  jobs:
+  - template: azure-build-and-test.yml
+
+- stage: Deploy
+  condition: and(succeeded('BuildAndTest'), ne(variables['build.reason'], 'PullRequest'))
+  jobs:
+  - template: azure-deployment.yml
+</code></pre>
+<p>The <code>BuildAndTest</code> stage can contain many parallel jobs that might build your
+project on, say, Linux, MacOS, and Windows platforms. If all of those jobs
+succeed, and the build is <em>not</em> a pull request (so, it was triggered in an
+update to the <code>master</code> or <code>rc</code> branch), the deployment stage will run.</p>
+<p>Here, we use <a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/process/templates?view=azure-devops">templates</a> to group the jobs for the two stages into
+their own files. Templates are generally helpful for breaking CI/CD tasks into
+more manageable chunks. However, they can be a bit tricky to get the hang of; a
+key restriction is that templates are processed at “compile time”, and some
+variables or other build settings are not known until “run time”.</p>
+<h2 id="installing-cranko"><a class="header" href="#installing-cranko">Installing Cranko</a></h2>
+<p>To install the latest version of Cranko into your build workers, we recommend
+the following pair of tasks. By using a <code>condition</code> here, these tasks can be run
+on <a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/agents/agents?view=azure-devops&amp;tabs=browser">agents</a> running any operating system, and the right thing will
+happen. This is useful if this setup step goes into a <a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/process/templates?view=azure-devops">template</a>.</p>
+<pre><code class="language-yaml">- bash: |
+    set -euo pipefail  # note: `set -x` breaks ##vso echoes
+    d="$(mktemp -d /tmp/cranko.XXXXXX)"
+    cd "$d"
+    curl --proto '=https' --tlsv1.2 -sSf https://pkgw.github.io/cranko/fetch-latest.sh | sh
+    echo "##vso[task.prependpath]$d"
+  displayName: Install latest Cranko (not Windows)
+  condition: and(succeeded(), ne(variables['Agent.OS'], 'Windows_NT'))
+
+- pwsh: |
+    $d = Join-Path $Env:Temp cranko-$(New-Guid)
+    [void][System.IO.Directory]::CreateDirectory($d)
+    cd $d
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+    iex ((New-Object System.Net.WebClient).DownloadString('https://pkgw.github.io/cranko/fetch-latest.ps1'))
+    echo "##vso[task.prependpath]$d"
+  displayName: Install latest Cranko (Windows)
+  condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
+</code></pre>
+<p>If all of your agents will be running on the same operating system, you can
+choose the appopriate task and remove the <code>condition</code>.</p>
+<h2 id="creating-and-transferring-the-release-commit"><a class="header" href="#creating-and-transferring-the-release-commit">Creating and transferring the release commit</a></h2>
+<p>If you use a multi-stage build process, a wrinkle emerges. You need to create a
+single “release commit” to be published if the CI/CD succeeds. But if
+publication happens in your <code>Deploy</code> stage, those jobs are separate from the
+build jobs that actually ran the <a href="integrations/../commands/release-workflow-apply-versions.html"><code>cranko release-workflow apply-versions</code></a> and <a href="integrations/../commands/release-workflow-commit.html"><code>cranko release-workflow commit</code></a> commands.</p>
+<p>We recommend publishing <em>the release commit</em> as an Azure Pipelines artifact.
+This can be accomplished pretty conveniently with the <a href="https://git-scm.com/book/en/v2/Git-Tools-Bundling">Git bundle</a>
+functionality. <em>All</em> of your main build jobs should apply version numbers:</p>
+<pre><code class="language-yaml">- bash: |
+    set -xeuo pipefail
+    git status # [see below]
+    cranko release-workflow apply-versions
+  displayName: Apply versions with Cranko
+</code></pre>
+<p>(The <code>git status</code> helps on Windows, where it seems that sometimes <code>libgit2</code>
+thinks that the working tree is dirty even though it’s not. There’s some issue
+about updating the Git index file.)</p>
+<p><em>One</em> of your build jobs should also commit the version numbers into a release
+commit, and publish the resulting commit as a Git bundle artifact:</p>
+<pre><code class="language-yaml">- bash: |
+    set -xeuo pipefail
+    git add .
+    cranko release-workflow commit
+    git show  # useful diagnostic
+  displayName: Generate release commit
+
+- bash: |
+    set -xeuo pipefail
+    mkdir $(Build.ArtifactStagingDirectory)/git-release
+    git bundle create $(Build.ArtifactStagingDirectory)/git-release/release.bundle origin/master..HEAD
+  displayName: Bundle release commit
+
+- task: PublishPipelineArtifact@1
+  displayName: Publish git bundle artifact
+  inputs:
+    targetPath: '$(Build.ArtifactStagingDirectory)/git-release'
+    artifactName: git-release
+</code></pre>
+<p>(As a side note, if you run <code>bash</code> tasks on Windows, there is currently a bug
+where variables such as <code>$(Build.ArtifactStagingDirectory)</code> are expanded as
+Windows-style paths, e.g. <code>C:\foo\bar</code>, rather than Unix-style paths,
+<code>/c/foo/bar</code>. You will either need to transform these variables, or not use bash
+in Windows.)</p>
+<p>Your deployment stages should then retrieve this artifact and apply the release
+commit:</p>
+<pre><code class="language-yaml"># Fetch artifacts from previous stages
+- download: current
+
+# Check out source repo again
+- checkout: self
+  submodules: recursive
+
+- bash: |
+    set -xeuo pipefail
+    git switch -c release
+    git pull --ff-only $(Pipeline.Workspace)/git-release/release.bundle
+  displayName: Restore release commit
+</code></pre>
+<h1 id="standard-deployment-jobs"><a class="header" href="#standard-deployment-jobs">Standard deployment jobs</a></h1>
+<p>If your pipeline is running in response to an update to the <code>rc</code> branch, and
+your CI tests succeeded, there are several common deployment steps that you can
+invoke as (more or less) independent jobs. We recommend using a
+<a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/process/templates?view=azure-devops">template</a> with standard setup steps to install Cranko and recover
+the release commit, as shown above. Here we’ll assume that these have been
+bundled into a template named <code>azure-deployment-setup.yml</code>.</p>
+<p>We also assume here that you have a <a href="https://docs.microsoft.com/en-us/azure/devops/pipelines/library/variable-groups?view=azure-devops">variable group</a> called
+<code>Deployment Credentials</code> that includes necessary credentials in variables named
+<code>GITHUB_TOKEN</code>, <code>NPM_TOKEN</code>, etc.</p>
+<p>No matter which packaging system(s) you use, you should create tags and update
+the upstream <code>release</code> branch. This example assumes that it lives on GitHub:</p>
+<pre><code class="language-yaml">- ${{ if eq(variables['Build.SourceBranchName'], 'rc') }}:
+  - job: branch_and_tag
+    pool:
+      vmImage: ubuntu-latest
+    variables:
+    - group: Deployment Credentials
+    steps:
+    - template: azure-deployment-setup.yml
+
+    - bash: |
+        cranko github install-credential-helper
+      displayName: Set up Git pushes
+      env:
+        GITHUB_TOKEN: $(GITHUB_TOKEN)
+
+    - bash: |
+        set -xeou pipefail
+        cranko release-workflow tag
+        git push --tags origin release:release
+      displayName: Tag and push
+      env:
+        GITHUB_TOKEN: $(GITHUB_TOKEN)
+</code></pre>
+<h3 id="github-releases"><a class="header" href="#github-releases">GitHub releases</a></h3>
+<p>If you are indeed using GitHub, Cranko can automatically create <a href="https://docs.github.com/en/github/administering-a-repository/about-releases">GitHub
+releases</a> for you. You must ensure that this task runs <em>after</em> the
+tags are pushed, because otherwise GitHub will auto-create incorrect tags for
+you:</p>
+<pre><code class="language-yaml">- ${{ if eq(variables['Build.SourceBranchName'], 'rc') }}:
+  - job: github_releases
+    dependsOn: branch_and_tag # otherwise, GitHub creates the tags itself!
+    pool:
+      vmImage: ubuntu-latest
+    variables:
+    - group: Deployment Credentials
+
+    steps:
+    - template: azure-deployment-setup.yml
+
+    - bash: cranko github install-credential-helper
+      displayName: Set up Git pushes
+      env:
+        GITHUB_TOKEN: $(GITHUB_TOKEN)
+
+    - bash: cranko github create-releases
+      displayName: Create GitHub releases
+      env:
+        GITHUB_TOKEN: $(GITHUB_TOKEN)
+</code></pre>
+<p>You might also use <a href="integrations/../commands/cicd/github-upload-artifacts.html"><code>cranko github upload-artifacts</code></a> to upload
+artifacts associated with those releases, although if you have a monorepo you
+must use <a href="integrations/../commands/util/show.html"><code>cranko show if-released</code></a> to check at
+runtime whether the project in question was actually released.</p>
+<h3 id="cargo-publication"><a class="header" href="#cargo-publication">Cargo publication</a></h3>
+<p>If your repository contains Cargo packages, you should publish them:</p>
+<pre><code class="language-yaml">- ${{ if eq(variables['Build.SourceBranchName'], 'rc') }}:
+  - job: cargo_publish
+    pool:
+      vmImage: ubuntu-latest
+    variables:
+    - group: Deployment Credentials
+
+    steps:
+    - template: azure-deployment-setup.yml
+
+    - bash: cranko cargo foreach-released publish
+      displayName: Publish updated Cargo crates
+      env:
+        CARGO_REGISTRY_TOKEN: $(CARGO_REGISTRY_TOKEN)
+</code></pre>
+<h3 id="npm-publication"><a class="header" href="#npm-publication">NPM publication</a></h3>
+<p>Likewise for NPM packages:</p>
+<pre><code class="language-yaml">- ${{ if eq(variables['Build.SourceBranchName'], 'rc') }}:
+  - job: npm_publish
+    pool:
+      vmImage: ubuntu-latest
+    variables:
+    - group: Deployment Credentials
+
+    steps:
+    - template: azure-deployment-setup.yml
+
+    - bash: cranko npm install-token
+      displayName: Set up NPM authentication
+      env:
+        NPM_TOKEN: $(NPM_TOKEN)
+
+    # [ do any necessary build stuff here ]
+
+    - bash: cranko npm foreach-released npm publish
+      displayName: Publish to NPM
+
+    - bash: shred ~/.npmrc
+      displayName: Clean up credentials
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="integrations-python"><a class="header" href="#integrations-python">Integrations: Python</a></h1>
+<p>Cranko supports Python projects set up using <a href="https://www.pypa.io/">PyPA</a>-compliant tooling. Because
+the Python packaging ecosystem contains a lot of variation, Cranko often needs
+you to give it a few hints to be able to operate correctly.</p>
+<h2 id="autodetection"><a class="header" href="#autodetection">Autodetection</a></h2>
+<p>Cranko identifies Python projects by looking for directories containing files
+named <code>setup.py</code>, <code>setup.cfg</code>, <em>or</em> <code>pyproject.toml</code>. It is OK if one directory
+contains more than one of these files.</p>
+<h2 id="project-metadata"><a class="header" href="#project-metadata">Project Metadata</a></h2>
+<p>While the Python packaging ecosystem is moving towards standardized metadata
+files, there are still lots of projects where the package name and version are
+specified only in the <code>setup.py</code> file. The only fully correct way to extract
+these metadata would be to execute arbitrary Python code, which isn’t possible
+for Cranko. Instead, Cranko uses a variety of more superficial techniques to try
+extract project metadata.</p>
+<h3 id="project-name"><a class="header" href="#project-name">Project name</a></h3>
+<ol>
+<li>If there is a <code>pyproject.toml</code> file containing a key <code>name</code> in a
+<code>tool.cranko</code> section, that value is used as the project name.</li>
+<li>Otherwise, if there is a <code>setup.cfg</code> file containing a <code>name</code> key in a
+<code>metadata</code> section, that value is used as the project name.</li>
+<li>Otherwise, there should be a <code>setup.py</code> file containing a line with the
+following form:
+<pre><code class="language-python">project_name = "myproject"  # cranko project-name
+</code></pre>
+Specifically, Cranko will search for a line containing a comment with the
+text <code>cranko project-name</code>. Within such a line, it will then search for a
+string literal and extract its text as the project name. Cranko’s parsing of
+Python string literals is quite naive — escaped characters and the like won’t
+work.</li>
+</ol>
+<h3 id="project-version"><a class="header" href="#project-version">Project version</a></h3>
+<p>Cranko will extract the project version from either <code>setup.py</code>, or from an
+arbitrary other Python file (i.e., from <code>myproject/version.py</code> or something
+similar). To tell Cranko to search for the version from a file <em>other</em> than
+<code>setup.py</code>, ensure that your project has a <code>pyproject.toml</code> file and add an
+entry of this form:</p>
+<pre><code class="language-python">[tool.cranko]
+main_version_file = "myproject/version.py"
+</code></pre>
+<p>The path should be relative to the directory containing the <code>pyproject.toml</code>
+file.</p>
+<p>Within that file, there are two options:</p>
+<ol>
+<li>If your project’s version is expressed as <a href="https://docs.python.org/3/library/sys.html#sys.version_info">sys.version_info</a> tuple, annotate
+it with a comment containing the text <code>cranko project-version tuple</code>:
+<pre><code class="language-python">version_info = (1, 2, 0, 'final', 0)  # cranko project-version tuple
+</code></pre>
+Cranko will parse the tuple contents into a <a href="https://www.python.org/dev/peps/pep-0440/">PEP-440</a> version and rewrite it
+as needed. Note that some PEP-440 versions are not expressible as
+<a href="https://docs.python.org/3/library/sys.html#sys.version_info">sys.version_info</a> tuples. Also, Cranko’s tuple parser is quite naive, and
+only handles the most basic form of Python’s tuple, integer, and string
+literals. When your repo is bootstrapped, this line will be rewritten to look
+like:
+<pre><code class="language-python">version_info = (0, 0, 0, 'dev', 0)  # cranko project-version tuple
+</code></pre>
+because Cranko will start managing the version number.</li>
+<li>If your project’s version is expressed as a string literal, annotate
+it with a comment containing just the text <code>cranko project-version</code>:
+<pre><code class="language-python">version = '1.2.0'  # cranko project-version
+</code></pre>
+Cranko will search for a string literal in the line and parse it as a
+<a href="https://www.python.org/dev/peps/pep-0440/">PEP-440</a> version. Here too, Cranko’s parsing of the literal is quite naive
+and only handles the most basic forms. When your repo is bootstrapped, this
+line will be rewritten to look like:
+<pre><code class="language-python">version = '0.dev0'  # cranko project-version tuple
+</code></pre>
+because Cranko will start managing the version number.</li>
+</ol>
+<h2 id="additional-annotated-files"><a class="header" href="#additional-annotated-files">Additional Annotated Files</a></h2>
+<p>If there are files within your Python project besides <code>setup.py</code> or your
+<code>main_version_file</code> that can provide useful metadata to Cranko — or will need
+rewriting by Cranko to update versioning and/or dependency information — you
+must tell Cranko which files it should check. Otherwise, Cranko would have to
+scan every file in your repository, which would significantly slow it down with
+large projects.</p>
+<p>Tell Cranko which additional files to search by adding an <code>annotated_files</code> key
+to a <code>tool.cranko</code> section in a <code>pyproject.toml</code> file for your project:</p>
+<pre><code class="language-toml">[tool.cranko]
+annotated_files = [
+  "myproject/npmdep.py",
+  "myproject/rustdep.py",
+]
+</code></pre>
+<h2 id="internal-dependencies"><a class="header" href="#internal-dependencies">Internal Dependencies</a></h2>
+<p><a href="integrations/../concepts/internal-dependencies.html">“Internal” dependencies</a> refer to
+<a href="https://en.wikipedia.org/wiki/Monorepo">monorepo</a> situations where one repository contains more than one project, and
+some of those projects depend on one another.</p>
+<p>Cranko actually doesn’t yet automatically recognize internal dependencies
+between multiple Python projects within one repository — the monorepo model
+seems to be extremely rare for Python packages. It does, however, recognize
+internal dependencies in a generic fashion that is useful if, for instance, your
+repo contains a <a href="https://jupyterlab.readthedocs.io/en/stable/user/extensions.html">JupyterLab extension</a> that consists of a Python package that is
+tightly coupled to an NPM package.</p>
+<p>Internal dependencies can be marked by tagging the dependency version
+requirement in one of your <a href="integrations/python.html#additional-annotated-files">annotated files</a>. Ensure that one or more of these
+files contains a line of code with the following form:</p>
+<pre><code class="language-python">npm_requirement = '1.2.0'  # cranko internal-req myfrontend
+</code></pre>
+<p>In this example, the python package has a dependency on the project name
+<code>myfrontend</code>, and that it requires version 1.2.0 or greater. (Here we envision
+that the <code>myfrontend</code> project is an NPM package, so that this version
+requirement is a <a href="https://semver.org/">semver</a> requirement.) As with other annotations, all that
+Cranko does here is to search for something that looks like a string literal
+within the tagged line, and attempt to parse it. As far as Cranko is concerned,
+the only thing that matters in the annotated line is what happens inside the
+string literal delimeters. You don’t need to do anything with the associated
+variable (<code>npm_requirement</code>), or even assign the string literal to a variable,
+if it’s not needed in your code.</p>
+<p>When you bootstrap your project, your tagged line will be rewritten to resemble
+something like:</p>
+<pre><code class="language-python">npm_requirement = '0.0.0-dev.0'  # cranko internal-req myfrontend
+</code></pre>
+<p>because Cranko takes over the expression of concrete version requirements in the
+repo.</p>
+<h3 id="versioning-internal-dependencies"><a class="header" href="#versioning-internal-dependencies">Versioning internal dependencies</a></h3>
+<p>As described in <a href="integrations/../jit-versioning/index.html#the-monorepo-wrinkle">Just-in-Time Versioning</a>, Cranko needs the
+version requirements of internal dependencies to be expressed as <em>Git commits</em>
+rather than version numbers. These requirements must be expressed in the
+<code>pyproject.toml</code> file using the following structuring:</p>
+<pre><code class="language-toml">[tool.cranko.internal_dep_versions]
+"myfrontend" = "2937e376b962162067135f3ac8b7b6a0f1c3efea"
+</code></pre>
+<p>This entry expresses that the Python project requires a release of the
+<code>myfrontend</code> package that contains the Git commit <code>2937e376...</code>. When Cranko
+rewrites your project files during release processing, it will translate this
+requirement into a concrete version number and update your <a href="integrations/python.html#additional-annotated-files">annotated files</a>
+with the appropriate expression.</p>
+<p><strong>TODO</strong>: write some generic docs about these requirement expressions, and link
+to them from here.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="integrations-visual-studio-c-projects"><a class="header" href="#integrations-visual-studio-c-projects">Integrations: Visual Studio C# Projects</a></h1>
+<p>Cranko has basic support for managing Visual Studio C# projects, based on
+<code>AssemblyInfo.cs</code> files. This support has been developed for a narrow use-case
+and could potentially become much more sophisticated.</p>
+<h2 id="autodetection-1"><a class="header" href="#autodetection-1">Autodetection</a></h2>
+<p>Cranko identifies C# projects by looking for directories that contain a file
+with a name ending in <code>.csproj</code> <em>and</em> another file with a name matching the
+pattern <code>*/AssemblyInfo.cs</code>. Cranko will get confused if you have more than one
+<code>.csproj</code> file in a single directory.</p>
+<p>Cranko additionally searches for "setup installer" project files, whose names
+end in <code>.vdproj</code>. If such a file is found, <em>and</em> it seems to refer to a single
+"primary output project" recognized by Cranko (via a <code>OutputProjectGuid</code> key),
+the <code>ProductVersion</code> key in the file will be updated to track the corresponding
+project version.</p>
+<h2 id="project-metadata-1"><a class="header" href="#project-metadata-1">Project Metadata</a></h2>
+<p>Project metadata are extracted in a fairly basic manner:</p>
+<h3 id="project-name-1"><a class="header" href="#project-name-1">Project name</a></h3>
+<p>The project name is taken to be the contents of the last <code>&lt;AssemblyName&gt;</code>
+element in the <code>.csproj</code> XML file.</p>
+<h3 id="project-version-1"><a class="header" href="#project-version-1">Project version</a></h3>
+<p>Cranko will extract the project version from the <code>AssemblyVersion</code> attribute of
+a project's <code>AssemblyInfo.cs</code> file. In particular, it searches for a line
+starting with the exact text <code>[assembly: AssemblyVersion</code>, and extracts whatever
+is between double quotation marks on that line.</p>
+<p>C# project versions emulate the <a href="integrations/../concepts/versions.html#net-versions">.NET
+System.Version</a> type.</p>
+<p>When updating project files, both the <code>AssemblyVersion</code> and the
+<code>AssemblyFileVersion</code> attributes are updated, if present.</p>
+<p>If a project has one or more associated <code>.vdproj</code> installer projects, the
+<code>ProductVersion</code> stored with the installer(s) will lose the fourth component
+(the "revision") of the project version, because four-component versions are
+rejected by the installer builder. The <code>PackageCode</code> and <code>ProductCode</code> of the
+installer will be replaced with a new, randomly-generated UUID (the same one for
+both codes). This is a conservative, and possibly sketchy, approach, since it
+means that different installer versions will unconditionally be treated as
+<a href="https://docs.microsoft.com/en-us/windows/win32/msi/major-upgrades">"major upgrades"</a>. See <a href="https://docs.microsoft.com/en-us/windows/win32/msi/changing-the-product-code">Changing the Product Code</a> for more information.</p>
+<h2 id="internal-dependencies-1"><a class="header" href="#internal-dependencies-1">Internal Dependencies</a></h2>
+<p><a href="integrations/../concepts/internal-dependencies.html">“Internal” dependencies</a> refer to
+<a href="https://en.wikipedia.org/wiki/Monorepo">monorepo</a> situations where one repository contains more than one project, and
+some of those projects depend on one another.</p>
+<p>Cranko automatically detects internal dependencies between C# projects by
+searching for <code>&lt;Project&gt;</code> elements in the <code>.csproj</code> XML file, where the text
+contents of these elements give the GUID of another project. Such elements
+should be contained inside a <code>&lt;ProjectReference&gt;</code> element but Cranko's parser
+doesn't bother to require that.</p>
+<p>As described in <a href="integrations/../jit-versioning/index.html#the-monorepo-wrinkle">Just-in-Time Versioning</a>, Cranko operates under
+a model where every internal dependency should be associated with a minimum
+compatible version of the dependee project, expressed as a <em>Git commit</em> rather
+than a version number.</p>
+<p>There is (currently?) no place where Cranko outputs internal dependency version
+requirements into the project files, because such requirements are automatically
+embedded into C# assemblies at build time by the compiler. However, Cranko still
+prompts you to annotate your projects with this information, because it can help
+you keep track of when new project releases must be made. These requirements
+should be recorded in each project's <code>.csproj</code> file in the following way:</p>
+<pre><code class="language-xml">&lt;ProjectExtensions&gt;
+   &lt;Cranko&gt;
+      &lt;CrankoInternalDepVersion&gt;{c05266fe-6947-42f1-9863-7cdbeed60869}=manual:unused&lt;/CrankoInternalDepVersion&gt;
+      &lt;CrankoInternalDepVersion&gt;{GUID}={req}&lt;/CrankoInternalDepVersion&gt;
+   &lt;/Cranko&gt;
+&lt;/ProjectExtensions&gt;
+</code></pre>
+<p>Each <code>&lt;CrankoInternalDepVersion&gt;</code> item associates a dependency, identified by
+its GUID, with a version requirement. You can use <code>manual:unused</code> if you don't
+want to track such information in detail.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="integrations-zenodo"><a class="header" href="#integrations-zenodo">Integrations: Zenodo</a></h1>
+<p>Cranko supports safe, automatic software <a href="https://www.doi.org/">DOI</a> registration through the <a href="https://zenodo.org/">Zenodo</a>
+service operated by <a href="https://home.cern/">CERN</a> in collaboration with other scientific organizations.</p>
+<h2 id="orientation-software-dois"><a class="header" href="#orientation-software-dois">Orientation: Software DOIs</a></h2>
+<p>While most people think of DOIs as associated with scholarly publications, more
+and more DOIs are being associated with other forms of digital academic output.
+And, of course, software is more and more becoming an important form of digital
+academic output! While it is beyond the scope of this documentation to explain
+software DOIs in depth, it is worth mentioning the distinction between a
+<em>version DOI</em> and a <em>concept DOI</em>.</p>
+<p>Version DOIs are perhaps more familiar. Just like each release of a software
+package is assigned a unique version number, each release of a software package
+can be assigned a unique DOI corresponding to that version. If you want to know
+which specific version of a piece of software that someone was using, either
+the exact version number or the exact version DOI will tell you that.</p>
+<p>If all you care about is knowing what software someone was running, then version
+DOIs don't add anything new that version numbers don't already provide. However,
+unlike version numbers, DOIs are first-class items in the scholarly publishing
+information ecosystem. When you give software a DOI, it can be integrated into
+that ecosystem in way that isn't possible otherwise. Probably the most important
+aspect of this is that software DOIs can be associated with author lists and
+<a href="https://orcid.org/">ORCID iDs</a> using standard scholarly metadata systems, so
+that researchers can get personal credit when their software is used and cited!</p>
+<p>Because we want to be able to know exactly what piece of code a person was
+running, we absolutely want to create a new DOI for each release of a software
+package. But if that package has a whole bunch of releases, we have a whole
+bunch of different DOIs, which is going to make it really tedious to quantify
+the usage of the package overall. This is where concept DOIs come in. Concept
+DOIs don’t really carry any information on their own, but they can be used in
+the DOI metadata framework to link together different releases of the same
+software package in a machine-understandable way. While the DOI
+<a href="https://doi.org/10.5281/zenodo.6963051">10.5281/zenodo.6963051</a> is a machine-usable way to talk about “version 4.21.1
+of the <a href="https://huggingface.co/transformers">transformers</a>” package, the concept DOI <a href="https://doi.org/10.5281/zenodo.3385997">10.5281/zenodo.3385997</a> is a
+machine-usable way to refer to the thing that is “the transformers package”
+overall.</p>
+<h2 id="workflow-overview"><a class="header" href="#workflow-overview">Workflow Overview</a></h2>
+<p>Cranko’s support for Zenodo “deposition” involves a multi-stage process. It
+follows the principles of the <a href="integrations/../jit-versioning/index.html">just-in-time versioning approach</a> where
+release metadata only ever appear in tested release artifacts.</p>
+<ul>
+<li>During the beginning of CI/CD processing, a new Zenodo deposit is
+<a href="integrations/../commands/cicd/zenodo-preregister.html">preregistered</a>, and the DOIs that <em>will be</em> created are obtained.
+These can be inserted into the source files of your software, so that it can
+print out its own DOI. This step can be run during pull-request processing:
+but instead of doing anything with the Zenodo API, fake DOIs are generated and
+used.</li>
+<li>Once CI/CD tests have all passed, you can <a href="integrations/../commands/cicd/zenodo-upload-artifacts.html">upload artifacts</a> if so
+desired, then actually <a href="integrations/../commands/cicd/zenodo-publish.html">publish</a> the release. Zenodo will actually register
+the DOIs.</li>
+<li>Because Zenodo deposits are associated with version numbers, each deposit
+process is associated with a specific cranko <a href="integrations/../concepts/projects.html">project</a>. In a monorepo
+scenario, you can run multiple deposits for multiple projects as you see fit.</li>
+</ul>
+<h2 id="getting-started-1"><a class="header" href="#getting-started-1">Getting Started</a></h2>
+<p>To start using the Zenodo integration, you need to create a <a href="integrations/../configuration/zenodo.html">Zenodo metadata
+file</a> somewhere in your repository. This file is traditionally called
+<code>zenodo.json5</code> and can be stored anywhere you feel like.</p>
+<p>While you should see the <a href="integrations/../configuration/zenodo.html">Zenodo Metadata Files</a> page for the full
+details of the file format, the short version is that it has two main fields.
+The first, <code>"metadata"</code>, contains the metadata that will describe your Zenodo
+deposition. See <a href="https://developers.zenodo.org/#deposit-metadata">the Zenodo developer documentation</a> for a precise
+definition of all of the fields that can be used here, or check out <a href="https://github.com/pkgw/cranko/blob/master/ci/zenodo.json5">Cranko’s
+own version of the file</a> for inspiration. <em>The contents of this file
+are things you need to decide for yourself,</em> including, most importantly, the
+author list that you want to associate with your project.</p>
+<p>The second field, <code>"conceptrecid"</code>, will be used to ensure that successive
+releases of your project are all tied together with the same concept DOI. When
+creating the first Zenodo release of your software, you should set this to the
+special value <code>"new-for:$version"</code>, where <code>$version</code> is the planned next version
+of the project being released. For instance, you might put <code>"new-for:0.12.0"</code> at
+first. If the preregistration process runs for a <em>different</em> version, it will
+error out. This precaution helps make sure that you don’t forget to update your
+metadata file once the concept DOI has been created.</p>
+<p>If you're using a monorepo, you can make as many Zenodo releases as you like
+during CI processing. Just run the relevant commands as many times as needed,
+and create a different Zenodo configuration file for each project that gets
+assigned DOIs.</p>
+<h2 id="rewrites"><a class="header" href="#rewrites">Rewrites</a></h2>
+<p>The <a href="integrations/../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a> command can insert the DOIs that <em>will
+be</em> registered into your source code. You can use this functionality to create
+software releases that <em>know their own DOIs</em>.</p>
+<p>We suggest that you include commands in your software to print out these DOIs,
+along the lines of <a href="integrations/../commands/util/show.html#cranko-show-cranko-version-doi"><code>cranko show cranko-version-doi</code></a> and <a href="integrations/../commands/util/show.html#cranko-show-cranko-concept-doi"><code>cranko show cranko-concept-doi</code></a>. This way, there is an easy way for users to get the
+precise DOIs relating to the software that they're running. You might also want
+to insert these DOIs into logs or metadata associated with the files that your
+software creates, although in many cases the version number is going to be more
+understandable to users.</p>
+<p>This insertion happens during the <a href="integrations/../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a> command,
+which will rewrite any files whose paths you pass to it on the command line.
+The following rewrite rules are followed:</p>
+<ul>
+<li>The text <code>xx.xxxx/dev-build.$project.version</code>, where <code>$project</code> is the name of
+the Cranko project being released, is replaced with the version DOI. To be
+explicit, for Cranko itself the template to be replaced would be
+<code>xx.xxxx/dev-build.cranko.version</code>.</li>
+<li>The text <code>xx.xxxx/dev-build.$project.concept</code>, where <code>$project</code> is the name of
+the Cranko project being released, is replaced with the concept DOI.</li>
+</ul>
+<p>If you’re feeling extra-clever, you can include these templates in your
+<code>CHANGELOG.md</code> entry, and your final changelog will include the DOIs of the
+release that it describes. (If you do this, you’ll need to pass the path to
+<code>CHANGELOG.md</code> as an argument to <a href="integrations/../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a>.)</p>
+<p>If you’re building out of source control, these replacements won't happen, of
+course. If a pull request or other non-release build is being processed, or if
+you’re in a monorepo and the package in question isn’t being released, fake DOIs
+with similar forms will be substituted in. You can add checks in your code to
+see whether the DOIs start with the universal DOI prefix, <code>"10."</code>, to know
+whether your DOIs are real or fake.</p>
+<h2 id="cicd-workflow"><a class="header" href="#cicd-workflow">CI/CD Workflow</a></h2>
+<p>Zenodo publication operations require you to have a <a href="https://developers.zenodo.org/">Zenodo API token</a>,
+which you can create in the <a href="https://zenodo.org/account/settings/applications/tokens/new/">Zenodo Account Tokens page</a>. You need to get
+this token into the environment variable <code>ZENODO_TOKEN</code> for the Zenodo workflow
+to work.</p>
+<p>The <a href="integrations/../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a> command(s) should be run at the
+beginning of your CI/CD workflow, before <a href="integrations/./release-workflow-commit.html"><code>cranko release-workflow commit</code></a>. As
+described above, the command inserts placeholders for non-release builds, so you
+can run it in all of your workflows without worrying about needing to detect
+whether the current build is for a project release. If you’re using a monorepo
+with multiple projects that get Zenodo deposits, run the command as many times
+as needed. After all invocations are done, you should <code>git add</code> your modified
+files to make sure they get included in the release commit.</p>
+<p>At the end of your CI/CD workflow, if you are actually making real releases, you
+should run <a href="integrations/../commands/cicd/zenodo-upload-artifacts.html"><code>cranko zenodo upload-artifacts</code></a> as needed, then finally
+<a href="integrations/../commands/cicd/zenodo-publish.html"><code>cranko zenodo publish</code></a> to publish your new deposits. Once again, in
+a monorepo scenario, these commands should be run as many times as needed — with
+filters in place to only execute them if the projects in question have actually
+been released. This can be accomplished with <a href="integrations/../commands/util/show.html#cranko-show-if-released"><code>cranko show if-released --exit-code</code></a>.</p>
+<h2 id="continued-releases"><a class="header" href="#continued-releases">Continued Releases</a></h2>
+<p>After your first successful Zenodo deposit, you should update your
+<code>zenodo.json5</code> file and replace the special <code>"conceptrecid"</code> field with the
+Zenodo record ID corresponding to the “concept” of your software package. This
+is easily findable in the concept DOI, and is also printed by
+<a href="integrations/../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a>.</p>
+<p>Going forward, you should review the <code>zenodo.json5</code> file periodically and update
+as needed — in particular, you should be attentive to the author list. As with
+any academic product, the choice of who goes on an author list, and what order
+that list is in, is not something that can be automated — you have to decide how
+you want to handle it.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="internal-dependencies-2"><a class="header" href="#internal-dependencies-2">Internal Dependencies</a></h1>
+<p>An <em>internal dependency</em> is a dependency between two <a href="concepts/./projects.html">projects</a>
+stored in the same repository. Internal dependencies are therefore closely
+associated with <a href="https://en.wikipedia.org/wiki/Monorepo">monorepos</a> in Cranko's terminology. You can have a monorepo
+that doesn't have any internal dependencies, but usually the point of a monorepo
+setup is to manage a group of interdependent projects.</p>
+<p>As outlined in the introduction to <a href="concepts/../jit-versioning/index.html#the-monorepo-wrinkle">Just-in-Time Versioning</a>,
+internal dependencies (perhaps counterintuitively) take some extra effort to
+manage. This situation stems from two assumptions in the JIT model:</p>
+<ul>
+<li>Any intra-project dependency (internal or external) needs to be associated
+with a <em>version requirement</em> specifying the range of versions of the
+"dependee" package that the "depending" package is compatible with. In simple
+cases this might be expressible as "anything newer than 1.0", but version
+requirements can potentially be complex ("anything in the 1.x or 2.x series,
+but not 3.x, and not 1.10").</li>
+<li>In the JIT versioning model, specific version numbers shouldn't be stored in
+the main development branch of your repository.</li>
+</ul>
+<p>It's important to note that dependency version requirements can't be determined
+automatically. Say that I have a monorepo containing two projects,
+<code>awesome_database</code> and <code>awesome_webserver</code>. It's reasonable to assume that at
+any given commit, the two are compatible, but is the development version of
+<code>awesome_webserver</code> compatible with version 1.9 of <code>awesome_database</code>? Is it
+compatible with version 1.1? You could imagine some level of automated API
+analysis to test source-level compatibility, but it's always possible that the
+semantics of an API can change in a way that maintains source compatibility but
+breaks actual usage. Ultimately the <em>only</em> sound approach is for a human to make
+this determination.</p>
+<p>Getting back to Cranko's challenge: at some point I'm going to want to make a
+new release of <code>awesome_webserver</code> with metadata saying that it requires
+<code>awesome_database &gt;= 2.0</code>. How can I tell Cranko what version requirement to
+insert into the <code>awesome_webserver</code> project files when the main development
+branch can't "know" what the most recent version of <code>awesome_database</code> is?</p>
+<h2 id="commit-based-internal-dependency-version-requirements"><a class="header" href="#commit-based-internal-dependency-version-requirements">Commit-Based Internal Dependency Version Requirements</a></h2>
+<p>Cranko solves this problem by requiring that you specify internal dependency
+version requirements as <em>Git commits</em>, not version numbers. For each internal
+dependency from a "depending" project X on a "dependee" project Y, you must
+specify a Git commit such that X is compatible with releases of Y whose sources
+contain that commit in their histories.</p>
+<p>What does Cranko do with this information? When making a release of project X,
+Cranko has sufficient information to determine the <em>oldest</em> version of project Y
+containing that commit. It will rewrite project X's public metadata to encode
+that version requirement.</p>
+<p>It can happen that no such release exists — perhaps project X requires a new
+feature that was just added to Y, and no release of Y has yet been made. Cranko
+will detect this situation and, correctly, refuse to let you make a release of
+project X. However, you can release X and Y <em>simultaneously</em> (in one <code>rc</code> push),
+and Cranko will detect this and generate correct metadata.</p>
+<p>The commit-based model implies a restriction that version requirements for
+internal dependencies must have the simplest form: X is compatible with any
+version of Y newer than Z, for some Z determined at release time. This is not
+expected to be restrictive in practice because Cranko assumes that at any given
+commit in a monorepo, all projects are compatible as expressed in the source
+tree.</p>
+<h2 id="expressing-internal-dependency-commit-requirements"><a class="header" href="#expressing-internal-dependency-commit-requirements">Expressing Internal Dependency Commit Requirements</a></h2>
+<p>Project meta-files don't have native support for commit-based version
+requirements because it would be inappropriate to include information specific
+to a project's revision system in such files. Therefore, Cranko always has to
+define some kind of custom way for you to capture this metadata, with the
+specific mechanism depending on the project type. For instance:</p>
+<ul>
+<li>In Rust, you add <code>[package.metadata.internal_dep_versions]</code> fields in Cargo.toml</li>
+<li>In Python, you annotate version requirement lines in your <code>setup.py</code> file or
+equivalent</li>
+</ul>
+<p>The documentation for each language integration should specify the approach and
+specific syntax you should use.</p>
+<h2 id="development-with-internal-dependency-requirements"><a class="header" href="#development-with-internal-dependency-requirements">Development with Internal Dependency Requirements</a></h2>
+<p>The <a href="concepts/../workflows-bootstrap/index.html#transforming-internal-dependencies"><code>cranko bootstrap</code></a> command will endeavor to update your project files
+to include your pre-existing internal version requirements using a special
+"manual" mode. This is required for version requirements that reach into a
+project's pre-Cranko history.</p>
+<p>Once the internal requirements are set up, you should <em>ideally</em> update commit
+requirements as APIs are added or broken. For instance, say that project
+<code>awesome_database</code> adds a new API in commit A, and project <code>awesome_webserver</code>
+starts using it sometime later in commit B. Commit B <em>should</em> update the
+metadata to indicate that <code>awesome_webserver</code> now requires a version of
+<code>awesome_database</code> based on commit A, or later.</p>
+<p>If you don't remember to update the metadata immediately, that's OK. So long as
+the metadata for <code>awesome_webserver</code> are updated sometime before its next
+release, the released files will contain the right information.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="projects"><a class="header" href="#projects">Projects</a></h1>
+<p>A <em>project</em> is a thing that is manifested in a series of
+<a href="concepts/./releases.html">releases</a>, each release assigned a unique
+<a href="concepts/./versions.html">version</a>. In the Cranko model, each projects’ source materials
+are tracked in a repository.</p>
+<p>We will sometimes refer to projects as “software,“ but it’s worth emphasizing
+that there’s no reason that a project has to consist of computer source code. It
+could be a website, a data product, or whatever else. A project might be
+associated with some kind of external publishing framework, like an <a href="https://docs.npmjs.com/about-packages-and-modules">npm
+package</a> or a <a href="https://doc.rust-lang.org/book/ch07-01-packages-and-crates.html">Rust crate</a>, but it doesn’t have to be.</p>
+<h2 id="prefixing"><a class="header" href="#prefixing">Prefixing</a></h2>
+<p>Cranko associates each project with a certain prefix inside the repository file
+tree. These prefixes can overlap somewhat: for instance, it is very common that
+a repository contains a main project at its root, and sub-projects within
+subdirectories of that root.</p>
+<p>By default, Cranko assumes that files inside of a project’s prefix “belong” to
+that project, except when those files “belong” to a project rooted in a more
+specific prefix. This mapping is used to assess which commits affect which
+projects: if a project is rooted in <code>crates/log_util</code>, and a commit alters the
+file <code>crates/log_util/src/color.rs</code>, that commit is categorized as affecting
+that project. A single commit may affect zero, one, or many projects. Cranko
+uses this analysis to suggest which projects may be ready for release.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="releases"><a class="header" href="#releases">Releases</a></h1>
+<p>Cranko’s idea of a <em>release</em> closely tracks the one implied by the <a href="https://semver.org/">semantic
+versioning specification</a>. Each <a href="concepts/./projects.html">project</a> in a repo is
+sent out into the world in a time-series of releases. Each release is associated
+with a <a href="concepts/./versions.html">version</a>, a Git commit, and some set of <em>artifacts</em>,
+which are almost always “files” in the standard computing sense. All of these
+should be immutable and, to some extent, irrevocable: once you’ve made a
+release, it’s never coming back. This sounds dangerous, but a big point of
+release automation is to make the release process so easy that if you mess
+something up, it’s easy to supersede it with a fixed version.</p>
+<p>The fundamental assumption of Cranko is that we are seeking to achieve total
+automation of the software release process. It is important to point out that
+Cranko does not seek to automate the <em>decision to release</em>: it is the authors’
+opinion that it is important for this decision to be in human hands. (Although
+if you want to automate that decision too, we can’t and won’t stop you.) But
+once that decision has been made, as much of the process involved should proceed
+mechanically. We believe that the <a href="concepts/../jit-versioning/index.html">just-in-time versioning</a> workflow
+provides an extremely sound basis on which to make this happen.</p>
+<p>Because repositories can contain multiple projects, an individual commit in a
+repository’s history might be associated with zero, one, or <em>many</em> project
+releases. This model requires a certain amount of trust: if I release project X
+in commit Y, I’m implictly asserting that all projects not-X do <em>not</em> need to be
+released at the same time. There is no way for a computer to know that this is
+actually true. (The same kind of trust is required by Git’s merge algorithm,
+which assumes that if two different commits do not alter the same part of the
+same files, that they do not conflict with one another. This assumption is a
+good heuristic, but not infallible.) In Cranko’s case, the only way to avoid
+placing this trust in the user would be to demand that the release of <em>any</em>
+project requires the release of <em>all</em> projects, which is takes cautiousness to
+the level of absurdity.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="versions"><a class="header" href="#versions">Versions</a></h1>
+<p>Every <a href="concepts/./projects.html">project</a> in Cranko has one or more
+<a href="concepts/./releases.html">releases</a>, each of which is associated with a version (AKA
+“version number”). We can think of the version of the most recent release as
+being the “current” version of the project, but it is important to remember that
+in a given repository a project may be in an intermediate state between releases
+and hence between well-defined version numbers.</p>
+<p>Cranko’s model takes pains to avoid strong assumptions about what version
+“numbers” look like — they don't even need to be numbers — or how they change
+over time. Well-specified versioning syntaxes like <a href="https://semver.org/">semver</a> are
+supported, but the goal is to make it possible to use domain-specific syntaxes
+as well. In particular, at the moment, Cranko supports three schemes:</p>
+<ul>
+<li><a href="concepts/versions.html#python-pep-440-versions">Python (“PEP440”) versions</a></li>
+<li><a href="concepts/versions.html#semantic-versioning-versions">Semantic Versioning (“semver”) versions</a></li>
+<li><a href="concepts/versions.html#net-versions">.NET versions</a></li>
+</ul>
+<h2 id="python-pep-440-versions"><a class="header" href="#python-pep-440-versions">Python PEP-440 versions</a></h2>
+<p>Python packages are assumed to be versioned according to <a href="https://www.python.org/dev/peps/pep-0440/">PEP-440</a>. This is a
+very flexible scheme that allows any number of primary numbers as well as
+“alpha”, “beta”, “rc”, “dev”, <em>and</em> “post” sequencing. Consult <a href="https://www.python.org/dev/peps/pep-0440/">PEP-440</a> for
+details.</p>
+<p>Used by Python packages.</p>
+<h2 id="semantic-versioning-versions"><a class="header" href="#semantic-versioning-versions">Semantic Versioning versions</a></h2>
+<p>“Semver” versions follow the <a href="https://semver.org/">Semantic Versioning 2</a> specification.
+They generally follow a <code>MAJOR.MINOR.MICRO</code> structure with optional extra
+prerelease and build metadata. The semver specification is rigorously defined
+(as you’d hope), so consult that document for details.</p>
+<p>Used by Cargo and NPM packages.</p>
+<h2 id="net-versions"><a class="header" href="#net-versions">.NET Versions</a></h2>
+<p>.NET versions emulate the .NET <a href="https://docs.microsoft.com/en-us/dotnet/api/system.version">System.Version</a> type. This is a simple
+type following the form <code>MAJOR.MINOR.BUILD.REVISION</code>, where each piece is an
+integer. The maximum allowed value of each item is 65534.</p>
+<p>Used by packages in <a href="concepts/../integrations/csproj.html">Visual Studio C# projects</a>.</p>
+<p>The <code>micro bump</code> version bump syntax will update the "build" component of a
+version string. There is currently no syntax to bump the revision component of a
+version string.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="configuration"><a class="header" href="#configuration">Configuration</a></h1>
+<p>Cranko aims to “just work” with minimal explicit configuration. That being said,
+flexibility is clearly important in a workflow tool. If some aspect of Cranko’s
+behavior isn’t configurable, the reason is probably simply that no one has
+gotten around to wiring up the necessary code, rather than a reluctance to allow
+flexibility.</p>
+<h2 id="the-per-repository-configuration-file"><a class="header" href="#the-per-repository-configuration-file">The per-repository configuration file</a></h2>
+<p>For each Cranko-using repository, the main configuration file is located at
+<code>.config/cranko/config.toml</code>. Cranko can run without this file, and the hope is
+that the tool can be very useful without requiring the file’s presence.</p>
+<p>For reproducibility and testability, the goal is that as much Cranko
+configuration as possible can be centralized in this file, without per-user or
+per-environment customizations. At the moment, no other Cranko configuration
+files are supported.</p>
+<p>The <code>config.toml</code> file may contain the following items:</p>
+<ul>
+<li><a href="configuration/index.html#the-repo-section"><code>[repo]</code></a> — Configuration relating to the backing repository
+<ul>
+<li><a href="configuration/index.html#the-rc_name-field"><code>rc_name</code></a> — The name of the <code>rc</code>-like branch</li>
+<li><a href="configuration/index.html#the-release_name-field"><code>release_name</code></a> — The name of the <code>release</code>-like branch</li>
+<li><a href="configuration/index.html#the-release_tag_name_format-field"><code>release_tag_name_format</code></a> — The format for release tag names</li>
+<li><a href="configuration/index.html#the-upstream_urls-field"><code>upstream_urls</code></a> — How the upstream remote is recognized</li>
+</ul>
+</li>
+<li><a href="configuration/index.html#the-projects-section"><code>[projects]</code></a> — Configuration relating to individual projects
+<ul>
+<li><a href="configuration/index.html#the-ignore-field"><code>ignore</code></a> — Flagging projects to be ignored</li>
+</ul>
+</li>
+<li><a href="configuration/index.html#the-npm-section"><code>[npm]</code></a> — Configuration relating to the NPM integration
+<ul>
+<li><a href="configuration/index.html#the-internal_dep_protocol-field"><code>internal_dep_protocol</code></a> — A resolver protocol to use for internal dependencies</li>
+</ul>
+</li>
+</ul>
+<p>As mentioned above, additional items are planned to be added as the need arises.</p>
+<h3 id="the-repo-section"><a class="header" href="#the-repo-section">The <code>[repo]</code> section</a></h3>
+<p>This section contains configuration relating to the backing Git repository.</p>
+<h4 id="the-rc_name-field"><a class="header" href="#the-rc_name-field">The <code>rc_name</code> field</a></h4>
+<p>This field is a string specifying the name of the <code>rc</code>-like branch that will be
+used. If unspecified, the default is indeed <code>rc</code>. The same name will be used in
+the local checkout and when consulting the upstream repository.</p>
+<h4 id="the-release_name-field"><a class="header" href="#the-release_name-field">The <code>release_name</code> field</a></h4>
+<p>This field is a string specifying the name of the <code>release</code>-like branch that
+will be used. If unspecified, the default is indeed <code>release</code>. The same name
+will be used in the local checkout and when consulting the upstream repository.</p>
+<h4 id="the-release_tag_name_format-field"><a class="header" href="#the-release_tag_name_format-field">The <code>release_tag_name_format</code> field</a></h4>
+<p>This field is a string specifying how the names of Git tags corresponding to
+releases will be constructed. The default is <code>{project_slug}@{version}</code>.</p>
+<p>Values are interpolated using a standard curly-brace substitution scheme (as
+implemented by the <code>curly</code> module of the <a href="https://github.com/jan-auer/dynfmt">dynfmt</a> crate). Available input
+variables are:</p>
+<ul>
+<li><code>project_slug</code>: the “user facing name” of the released project</li>
+<li><code>version</code>: the stringification of the version of the released project</li>
+</ul>
+<h4 id="the-upstream_urls-field"><a class="header" href="#the-upstream_urls-field">The <code>upstream_urls</code> field</a></h4>
+<p>This field is a list of strings giving the Git URLs associated with the
+canonical upstream repository, which is the one that will perform automated
+release processing upon updates to its <code>rc</code>-like branch. For example:</p>
+<pre><code class="language-toml">upstream_urls = [
+  "git@github.com:pkgw/cranko.git",
+  "https://github.com/pkgw/cranko.git"
+]
+</code></pre>
+<p>(The <em>name</em> of the upstream remote might change from one checkout to the next,
+but the set of canonical upsteam <em>URLs</em> should be small.)</p>
+<p>The ordering of the URLs does not matter. If the list is empty (i.e. it is
+unspecified), and there is only one remote, Cranko will use it. If there is more
+than one remote but one is named <code>origin</code>, Cranko will use that. Otherwise,
+Cranko will error out. If more than one remote matches any of the URLs, one of
+them will be used but it is unspecified which.</p>
+<h3 id="the-projects-section"><a class="header" href="#the-projects-section">The <code>[projects]</code> section</a></h3>
+<p>This section contains configuration relating to individual projects in the
+repository. Cranko generallly prefers to locate this configuration in
+project-appropriate metadata files (such as <code>Cargo.toml</code>), but this isn't always
+possible.</p>
+<p>This “section” should be a dictionary keyed by the full “qualified names”
+associated with a project. For instance, for an NPM project, you might configure
+it with code such as:</p>
+<pre><code class="language-toml">[projects."npm:@mymonorepo/tests"]
+ignore = true
+</code></pre>
+<h4 id="the-ignore-field"><a class="header" href="#the-ignore-field">The <code>ignore</code> field</a></h4>
+<p>This field tells Cranko to ignore the existence of the project in question.</p>
+<p>For a variety of reasons, Cranko might autodetect a project in your repository
+that you never intend to release. This setting allows you to pretend that such a
+project simply doesn’t exist. The setting is applied in the repository-wide
+configuration file, not in project metadata, in case the project is imported
+from a vendor source that doesn’t include Cranko metadata.</p>
+<h3 id="the-npm-section"><a class="header" href="#the-npm-section">The <code>[npm]</code> section</a></h3>
+<p>This section contains configuration pertaining to Cranko’s NPM integration.</p>
+<h3 id="the-internal_dep_protocol-field"><a class="header" href="#the-internal_dep_protocol-field">The <code>internal_dep_protocol</code> field</a></h3>
+<p>This optional string field specifies a Yarn <a href="https://yarnpkg.com/features/protocols">resolution protocol</a> to insert into
+the requirements lines for dependencies internal to a monorepo. If you are using
+Yarn as your package manager, setting this to <a href="https://yarnpkg.com/features/protocols#workspace"><code>"workspace"</code></a> will force Yarn to
+always resolve the dependency to one within the workspace. This should help
+ensure that your internal dependency version specifications are correct and
+self-consistent.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="zenodo-metadata-files"><a class="header" href="#zenodo-metadata-files">Zenodo Metadata Files</a></h1>
+<p>Cranko's <a href="configuration/../integrations/zenodo.html">Zenodo integration</a> involves one or more configuration files,
+traditionally named <code>zenodo.json5</code>. This page documents the format of these
+files.</p>
+<p>A project repository may contain zero, one, or many Zenodo metadata files.
+Cranko does not care about where they live in the repository tree. So long as
+the commands that run in your CI system refer to the right files in the right
+places, any filesystem layout is fine.</p>
+<p>The Zenodo metadata file is parsed in the <a href="https://json5.org/">JSON5</a> format. This is a superset of
+<a href="https://en.wikipedia.org/wiki/JSON">JSON</a> that is slightly more flexible, especially including support for
+comments.</p>
+<p>The overall structure of the Zenodo metadata file should be as follows:</p>
+<pre><code>{
+  "conceptrecid": $string
+  "metadata": $object
+}
+</code></pre>
+<h3 id="conceptrecid"><a class="header" href="#conceptrecid"><code>conceptrecid</code></a></h3>
+<p>This field is mandatory. When publishing the first release of a project to
+Zenodo, it should contain text of the form <code>"new-for:$version"</code>, where
+<code>$version</code> is the to-be-published version of the project.</p>
+<p>After the first release, it should be replaced with the Zenodo “record ID” of
+the “concept” item corresponding to the project. This is the serial number
+associated with the “Cite all version” item associated with the project. The
+<a href="configuration/../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a> command will print out this record ID when it runs
+for a first release. But don’t worry: it's not hard to figure out this value.</p>
+<p>The scheme above is intended to make it so that one does not accidentally create
+a series of releases that are not properly linked by their concept identifier.
+Because the <code>new-for</code> mode captures the specific release that it is intended to
+be used for, if you forget to update the field, the next release will error out.</p>
+<h3 id="metadata"><a class="header" href="#metadata"><code>metadata</code></a></h3>
+<p>This field is mandatory. It should be filled with Zenodo deposit metadata in
+<a href="https://developers.zenodo.org/#deposit-metadata">the JSON format documented by Zenodo</a>. Use whichever fields are
+appropriate for your project.</p>
+<p>The following fields will be overwritten by Cranko upon preregistration:</p>
+<ul>
+<li><code>title</code> will be set to <code>"$projectname $projectversion"</code></li>
+<li><code>publication_date</code> will be set to today’s date, as understood by whichever
+computer Cranko is running on</li>
+<li><code>version</code> will be set to <code>"$projectversion"</code></li>
+</ul>
+<h2 id="preregistration-rewrites"><a class="header" href="#preregistration-rewrites">Preregistration Rewrites</a></h2>
+<p>Upon success of the <a href="configuration/../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a> command, this file will be
+rewritten to include other metadata specific to the deposit being made. These
+updates should not be committed to the main branch of your repository, and you
+should not depend on any particular keys being available.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-bootstrap"><a class="header" href="#cranko-bootstrap"><code>cranko bootstrap</code></a></h1>
+<p>Bootstrap an existing repository to start using Cranko.</p>
+<h4 id="usage"><a class="header" href="#usage">Usage</a></h4>
+<pre><code>cranko bootstrap [--force] [--upstream UPSTREAM-NAME]
+</code></pre>
+<p>For detailed usage guidance, see the <a href="commands/dev/../../workflows-bootstrap/index.html">Bootstrapping
+Workflow</a> section.</p>
+<p>The <code>--upstream UPSTREAM-NAME</code> option specifies the name of the Git remote that
+should be considered the canonical “upstream” repository. If unspecified, Cranko
+will guess with a preference for the remote named <code>origin</code>.</p>
+<p>The <code>--force</code> option will force the command to proceed even in unexpected
+circumstances, such as when the working tree contains modified files.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-confirm"><a class="header" href="#cranko-confirm"><code>cranko confirm</code></a></h1>
+<p>Create a new <code>rc</code> commit to request the release of one or more projects.</p>
+<h4 id="usage-1"><a class="header" href="#usage-1">Usage</a></h4>
+<pre><code>cranko confirm [--force]
+</code></pre>
+<p>This command gathers release request information prepared from one or more calls
+to <code>cranko stage</code> and synthesizes it into a new commit on the <code>rc</code> branch.
+Edited changelog files in the working directory are then reset to match the HEAD
+commit.</p>
+<p>The <code>cranko confirm</code> command analyzes the
+<a href="commands/dev/../../concepts/internal-dependencies.html">internal interdependencies</a> of the
+projects within the repository and will refuse to propose a release with
+unsatisfied requirements. That is, if a proposed new release of project X would
+require a new release of project Y but one is not being requested, the command
+will exit with an error.</p>
+<p>After the release request is recorded on the <code>rc</code> branch, in a typical workflow
+the release request would be submitted to the CI/CD system by pushing the branch
+to the upstream repository.</p>
+<h4 id="example"><a class="header" href="#example">Example</a></h4>
+<pre><code class="language-shell">$ cranko stage foo_util
+foo_util: 4 relevant commit(s) since 1.1.0
+$ {edit util/CHANGELOG.md}
+$ cranko confirm
+info: foo_util: micro bump (expected: 1.1.0 =&gt; 1.1.1)
+info: staged rc commit to `rc` branch
+$ git push origin rc
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-diff"><a class="header" href="#cranko-diff"><code>cranko diff</code></a></h1>
+<p>Print a <a href="https://git-scm.com/docs/git-diff">diff</a> comparing the last release of a project to the state of the
+current working tree.</p>
+<h4 id="usage-2"><a class="header" href="#usage-2">Usage</a></h4>
+<pre><code>cranko diff [PROJECT-NAME]
+</code></pre>
+<p>You can leave <code>[PROJECT-NAME]</code> unspecified if there's only one project in the
+repo.</p>
+<h4 id="example-1"><a class="header" href="#example-1">Example</a></h4>
+<pre><code class="language-shell">$ cranko diff
+diff --git a/Cargo.lock b/Cargo.lock
+index 41bc0b8..02069cd 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -1,22 +1,29 @@
+ # This file is automatically @generated by Cargo.
+ # It is not intended for manual editing.
++version = 3
++
+ [[package]]
+...
+</code></pre>
+<h4 id="remarks"><a class="header" href="#remarks">Remarks</a></h4>
+<p>This command is helpful to get an overview of the changes that have occurred
+since the last release. It farms out its work to the <code>git diff</code> subcommand,
+executing a command of the form:</p>
+<pre><code class="language-shell">$ git diff [COMMIT] -- [DIR]
+</code></pre>
+<p>where <code>[COMMIT]</code> is last the main-branch commit included in the most recent
+release of the project in question, and <code>[DIR]</code> is the primary working directory
+associated with that project. In other words, this command is different than
+<code>git diff</code> because it compares against the most recent <em>release</em> commit, as
+opposed to the most recent commit of any kind. It also filters the diff output
+by repository path.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-log"><a class="header" href="#cranko-log"><code>cranko log</code></a></h1>
+<p>Print repository history for a project since its last release.</p>
+<h4 id="usage-3"><a class="header" href="#usage-3">Usage</a></h4>
+<pre><code>cranko log [--stat] [PROJECT-NAME]
+</code></pre>
+<p>You can leave <code>[PROJECT-NAME]</code> unspecified if there's only one project in the
+repo.</p>
+<p>The <code>--stat</code> argument, if specified, is forwarded to <code>git show</code>.</p>
+<h4 id="example-2"><a class="header" href="#example-2">Example</a></h4>
+<pre><code class="language-shell">$ cranko log
+commit d262b397eae451e23c68438fb3ddde6fc64dc65a (HEAD)
+Author: Peter Williams &lt;peter@newton.cx&gt;
+Date:   Sat Apr 3 10:47:18 2021 -0400
+
+...
+</code></pre>
+<h4 id="remarks-1"><a class="header" href="#remarks-1">Remarks</a></h4>
+<p>This command is helpful to get an overview of the changes that might potentially
+be <a href="commands/dev/./stage.html">staged</a> for a release. It generates a list of relevant commits
+and then farms out the display work to the <code>git show</code> subcommand.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-stage"><a class="header" href="#cranko-stage"><code>cranko stage</code></a></h1>
+<p>Begin the process of preparing one or more projects for release.</p>
+<h4 id="usage-4"><a class="header" href="#usage-4">Usage</a></h4>
+<pre><code>cranko stage [--force] [PROJECT-NAMES...]
+</code></pre>
+<p>If <code>{PROJECT-NAMES}</code> is unspecified, all projects that have been affected by any
+commits since their last release are staged.</p>
+<p>Using the <code>--force</code> flag and explicit <code>{PROJECT-NAMES}</code> will allow you to stage
+projects even if Cranko believes that they have not been affected by any commits
+since their most recent releases. This can be useful if, say, you need to
+re-attempt a release with updated CI configuration but no code changes.</p>
+<p>For each project that is staged, its changelog files in the working directory
+are rewritten to include template release-request information and a draft set of
+release notes based on the Git commits affecting the project since its last
+release. The exact format used will depend on the project’s configuration.</p>
+<p>You should edit these files as you see fit to prepare the release notes and set
+the parameters of the proposed release. The changelog will include previous
+entries which can be revised if desired. When the release information is ready,
+use <code>cranko confirm</code> to prepare a new commit on the <code>rc</code> branch for submission
+to the CI/CD system.</p>
+<p>To “un-stage” a project, just restore its changelog files to their unmodified
+state.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-status"><a class="header" href="#cranko-status"><code>cranko status</code></a></h1>
+<p>Print out information about unreleased changes in in the HEAD commit of the
+repository.</p>
+<h4 id="usage-5"><a class="header" href="#usage-5">Usage</a></h4>
+<pre><code>cranko status [PROJECT-NAMES]
+</code></pre>
+<p>If <code>{PROJECT-NAMES}</code> is unspecified, status information is printed about all
+projects.</p>
+<h4 id="example-3"><a class="header" href="#example-3">Example</a></h4>
+<pre><code class="language-shell">$ cranko status
+tcprint: 2 relevant commit(s) since 0.1.1
+drorg: 5 relevant commit(s) since 0.3.0
+$
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-cargo-foreach-released"><a class="header" href="#cranko-cargo-foreach-released"><code>cranko cargo foreach-released</code></a></h1>
+<p>Run a Rust <a href="https://doc.rust-lang.org/cargo/">cargo</a> command for all Rust/Cargo projects that have
+had new releases.</p>
+<h4 id="usage-6"><a class="header" href="#usage-6">Usage</a></h4>
+<pre><code>cranko cargo foreach-released
+    [--pause=SECONDS]
+    [--command-name=COMMAND]
+    [--] [CARGO-ARGS...]
+</code></pre>
+<p>This command should be run in CI processing of an update to the <code>rc</code> branch,
+after the release has been vetted and the release commit has been created. The
+current branch should be the <code>release</code> branch.</p>
+<h4 id="example-4"><a class="header" href="#example-4">Example</a></h4>
+<pre><code class="language-shell">$ cranko cargo foreach-released -- publish --no-verify
+</code></pre>
+<p>Note that the name of <code>cargo</code> itself should <em>not</em> be one of the arguments.
+Furthermore, due to the way that Cranko parses its command-line arguments, if
+any option flags are to be passed to Cargo, you must precede the whole set of
+Cargo options with a double-dash (<code>--</code>). The example above would run <a href="https://doc.rust-lang.org/cargo/commands/cargo-publish.html"><code>cargo publish --no-verify</code></a> for each released package — which is
+basically the whole reason that this command exists.</p>
+<p>Automated publishing requires a Cargo API token. Ideally, such tokens should not
+be included in command-line arguments. The <a href="https://doc.rust-lang.org/cargo/commands/cargo-publish.html"><code>cargo publish</code></a>
+command can obtain tokens from the <code>CARGO_REGISTRY_TOKEN</code> environment variable
+(for the <a href="https://crates.io/">Crates.io</a> registry) or <code>CARGO_REGISTRIES_${NAME}_TOKEN</code> for other
+registries. See <a href="https://doc.rust-lang.org/cargo/commands/cargo-publish.html">the <code>cargo publish</code> docs</a> for the official
+documentation.</p>
+<p>The <code>--command-name</code> argument can be used to specify a different command to be
+run instead of the default <code>cargo</code>. For instance, one might use
+<code>--command-name=cross</code> for certain operations in a cross-compiled build using
+the <a href="https://github.com/rust-embedded/cross">rust-embedded/cross</a> framework.</p>
+<p>The <code>--pause</code> argument causes the command to pause for the specified number of
+seconds between invocations of <code>cargo</code> commands, when more than one command is
+to be run. This is aimed at <code>cargo publish</code> workflows, where you can encounter
+errors if you try to publish several interdependent crates in rapid succession.
+The problem appears to be that Crates.io checks the dependency specifications of
+crates as they’re published, and if one crate requires a version of another that
+was <em>just</em> published, the check fails. As of writing we don’t know how much of a
+delay is enough to avoid this problem, but the Crates.io index repository is
+sometimes updated multiple times in the same minute, so something like thirty
+seconds is hopefully sufficient.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-cargo-package-released-binaries"><a class="header" href="#cranko-cargo-package-released-binaries"><code>cranko cargo package-released-binaries</code></a></h1>
+<p>Create archives of the binary files associated with all Rust/<a href="https://doc.rust-lang.org/cargo/">Cargo</a> projects
+that have had new releases.</p>
+<h4 id="usage-7"><a class="header" href="#usage-7">Usage</a></h4>
+<pre><code>cranko cargo package-released-binaries
+    [--command-name=COMMAND]
+    [--reroot=PREFIX]
+    --target {TARGET}
+    {DEST-DIR} -- [CARGO-ARGS...]
+</code></pre>
+<p>This command should be run in CI processing of an update to the <code>rc</code> branch,
+after the release has been vetted and the release commit has been created. The
+current branch should be the <code>release</code> branch.</p>
+<h4 id="example-5"><a class="header" href="#example-5">Example</a></h4>
+<pre><code class="language-shell">$ cranko cargo package-released-binaries -t $target /tmp/artifacts/ -- build --release
+
+$ cranko cargo package-released-binaries \
+  --command-name=cross \
+  --reroot=$(pwd) \
+  -t $target \
+  /tmp/artifacts/ \
+  -- build --target=$target --features=vendored-openssl --release
+</code></pre>
+<p>For each <a href="https://doc.rust-lang.org/cargo/">Cargo</a> project known to Cranko that has a new release, this command
+creates a <code>.tar.gz</code> or Zip archive file of its associated binaries, if they
+exist. These archive files are placed in the <code>{DEST-DIR}</code> directory
+(<code>/tmp/artifacts</code>) in the example. These can be publicized as convenient release
+artifacts for projects that are delivered as standalone executables.</p>
+<p>In order to discover these binaries, Cranko must run <code>cargo build</code>, or a similar
+command, for each released project. In particular, it must run a Cargo command
+that accepts the <code>--message-format=json</code> argument and outputs information about
+compiler artifacts. Typically, the command of interest would be <code>cargo build --release</code>, in which case the command line to this tool should end with <code>-- build --release</code>. However, you might want to include feature flags or other
+selectors as appropriate. The <code>--message-flags=json</code> argument will be
+automatically (and unconditionally) appended.</p>
+<p>Unlike <a href="commands/cicd/./cargo-foreach-released.html"><code>cranko cargo foreach-released</code></a>, this
+command selects projects by passing a <code>--package=</code> argument to the subcommand,
+rather than changing the starting directory in which it is invoked. This
+behavior is needed for the analysis to work when passing through to <code>cross</code> (see
+below) when there are any Rust packages not rooted at the repository root.</p>
+<p>The created archive files will be named according to the format
+<code>{cratename}-{version}-{target}.{format}</code>. The archive format is <code>.tar.gz</code> on
+all platforms except Windows, for which it is <code>.zip</code>. This format is chosen by
+parsing the <code>-t</code>/<code>--target</code> argument, <em>not</em> by examining the host platform
+information.</p>
+<p>Within the archive files, the executables will be included with no pathing
+information. In the typical case that there is a Cargo project named <code>foo</code> with
+an associated binary also named <code>foo</code>, the archive will unpack into a single
+file named <code>foo</code> or <code>foo.exe</code>. If the project contains multiple binaries, the
+archive will contain all of them (unless you add a <code>--bin</code> option to the Cargo
+arguments).</p>
+<p>The <code>--command-name</code> argument can be used to specify a different command to be
+run instead of the default <code>cargo</code>. For instance, one might use
+<code>--command-name=cross</code> for certain operations in a cross-compiled build using
+the <a href="https://github.com/rust-embedded/cross">rust-embedded/cross</a> framework.</p>
+<p>The <code>--reroot</code> argument can be used to rewrite the paths returned by the build
+tool. This extremely specific operation is needed for the <a href="https://github.com/rust-embedded/cross">rust-embedded/cross</a>
+framework, which runs inside a Docker container and therefore returns paths that
+look like <code>/target/$arch/debug/...</code>. The value of this argument is naively
+prepended to whatever paths are returned from the tool. In the
+<a href="https://github.com/rust-embedded/cross">rust-embedded/cross</a> case, therefore, <code>--reroot=.</code> obtains paths that are
+meaningful on the build host.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-ci-util-env-to-file"><a class="header" href="#cranko-ci-util-env-to-file"><code>cranko ci-util env-to-file</code></a></h1>
+<p>Write the contents of an environment variable to a file, securely.</p>
+<h4 id="usage-8"><a class="header" href="#usage-8">Usage</a></h4>
+<pre><code>cranko ci-util env-to-file
+  [--decode=[text,base64]]
+  {VAR-NAME} {FILE-PATH}
+</code></pre>
+<p>This command examines the value of an environment variable <code>{VAR-NAME}</code> and
+writes it to a file on disk at <code>{FILE-PATH}</code>. Many CI systems expose credentials
+and other secret values as environment variables, and sometimes one needs to get
+these values into a file on disk for use by an external program. This tool
+provides a relatively secure mechanism for doing so, because it avoids inserting
+the variable’s value into the command-line arguments of an external program,
+which is generally unavoidable when trying to accomplish this effect within a
+shell script.</p>
+<h4 id="example-6"><a class="header" href="#example-6">Example</a></h4>
+<pre><code class="language-shell">$ cranko ci-util env-to-file --decode=base64 SECRET_KEY_BASE64 secret.key
+</code></pre>
+<p>Note that the variable name is written undecorated, without a leading <code>$</code> or
+wrapping <code>%%</code>. This is vital! Otherwise your shell will expand the value of the
+variable before running the command, which will not only cause it to fail, but
+will defeat the whole goal of the command, which is to avoid revealing the
+variable’s value on the terminal.</p>
+<p>The <code>--decode</code> option specifies how the value of the variable should be decoded
+before writing to disk. In the default, <code>text</code>, the variable’s value is treated
+as Unicode text, in whatever standard is most appropriate for the operating
+system, and written to the file in UTF-8 encoding. If the mode is <code>base64</code>, the
+variable’s value is taken to be base64-encoded text, and the decoded binary data
+are written out.</p>
+<p>The file on disk is created in “exclusive” mode, such that the tool will exit
+with an error if the file already exists. On Unix systems, it is created such
+that only the owning user has any access permissions (mode 0o600).</p>
+<p>Files created with this tool should be scrubbed off of the filesystem after they
+are no longer needed with an approprite utility such as <code>shred</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-github-create-custom-release"><a class="header" href="#cranko-github-create-custom-release"><code>cranko github create-custom-release</code></a></h1>
+<p>Create a new <a href="https://docs.github.com/en/github/administering-a-repository/about-releases">GitHub release</a> with customized metadata. You
+probably ought to be using <a href="commands/cicd/./github-create-releases.html"><code>cranko github create-releases</code></a> instead.</p>
+<h4 id="usage-9"><a class="header" href="#usage-9">Usage</a></h4>
+<pre><code>cranko github create-custom-release
+  [--draft]
+  [--prerelease]
+  --name {NAME}
+  [--desc {DESC}]
+  {TAG-NAME}
+</code></pre>
+<p>This command creates a new release on GitHub associated with the tag
+<code>{TAG-NAME}</code>, which should have already been pushed to the GitHub repository.</p>
+<p>You should probably using <a href="commands/cicd/./github-create-releases.html"><code>cranko github create-releases</code></a> instead of this command. The
+<code>create-releases</code> command efficiently handles monorepos with multiple packages
+that may be released at different times, and it automatically calculates the tag
+name, release name, and release description to use for each release. <em>This</em>
+command should be used only to create GitHub releases that are not associated
+with particular projects within the source repository. The motivating use case
+is the creation of a special “continuous” GitHub prerelease that is deleted (see
+<a href="commands/cicd/./github-delete-release.html"><code>cranko github delete-release</code></a>) and recreated with
+each update to a project’s main development branch. Note that this command is
+essentially decoupled from Cranko’s project-management infrastructure; all it
+does is leverage its GitHub API authentication hooks.</p>
+<p>By default, GitHub associates each release with a tarball and zipball of the
+repository contents at the time of the release. If you want to associate
+additional artifacts, use <a href="commands/cicd/./github-upload-artifacts.html"><code>cranko github upload-artifacts</code></a> with the <code>--by-tag</code> option.</p>
+<p>Note that GitHub “draft” releases seem to be treated a bit specially by the API.
+If you create a draft release with this command, some other release-related
+operations may not work. (If you encounter such a case, please add it to the
+documentation here.)</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-github-create-releases"><a class="header" href="#cranko-github-create-releases"><code>cranko github create-releases</code></a></h1>
+<p>Create new <a href="https://docs.github.com/en/github/administering-a-repository/about-releases">GitHub releases</a> associated with all projects that have
+had releases.</p>
+<h4 id="usage-10"><a class="header" href="#usage-10">Usage</a></h4>
+<pre><code>cranko github create-releases [PROJECT-NAMES...]
+</code></pre>
+<p>This command should be run in CI processing of an update to the <code>rc</code> branch,
+after the release has been vetted and the release commit has been created. The
+current branch should be the <code>release</code> branch.</p>
+<p>If <code>{PROJECT-NAMES}</code> is unspecified, creates releases for all projects that were
+released in this run. Otherwise, creates releases only for the name projects,
+<em>if</em> they have been released in this run. If an unreleased project is named, a
+warning is issued and the project is ignored.</p>
+<p>The GitHub releases are identified by the project name and have their
+description populated with the project release notes. By default, GitHub
+associates each release with a tarball and zipball of the repository contents at
+the time of the release. If you want to associate additional artifacts, use
+<a href="commands/cicd/./github-upload-artifacts.html">cranko github upload-artifacts</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-github-delete-release"><a class="header" href="#cranko-github-delete-release"><code>cranko github delete-release</code></a></h1>
+<p>Delete a <a href="https://docs.github.com/en/github/administering-a-repository/about-releases">GitHub release</a> associated with a given tag name.</p>
+<h4 id="usage-11"><a class="header" href="#usage-11">Usage</a></h4>
+<pre><code>cranko github delete-release {TAG-NAME}
+</code></pre>
+<p>This command deletes the GitHub release associated with <code>{TAG-NAME}</code>.</p>
+<p>This command is essentially a generic utility that leverages Cranko’s GitHub
+integration. It is provided to support use cases that maintain a “continuous
+deployment” release on GitHub that is always associated with the latest push to
+a branch (such as <code>master</code>). In such a use case, on every update to the branch
+in question, you’ll want to delete the existing release, then recreate it and
+re-populate its artifacts.</p>
+<p>Note that this command has no safety checks or “are you sure?” prompts.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-github-install-credential-helper"><a class="header" href="#cranko-github-install-credential-helper"><code>cranko github install-credential-helper</code></a></h1>
+<p>Install Cranko as a Git <a href="https://git-scm.com/docs/gitcredentials">credential helper</a> that will return a
+<a href="https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token">GitHub Personal Access Token (PAT)</a> stored in the environment variable
+<code>GITHUB_TOKEN</code>.</p>
+<h4 id="usage-12"><a class="header" href="#usage-12">Usage</a></h4>
+<pre><code>cranko github install-credential-helper
+</code></pre>
+<p>This command modifies the user-global Git configuration file to install Cranko
+as a “<a href="https://git-scm.com/docs/gitcredentials">credential helper</a>” program that Git uses to
+authenticate with remove servers. This particular credential helper uses the
+<code>GITHUB_TOKEN</code> environment variable to authenticate.</p>
+<p>Nothing about this command is specific to the Cranko infrastructure. It just
+comes in handy because Cranko projects need to be able to push to their upstream
+repositories from CI/CD, and this is tedious to configure without a helper tool.</p>
+<p>Furthermore, the only way in which this command is specific to GitHub is in the
+name of the environment variable it references, <code>GITHUB_TOKEN</code>.</p>
+<p>The installed credential helper is implemented with a hidden sub-command <code>cranko github _credential-helper</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-github-upload-artifacts"><a class="header" href="#cranko-github-upload-artifacts"><code>cranko github upload-artifacts</code></a></h1>
+<p>Upload artifact files to be associated with a <a href="https://docs.github.com/en/github/administering-a-repository/about-releases">GitHub release</a>.</p>
+<h4 id="usage-13"><a class="header" href="#usage-13">Usage</a></h4>
+<pre><code>cranko github upload-artifacts
+  [--overwrite]
+  [--by-tag]
+  {PROJECT-NAME} {PATH1 [PATH2...]}
+</code></pre>
+<p>This command will upload several local files to GitHub and associate them with
+a <a href="https://docs.github.com/en/github/administering-a-repository/about-releases">GitHub release</a>.</p>
+<p>The command operates in two modes. By default, the release that’s modified is
+the one associated with the Cranko project <code>{PROJECT-NAME}</code>, which is expected
+to have been released in the current <code>rc</code> run. That release should have been
+created by the <a href="commands/cicd/./github-create-releases.html"><code>cranko github create-releases</code></a>
+command. In this situation, this command should be run in CI processing of an
+update to the <code>rc</code> branch, after the release has been vetted and the release
+commit has been created. The current branch should be the <code>release</code> branch.</p>
+<p>Alternatively, if the <code>--by-tag</code> option is given, the <code>{PROJECT-NAME}</code> argument
+is treated as a Git tag name that will be looked up directly on GitHub. This
+mode is useful if you are trying to upload artifacts associated with a release
+created with <a href="commands/cicd/./github-create-custom-release.html"><code>cranko github create-custom-release</code></a>. In this case, the
+notion of the “current release” is not necessary, so Cranko’s checks for the
+state of the environment are not invoked.</p>
+<p>This command assumes that a <a href="commands/cicd/gh-pats">GitHub Personal Access Token (PAT)</a> is
+available in an environment variable named <code>GITHUB_TOKEN</code>.</p>
+<p>Because it does not make sense for this command to parallelize over released
+projects, it has relatively few tie-ins with the Cranko infrastructure. The key
+touch-point is how, in the default mode, this command uses the Cranko release
+information and project name to know which Git tag the artifact files should be
+associated with.</p>
+<h4 id="example-7"><a class="header" href="#example-7">Example</a></h4>
+<pre><code class="language-shell"># `rc` branch; we know that project foo_data has been released
+$ cranko github create-releases foo_data
+$ cranko github upload-artifacts foo_data compiled_v1.dat compiled_v2.data
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-npm-foreach-released"><a class="header" href="#cranko-npm-foreach-released"><code>cranko npm foreach-released</code></a></h1>
+<p>Run a command for all <a href="https://npmjs.com/">npm</a> projects that have had new releases.</p>
+<h4 id="usage-14"><a class="header" href="#usage-14">Usage</a></h4>
+<pre><code>cranko npm foreach-released [--] [COMMAND...]
+</code></pre>
+<p>This command should be run in CI processing of an update to the <code>rc</code> branch.</p>
+<h4 id="example-8"><a class="header" href="#example-8">Example</a></h4>
+<pre><code class="language-shell">$ cranko npm foreach-released -- npm publish
+</code></pre>
+<p>This would run <a href="https://docs.npmjs.com/cli/publish"><code>npm publish</code></a> for each released package — which is
+basically the whole reason that this command exists. The command is run “for”
+each package in the sense that the initial directory of each executed command is
+the directory containing the package’s <code>package.json</code> file.</p>
+<p>Automated publishing requires an NPM registry authentication token. Such a token
+can be securely installed into the per-user <code>.npmrc</code> configuration file with
+<a href="commands/cicd/./npm-install-token.html"><code>cranko npm install-token</code></a>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-npm-install-token"><a class="header" href="#cranko-npm-install-token"><code>cranko npm install-token</code></a></h1>
+<p>Install an <a href="https://docs.npmjs.com/about-authentication-tokens">NPM authentication token</a> into the per-user <code>.npmrc</code>
+or <code>.yarnrc.yml</code> configuration file to enable the publishing of NPM packages.</p>
+<h4 id="usage-15"><a class="header" href="#usage-15">Usage</a></h4>
+<pre><code>cranko npm install-token [--yarn] [--registry=REGISTRY]
+</code></pre>
+<p>This command appends a user-global configuration file to include an
+authentication token from the environment variable <code>NPM_TOKEN</code>.</p>
+<p>By default, the configuration is targeted at the <code>npm</code> command: the <code>.npmrc</code>
+file is edited, and the default <code>REGISTRY</code> is <code>//registry.npmjs.org/</code>.</p>
+<p>If the <code>--yarn</code> option is specified, the <code>.yarnrn.yml</code> file is instead edited,
+and the default <code>REGISTRY</code> is <code>https://registry.yarnpkg.com/</code>. Note that in this
+mode the name of the input environment variable is still <code>NPM_TOKEN</code>. The same
+token will work with Yarn, but needs to be placed in this different file in
+order for the <code>yarn npm publish</code> command to work.</p>
+<p>Nothing about this command is specific to the Cranko infrastructure. It just
+comes in handy because publishing to NPM is a common release automation task,
+and there aren’t many good ways to get a credential like <code>$NPM_TOKEN</code> from the
+environment into a file without exposing it on the command line of a program.</p>
+<p>For maximum security, the <code>.npmrc</code> or <code>.yarnrc.yml</code> file should be destroyed
+with a tool like <code>shred</code> after it is no longer needed.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-npm-lerna-workaround"><a class="header" href="#cranko-npm-lerna-workaround"><code>cranko npm lerna-workaround</code></a></h1>
+<p>Rewrite internal version requirements of <a href="https://npmjs.com/">npm</a> projects so that <a href="https://lerna.js.org/">Lerna</a> will
+understand them.</p>
+<h4 id="usage-16"><a class="header" href="#usage-16">Usage</a></h4>
+<pre><code>cranko npm lerna-workaround
+</code></pre>
+<p>This command will rewrite the <code>package.json</code> files of your NPM projects.</p>
+<h4 id="example-9"><a class="header" href="#example-9">Example</a></h4>
+<p>The <a href="https://lerna.js.org/">Lerna</a> tool is somewhat limited in its understanding of <a href="commands/cicd/../../concepts/internal-dependencies.html">internal
+dependencies</a> within a repository. If
+projects A and B are both at version 0.3,
+and project B states a requirement on version 0.3 of project A, Lerna
+understands the dependency. However, if project B only requires version 0.2 of
+project A, Lerna won't realize that the interdependency is internal. This will
+cause its understanding of the project dependency ordering to be incomplete,
+potentially leading to build-time errors.</p>
+<p>This command can temporarily rewrite your files so that Lerna will correctly
+understand the internal dependencies. Once you are done using Lerna, you can use
+Git to revert the changes, restoring your packages to be annotated with the
+correct dependencies.</p>
+<p>A sample CI workflow might look like:</p>
+<pre><code class="language-shell">$ cranko release-workflow apply-versions  # write correct versions
+$ git add .
+$ cranko release-workflow commit  # save them in a release commit
+$ cranko npm lerna-workaround  # write fake dep values to working tree
+$ lerna bootstrap  # do Lerna-y stuff
+$ lerna run build
+    ...
+$ lerna run test  # done with Lerna
+$ git checkout .  # throw away fake deps
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-python-foreach-released"><a class="header" href="#cranko-python-foreach-released"><code>cranko python foreach-released</code></a></h1>
+<p>Run a command for all <a href="https://www.pypa.io/">PyPA</a> projects that have had new releases.</p>
+<h4 id="usage-17"><a class="header" href="#usage-17">Usage</a></h4>
+<pre><code>cranko python foreach-released [--] [COMMAND...]
+</code></pre>
+<p>This command should be run in CI processing of an update to the <code>rc</code> branch.</p>
+<h4 id="example-10"><a class="header" href="#example-10">Example</a></h4>
+<pre><code class="language-shell">$ cranko python foreach-released -- touch upload-me.txt
+</code></pre>
+<p>This would run the command <code>touch upload-me.txt</code> for each released Python
+package. The command is run “for” each package in the sense that the initial
+directory of each executed command is the directory containing the package’s
+project meta-files.</p>
+<p>Note that this command is not so useful because the recommended PyPA publishing
+command, <a href="https://twine.readthedocs.io/en/latest/#twine-upload"><code>twine upload</code></a>, needs to be passed the name of the distribution
+file(s) to upload, and this Cranko command currently doesn’t give you a
+convenient way to interpolate those names. This feature isn’t fully baked
+because we’re unaware of any examples of single repositories containing multiple
+Python projects, so “vectorization” over all Python releases isn’t needed. For
+now, check whether your Python project was released using <a href="commands/cicd/../util/show.html#cranko-show-if-released"><code>cranko show if-released</code></a>, and run its publishing commands manually.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-python-install-token"><a class="header" href="#cranko-python-install-token"><code>cranko python install-token</code></a></h1>
+<p>Install a <a href="https://pypi.org/help/#apitoken">PyPI authentication token</a> into the per-user <code>.pypirc</code>
+configuration file to enable the publishing of Python packages to <a href="https://pypi.org/">PyPI</a>.</p>
+<h4 id="usage-18"><a class="header" href="#usage-18">Usage</a></h4>
+<pre><code>cranko python install-token [--repository=REPO]
+</code></pre>
+<p>This command appends the user-global python configuration file <code>.pypirc</code> to
+include an authentication token from the environment variable <code>PYPI_TOKEN</code>. The
+default <code>REPO</code> is <code>pypi</code>.</p>
+<p>Nothing about this command is specific to the Cranko infrastructure. It just
+comes in handy because publishing to PyPI is a common release automation task,
+and there aren’t many good ways to get a credential like <code>$PYPI_TOKEN</code> from the
+environment into a file without exposing it on the command line of a program.</p>
+<p>For maximum security, the <code>.pypirc</code> file should be destroyed with a tool like
+<code>shred</code> after it is no longer needed.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-release-workflow-apply-versions"><a class="header" href="#cranko-release-workflow-apply-versions"><code>cranko release-workflow apply-versions</code></a></h1>
+<p>Edit the files in the working tree to apply the version numbers requested in the
+current <code>rc</code> release request.</p>
+<h4 id="usage-19"><a class="header" href="#usage-19">Usage</a></h4>
+<pre><code>cranko release-workflow apply-versions [--force]
+</code></pre>
+<p>This command should be run as early as possible in all forms of your CI/CD
+pipeline. It will rewrite your project metadata files (<code>package.json</code>,
+<code>Cargo.toml</code>, etc.) to apply new version numbers as needed. On pushes to the
+<code>rc</code> branch, if the CI test suite passes, a final release commit should be
+created with <a href="commands/cicd/./release-workflow-commit.html"><code>cranko release-workflow commit</code></a>
+and then pushed to the upstream <code>release</code> branch to “lock in” the requested
+releases.</p>
+<p>For each project, new versions are computed by applying a “bump specification” to
+the version logged in the metadata of the most recent commit on the <code>release</code>
+branch. If that branch does not exist, and for newly-created projects, the
+reference version defaults to <code>0.0.0</code> or its equivalent. For pushes to the <code>rc</code>
+branch, projects whose releases have been requested have bumps applied based on
+the metadata of the <code>rc</code> release request. In other cases — such as PRs or pushes
+to the main development branch — all project versions are bumped using the
+default ”development mode” scheme, which usually applies a datecode or some
+other kind of informal identifier. Artifacts built in this mode should not be
+released openly.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-release-workflow-commit"><a class="header" href="#cranko-release-workflow-commit"><code>cranko release-workflow commit</code></a></h1>
+<p>Commit staged changes to the <code>release</code> branch, recording information about new
+releases.</p>
+<h4 id="usage-20"><a class="header" href="#usage-20">Usage</a></h4>
+<pre><code>cranko release-workflow commit [--force]
+</code></pre>
+<p>This command should be run in CI processing of an update to the <code>rc</code> branch,
+after the release has been vetted. The current branch should be the <code>rc</code> branch.
+This command will switch the current branch to the <code>release</code> branch, pointing at
+the new release commit.</p>
+<p>This command should be run after <a href="commands/cicd/./release-workflow-apply-versions.html"><code>cranko release-workflow apply-versions</code></a> to create the final <code>release</code> commit marking
+the successful release of the packages submitted as part of the current <code>rc</code>
+request. It can be run either before or after the release request is confirmed
+to be successful; but if it is run before, care should be taken that the commit
+is pushed to the upstream repository <em>if and only if</em> the CI tests are
+successful.</p>
+<p>Unlike <a href="commands/cicd/../dev/confirm.html"><code>cranko confirm</code></a>, this command respects the Git
+staging workflow, operating like <code>git commit</code> itself. Before running this
+command, you should first run <code>git add .</code> or something similar before it to
+stage all changed files. Note that in some workflows, a full build will result
+in modifications to files beyond those edited by the <a href="commands/cicd/./release-workflow-apply-versions.html"><code>apply versions</code></a> command, although ideally this should happen as
+minimally as possible. For instance, while Cranko can rewrite a <code>Cargo.toml</code>
+file for you, it does not attempt to rewrite <code>Cargo.lock</code>, which will instead be
+updated by the next call to <code>cargo build</code> or a similar command. Therefore, you
+should make sure that your <code>git add</code> command includes both the <code>Cargo.toml</code>
+<em>and</em> the <code>Cargo.lock</code> files when staging for the release commit.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-release-workflow-tag"><a class="header" href="#cranko-release-workflow-tag"><code>cranko release-workflow tag</code></a></h1>
+<p>Create Git tags corresponding to the projects that were released in an <code>rc</code>
+build.</p>
+<h4 id="usage-21"><a class="header" href="#usage-21">Usage</a></h4>
+<pre><code>cranko release-workflow tag
+</code></pre>
+<p>This command should be run in CI processing of an update to the <code>rc</code> branch,
+after the release has been vetted and the release commit has been created. The
+current branch should be the <code>release</code> branch.</p>
+<p>For every project that was released in this <code>rc</code> submission, a new Git version
+tag is created according to its tag name format. These tags should then be
+pushed to the upstream with <code>git push --tags</code>.</p>
+<h4 id="example-11"><a class="header" href="#example-11">Example</a></h4>
+<pre><code class="language-shell">$ cranko release-workflow tag
+info: created tag cranko@0.0.12 pointing at HEAD (e71c2aa)
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-zenodo-preregister"><a class="header" href="#cranko-zenodo-preregister"><code>cranko zenodo preregister</code></a></h1>
+<p>Prepare a new <a href="https://help.zenodo.org/">Zenodo deposit</a> to be associated with a
+release of a project.</p>
+<h4 id="usage-22"><a class="header" href="#usage-22">Usage</a></h4>
+<pre><code>cranko zenodo preregister
+  [--force] [-f]
+  --metadata=JSON5-FILE
+  PROJECT-NAME
+  REWRITE-FILES[...]
+</code></pre>
+<p>This command should be run in CI processing of an update to the <code>rc</code> branch,
+before <a href="commands/cicd/./release-workflow-commit.html"><code>cranko release-workflow commit</code></a>.</p>
+<h4 id="example-12"><a class="header" href="#example-12">Example</a></h4>
+<pre><code>cranko zenodo preregister --metadata=ci/zenodo.json5 cranko src/main.rs
+</code></pre>
+<p>This will preregister a new Zenodo deposit for the <code>cranko</code> project, using
+metadata from the file <code>ci/zenodo.json5</code>. Both that file and <code>src/main.rs</code> will
+be rewritten to contain DOI information generated by the preregistration.</p>
+<h4 id="remarks-2"><a class="header" href="#remarks-2">Remarks</a></h4>
+<p>See <a href="commands/cicd/../../integrations/zenodo.html">the Zenodo integration documentation</a> for an overview and description
+of Cranko's support for Zenodo deposition, including the rewrite format used by
+this command. See <a href="commands/cicd/../../configuration/zenodo.html">Zenodo Metadata Files</a> for a specification of the
+metadata file used by this command.</p>
+<p>This command can be run during pull requests, not just during formal releases.
+In that case, fake DOIs will be used for the rewrite steps. These are guaranteed
+to start with the text <code>"xx.xxxx/"</code>, unlike real DOIs which always start with
+<code>10.</code>. The DOIs should be obviously fake to any user that sees them, but if you
+have code that embeds or outputs those DOIs, you may wish to add tests that
+check for these fake values and issue warnings as appropriate.</p>
+<p>This command requires that the environment variable <code>ZENODO_TOKEN</code> has been set
+to a Zenodo API token, <em>during release processing only</em>. During pull request
+processing, you should make sure <strong>not</strong> to provide this parameter, so that it
+is not accessible to malicious submissions. As a precaution, in the latter
+circumstance, the command will exit with an error if the environment variable is
+non-empty.</p>
+<h4 id="see-also"><a class="header" href="#see-also">See also</a></h4>
+<ul>
+<li><a href="commands/cicd/../../integrations/zenodo.html">Integrations: Zenodo</a></li>
+<li><a href="commands/cicd/../../configuration/zenodo.html">Configuration: Zenodo Metadata Files</a></li>
+<li><a href="commands/cicd/./release-workflow-commit.html"><code>cranko release-workflow commit</code></a></li>
+<li><a href="commands/cicd/./zenodo-upload-artifacts.html"><code>cranko zenodo upload-artifacts</code></a></li>
+<li><a href="commands/cicd/./zenodo-publish.html"><code>cranko zenodo publish</code></a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-zenodo-publish"><a class="header" href="#cranko-zenodo-publish"><code>cranko zenodo publish</code></a></h1>
+<p>Publish a new <a href="https://help.zenodo.org/">Zenodo deposit</a>, triggering
+registration of its DOI.</p>
+<h4 id="usage-23"><a class="header" href="#usage-23">Usage</a></h4>
+<pre><code>cranko zenodo publish
+  [--force] [-f]
+  --metadata=JSON5-FILE
+</code></pre>
+<p>This command should be run in CI processing of an update to the <code>rc</code> branch,
+after <a href="commands/cicd/./zenodo-preregister.html"><code>cranko zenodo preregister</code></a> and any invocations of
+<a href="commands/cicd/./zenodo-upload-artifacts.html"><code>cranko zenodo upload-artifacts</code></a>.</p>
+<h4 id="example-13"><a class="header" href="#example-13">Example</a></h4>
+<pre><code>cranko zenodo publish --metadata=ci/zenodo.json5
+</code></pre>
+<p>This will publish the Zenodo deposit whose metadata are tracked in the file
+<code>ci/zenodo.json5</code>.</p>
+<h4 id="remarks-3"><a class="header" href="#remarks-3">Remarks</a></h4>
+<p>See <a href="commands/cicd/../../integrations/zenodo.html">the Zenodo integration documentation</a> for an overview and description
+of Cranko's support for Zenodo deposition. See <a href="commands/cicd/../../configuration/zenodo.html">Zenodo Metadata Files</a>
+for a specification of the metadata file used by this command.</p>
+<p>This command requires that the environment variable <code>ZENODO_TOKEN</code> has been
+set to a Zenodo API token.</p>
+<p>This command should only be run during formal releases, and not during pull
+requests. Note also that you can choose to <em>not</em> run this command in your CI/CD
+pipeline, and instead manually publish your Zenodo deposit after review by a
+human. That may be tempting, because Zenodo deposits cannot be changed once they
+are published. However, our experience is that it is more reliable and more
+convenient to fully automate the publication process and fix bugs in that
+automation as they arise, rather than including a human in the loop. If releases
+and deposits are “cheap”, there’s no problem with superseding them when one
+turns out to have a problem.</p>
+<h4 id="see-also-1"><a class="header" href="#see-also-1">See also</a></h4>
+<ul>
+<li><a href="commands/cicd/../../integrations/zenodo.html">Integrations: Zenodo</a></li>
+<li><a href="commands/cicd/../../configuration/zenodo.html">Configuration: Zenodo Metadata Files</a></li>
+<li><a href="commands/cicd/./zenodo-preregister.html"><code>cranko zenodo preregister</code></a></li>
+<li><a href="commands/cicd/./zenodo-upload-artifacts.html"><code>cranko zenodo upload-artifacts</code></a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-zenodo-upload-artifacts"><a class="header" href="#cranko-zenodo-upload-artifacts"><code>cranko zenodo upload-artifacts</code></a></h1>
+<p>Upload files to be associated with an in-progress <a href="https://help.zenodo.org/">Zenodo
+deposit</a>.</p>
+<h4 id="usage-24"><a class="header" href="#usage-24">Usage</a></h4>
+<pre><code>cranko zenodo upload-artifacts
+  [--force] [-f]
+  --metadata=JSON5-FILE
+  FILES[...]
+</code></pre>
+<p>This command should be run in CI processing of an update to the <code>rc</code> branch,
+after <a href="commands/cicd/./zenodo-preregister.html"><code>cranko zenodo preregister</code></a> and before <a href="commands/cicd/./zenodo-publish.html"><code>cranko zenodo publish</code></a>.</p>
+<h4 id="example-14"><a class="header" href="#example-14">Example</a></h4>
+<pre><code>cranko zenodo upload-artifacts --metadata=ci/zenodo.json5 build/mypackage-0.1.0.tar.gz
+</code></pre>
+<p>This will upload the file <code>build/mypackage-0.1.0.tar.gz</code> and associate it with
+the Zenodo deposit whose metadata are tracked in the file <code>ci/zenodo.json5</code>.</p>
+<h4 id="remarks-4"><a class="header" href="#remarks-4">Remarks</a></h4>
+<p>See <a href="commands/cicd/../../integrations/zenodo.html">the Zenodo integration documentation</a> for an overview and description
+of Cranko's support for Zenodo deposition. See <a href="commands/cicd/../../configuration/zenodo.html">Zenodo Metadata Files</a>
+for a specification of the metadata file used by this command.</p>
+<p>This command requires that the environment variable <code>ZENODO_TOKEN</code> has been
+set to a Zenodo API token.</p>
+<p>This command should only be run during formal releases, and not during pull
+requests.</p>
+<h4 id="see-also-2"><a class="header" href="#see-also-2">See also</a></h4>
+<ul>
+<li><a href="commands/cicd/../../integrations/zenodo.html">Integrations: Zenodo</a></li>
+<li><a href="commands/cicd/../../configuration/zenodo.html">Configuration: Zenodo Metadata Files</a></li>
+<li><a href="commands/cicd/./zenodo-preregister.html"><code>cranko zenodo preregister</code></a></li>
+<li><a href="commands/cicd/./zenodo-publish.html"><code>cranko zenodo publish</code></a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-git-util-reboot-branch"><a class="header" href="#cranko-git-util-reboot-branch"><code>cranko git-util reboot-branch</code></a></h1>
+<p>This command resets this history of a Git branch to be a single commit
+containing a specified tree of files. It can be useful to update <a href="https://pages.github.com/">GitHub
+Pages</a> or similar services that publish content based on a Git branch
+that whose history is unimportant.</p>
+<h4 id="usage-25"><a class="header" href="#usage-25">Usage</a></h4>
+<pre><code>cranko git-util reboot-branch [-m {MESSAGE}] {BRANCH} {ROOTDIR}
+</code></pre>
+<p>Rewrites the local version of the Git branch <code>{BRANCH}</code> to contain a single
+commit whose contents are those of the directory <code>{ROOTDIR}</code>. If specified,
+<code>{MESSAGE}</code> is used as the Git commit message. The commit author is generic.</p>
+<p>The history of the named branch is completely obliterated. If it is to be pushed
+to any remotes, it will need to be force-pushed.</p>
+<h4 id="example-15"><a class="header" href="#example-15">Example</a></h4>
+<pre><code class="language-shell"># During CI build/test of `rc` commit:
+$ ./website/generate.sh
+# After release is locked in:
+$ cranko git-util reboot-branch gh-pages ./website/content/
+$ git push -f origin gh-pages
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-help"><a class="header" href="#cranko-help"><code>cranko help</code></a></h1>
+<p>Prints out help information</p>
+<h4 id="usage-26"><a class="header" href="#usage-26">Usage</a></h4>
+<pre><code class="language-shell">cranko help {COMMAND}
+</code></pre>
+<p>This is equivalent to <code>cranko {COMMAND} --help</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-list-commands"><a class="header" href="#cranko-list-commands"><code>cranko list-commands</code></a></h1>
+<p>This command prints out the sub-commands of <code>cranko</code> that are available.</p>
+<h4 id="usage-27"><a class="header" href="#usage-27">Usage</a></h4>
+<pre><code>cranko list-commands
+</code></pre>
+<h4 id="example-16"><a class="header" href="#example-16">Example</a></h4>
+<pre><code>$ cranko list-commands
+Currently available "cranko" subcommands:
+
+    confirm
+    git-util
+    github
+    help
+    list-commands
+    release-workflow
+    show
+    stage
+    status
+</code></pre>
+<p>If a command is available in <code>$PATH</code> under the name <code>cranko-extension</code>, it will
+be available as <code>cranko extension</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cranko-show"><a class="header" href="#cranko-show"><code>cranko show</code></a></h1>
+<p>The <code>cranko show</code> command displays various potentially useful pieces of
+information about Cranko, its execution environment, and so on. It provides
+several subcommands:</p>
+<ul>
+<li><a href="commands/util/show.html#cranko-show-cranko-concept-doi"><code>cranko show cranko-concept-doi</code></a></li>
+<li><a href="commands/util/show.html#cranko-show-cranko-version-doi"><code>cranko show cranko-version-doi</code></a></li>
+<li><a href="commands/util/show.html#cranko-show-if-released"><code>cranko show if-released</code></a></li>
+<li><a href="commands/util/show.html#cranko-show-tctag"><code>cranko show tctag</code></a></li>
+<li><a href="commands/util/show.html#cranko-show-toposort"><code>cranko show toposort</code></a></li>
+<li><a href="commands/util/show.html#cranko-show-version"><code>cranko show version</code></a></li>
+</ul>
+<h2 id="cranko-show-cranko-concept-doi"><a class="header" href="#cranko-show-cranko-concept-doi"><code>cranko show cranko-concept-doi</code></a></h2>
+<p>This commands prints the <a href="https://help.zenodo.org/">concept DOI</a> associated with
+the Cranko software package.</p>
+<h4 id="usage-28"><a class="header" href="#usage-28">Usage</a></h4>
+<pre><code>cranko show cranko-concept-doi
+</code></pre>
+<h4 id="remarks-5"><a class="header" href="#remarks-5">Remarks</a></h4>
+<p>The printed <a href="https://www.doi.org/">DOI</a> is a citeable identifier associated with
+Cranko that will never change. Each individual release of Cranko is also
+associated with a “version DOI”, which you can use to log the specific version
+of Cranko that you used in a particular workflow. Citation metadata link the
+different version DOIs through the concept DOI.</p>
+<p>You are unlikely to need this command in everyday workflows.</p>
+<h2 id="cranko-show-cranko-version-doi"><a class="header" href="#cranko-show-cranko-version-doi"><code>cranko show cranko-version-doi</code></a></h2>
+<p>This commands prints the <a href="https://www.doi.org/">DOI</a> associated with the currently
+running version of Cranko.</p>
+<h4 id="usage-29"><a class="header" href="#usage-29">Usage</a></h4>
+<pre><code>cranko show cranko-version-doi
+</code></pre>
+<h4 id="remarks-6"><a class="header" href="#remarks-6">Remarks</a></h4>
+<p>Each release of Cranko should have a unique version number as well as a unique
+version DOI. While most DOIs resolve to scholarly publications, Cranko version
+DOIs “resolve” to a specific release of Cranko, logged with associated metadata
+and digital artifacts. If you wish to record the exact version of Cranko that
+you used in a workflow in the context of a scholarly citation system, use this
+DOI.</p>
+<h2 id="cranko-show-if-released"><a class="header" href="#cranko-show-if-released"><code>cranko show if-released</code></a></h2>
+<p>This command prints whether a project was just released. It expects to be run on
+a CI system with the <code>release</code> branch checked out, after the build has succeeded
+and <a href="commands/util/"><code>cranko release-workflow commit</code></a>../cicd/release-workflow-commit.md) has
+been invoked.</p>
+<h4 id="usage-30"><a class="header" href="#usage-30">Usage</a></h4>
+<pre><code>cranko show if-released [--exit-code] [--tf] {PROJECT_NAME}
+</code></pre>
+<p>Different arguments activate different modes by which the program will indicate
+whether the named project was just released.</p>
+<ul>
+<li><code>--exit-code</code>: the program will exit with a success exit code (0 on Unix-like
+systems) if the project <em>was</em> released. It will exit with an error exit code
+(1 on Unix-like systems) if the project <em>was not</em> released.</li>
+<li><code>--tf</code>: the program will print out the word <code>true</code> if the project <em>was</em>
+released. It print out the word <code>false</code> if the project <em>was not</em> released.</li>
+</ul>
+<p>At least one such mechanism must be activated.</p>
+<h4 id="example-17"><a class="header" href="#example-17">Example</a></h4>
+<pre><code class="language-shell">$ cranko show if-released --tf myproject
+false
+</code></pre>
+<h2 id="cranko-show-tctag"><a class="header" href="#cranko-show-tctag"><code>cranko show tctag</code></a></h2>
+<p>This command prints out a <code>thiscommit:</code> tag that includes the current date and
+some random characters, for easy copy-pasting into Cranko internal-dependency
+lines.</p>
+<h4 id="usage-31"><a class="header" href="#usage-31">Usage</a></h4>
+<pre><code>cranko show tctag
+</code></pre>
+<h4 id="example-18"><a class="header" href="#example-18">Example</a></h4>
+<pre><code class="language-shell">$ cranko show tctag
+thiscommit:2021-06-03:NmEuWn3
+</code></pre>
+<h2 id="cranko-show-toposort"><a class="header" href="#cranko-show-toposort"><code>cranko show toposort</code></a></h2>
+<p>This command prints out the names of the projects in the repository, one per
+line, in topologically-sorted order according to
+<a href="commands/util/../../concepts/internal-dependencies.html">internal dependencies</a>. That is,
+the name of a project is only printed after the names of all of its dependencies
+in the repo have already been printed. Because dependency cycles are prohibited,
+this is always possible. The exact ordering may not be stable, even from one
+invocation to the next.</p>
+<h4 id="usage-32"><a class="header" href="#usage-32">Usage</a></h4>
+<pre><code>cranko show toposort
+</code></pre>
+<h4 id="example-19"><a class="header" href="#example-19">Example</a></h4>
+<pre><code class="language-shell">$ cranko show toposort
+tectonic_errors
+tectonic_status_base
+tectonic_io_base
+tectonic_engine_xetex
+tectonic
+</code></pre>
+<h2 id="cranko-show-version"><a class="header" href="#cranko-show-version"><code>cranko show version</code></a></h2>
+<p>This command prints out the version assigned to a project.</p>
+<h4 id="usage-33"><a class="header" href="#usage-33">Usage</a></h4>
+<pre><code>cranko show version {PROJECT_NAME}
+</code></pre>
+<h4 id="example-20"><a class="header" href="#example-20">Example</a></h4>
+<pre><code class="language-shell">$ cranko show version foo_lib
+0.1.17
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+    </div>
+    </body>
+</html>

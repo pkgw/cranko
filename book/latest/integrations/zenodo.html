@@ -1,0 +1,368 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Zenodo - The Cranko Manual</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="A manual for the Cranko release automation tool.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../index.html">Overview</a></li><li class="chapter-item expanded "><a href="../installation/index.html"><strong aria-hidden="true">1.</strong> Installation</a></li><li class="chapter-item expanded "><a href="../getting-started/index.html"><strong aria-hidden="true">2.</strong> Getting Started</a></li><li class="chapter-item expanded "><a href="../jit-versioning/index.html"><strong aria-hidden="true">3.</strong> Just-in-Time Versioning</a></li><li class="chapter-item expanded "><div><strong aria-hidden="true">4.</strong> Workflows</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../workflows-bootstrap/index.html"><strong aria-hidden="true">4.1.</strong> Bootstrapping</a></li><li class="chapter-item expanded "><a href="../workflows-dev/index.html"><strong aria-hidden="true">4.2.</strong> Everyday Development</a></li><li class="chapter-item expanded "><a href="../workflows-cicd/index.html"><strong aria-hidden="true">4.3.</strong> CI/CD</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Integrations</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../integrations/azure-pipelines.html"><strong aria-hidden="true">5.1.</strong> Azure Pipelines</a></li><li class="chapter-item expanded "><a href="../integrations/python.html"><strong aria-hidden="true">5.2.</strong> Python</a></li><li class="chapter-item expanded "><a href="../integrations/csproj.html"><strong aria-hidden="true">5.3.</strong> Visual Studio C# Projects</a></li><li class="chapter-item expanded "><a href="../integrations/zenodo.html" class="active"><strong aria-hidden="true">5.4.</strong> Zenodo</a></li></ol></li><li class="chapter-item expanded "><li class="part-title">Reference Material</li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.</strong> Concepts</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../concepts/internal-dependencies.html"><strong aria-hidden="true">6.1.</strong> Internal Dependencies</a></li><li class="chapter-item expanded "><a href="../concepts/projects.html"><strong aria-hidden="true">6.2.</strong> Projects</a></li><li class="chapter-item expanded "><a href="../concepts/releases.html"><strong aria-hidden="true">6.3.</strong> Releases</a></li><li class="chapter-item expanded "><a href="../concepts/versions.html"><strong aria-hidden="true">6.4.</strong> Versions</a></li></ol></li><li class="chapter-item expanded "><a href="../configuration/index.html"><strong aria-hidden="true">7.</strong> Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../configuration/zenodo.html"><strong aria-hidden="true">7.1.</strong> Zenodo Metadata Files</a></li></ol></li><li class="chapter-item expanded "><li class="part-title">CLI Commands</li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Developer Commands</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../commands/dev/bootstrap.html"><strong aria-hidden="true">8.1.</strong> cranko bootstrap</a></li><li class="chapter-item expanded "><a href="../commands/dev/confirm.html"><strong aria-hidden="true">8.2.</strong> cranko confirm</a></li><li class="chapter-item expanded "><a href="../commands/dev/diff.html"><strong aria-hidden="true">8.3.</strong> cranko diff</a></li><li class="chapter-item expanded "><a href="../commands/dev/log.html"><strong aria-hidden="true">8.4.</strong> cranko log</a></li><li class="chapter-item expanded "><a href="../commands/dev/stage.html"><strong aria-hidden="true">8.5.</strong> cranko stage</a></li><li class="chapter-item expanded "><a href="../commands/dev/status.html"><strong aria-hidden="true">8.6.</strong> cranko status</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">9.</strong> CI/CD Commands</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../commands/cicd/cargo-foreach-released.html"><strong aria-hidden="true">9.1.</strong> cranko cargo foreach-released</a></li><li class="chapter-item expanded "><a href="../commands/cicd/cargo-package-released-binaries.html"><strong aria-hidden="true">9.2.</strong> cranko cargo package-released-binaries</a></li><li class="chapter-item expanded "><a href="../commands/cicd/ci-util-env-to-file.html"><strong aria-hidden="true">9.3.</strong> cranko ci-util env-to-file</a></li><li class="chapter-item expanded "><a href="../commands/cicd/github-create-custom-release.html"><strong aria-hidden="true">9.4.</strong> cranko github create-custom-release</a></li><li class="chapter-item expanded "><a href="../commands/cicd/github-create-releases.html"><strong aria-hidden="true">9.5.</strong> cranko github create-releases</a></li><li class="chapter-item expanded "><a href="../commands/cicd/github-delete-release.html"><strong aria-hidden="true">9.6.</strong> cranko github delete-release</a></li><li class="chapter-item expanded "><a href="../commands/cicd/github-install-credential-helper.html"><strong aria-hidden="true">9.7.</strong> cranko github install-credential-helper</a></li><li class="chapter-item expanded "><a href="../commands/cicd/github-upload-artifacts.html"><strong aria-hidden="true">9.8.</strong> cranko github upload-artifacts</a></li><li class="chapter-item expanded "><a href="../commands/cicd/npm-foreach-released.html"><strong aria-hidden="true">9.9.</strong> cranko npm foreach-released</a></li><li class="chapter-item expanded "><a href="../commands/cicd/npm-install-token.html"><strong aria-hidden="true">9.10.</strong> cranko npm install-token</a></li><li class="chapter-item expanded "><a href="../commands/cicd/npm-lerna-workaround.html"><strong aria-hidden="true">9.11.</strong> cranko npm lerna-workaround</a></li><li class="chapter-item expanded "><a href="../commands/cicd/python-foreach-released.html"><strong aria-hidden="true">9.12.</strong> cranko python foreach-released</a></li><li class="chapter-item expanded "><a href="../commands/cicd/python-install-token.html"><strong aria-hidden="true">9.13.</strong> cranko python install-token</a></li><li class="chapter-item expanded "><a href="../commands/cicd/release-workflow-apply-versions.html"><strong aria-hidden="true">9.14.</strong> cranko release-workflow apply-versions</a></li><li class="chapter-item expanded "><a href="../commands/cicd/release-workflow-commit.html"><strong aria-hidden="true">9.15.</strong> cranko release-workflow commit</a></li><li class="chapter-item expanded "><a href="../commands/cicd/release-workflow-tag.html"><strong aria-hidden="true">9.16.</strong> cranko release-workflow tag</a></li><li class="chapter-item expanded "><a href="../commands/cicd/zenodo-preregister.html"><strong aria-hidden="true">9.17.</strong> cranko zenodo preregister</a></li><li class="chapter-item expanded "><a href="../commands/cicd/zenodo-publish.html"><strong aria-hidden="true">9.18.</strong> cranko zenodo publish</a></li><li class="chapter-item expanded "><a href="../commands/cicd/zenodo-upload-artifacts.html"><strong aria-hidden="true">9.19.</strong> cranko zenodo upload-artifacts</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">10.</strong> Utility Commands</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../commands/util/git-util-reboot-branch.html"><strong aria-hidden="true">10.1.</strong> cranko git-util reboot-branch</a></li><li class="chapter-item expanded "><a href="../commands/util/help.html"><strong aria-hidden="true">10.2.</strong> cranko help</a></li><li class="chapter-item expanded "><a href="../commands/util/list-commands.html"><strong aria-hidden="true">10.3.</strong> cranko list-commands</a></li><li class="chapter-item expanded "><a href="../commands/util/show.html"><strong aria-hidden="true">10.4.</strong> cranko show</a></li></ol></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">The Cranko Manual</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/pkgw/cranko" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="integrations-zenodo"><a class="header" href="#integrations-zenodo">Integrations: Zenodo</a></h1>
+<p>Cranko supports safe, automatic software <a href="https://www.doi.org/">DOI</a> registration through the <a href="https://zenodo.org/">Zenodo</a>
+service operated by <a href="https://home.cern/">CERN</a> in collaboration with other scientific organizations.</p>
+<h2 id="orientation-software-dois"><a class="header" href="#orientation-software-dois">Orientation: Software DOIs</a></h2>
+<p>While most people think of DOIs as associated with scholarly publications, more
+and more DOIs are being associated with other forms of digital academic output.
+And, of course, software is more and more becoming an important form of digital
+academic output! While it is beyond the scope of this documentation to explain
+software DOIs in depth, it is worth mentioning the distinction between a
+<em>version DOI</em> and a <em>concept DOI</em>.</p>
+<p>Version DOIs are perhaps more familiar. Just like each release of a software
+package is assigned a unique version number, each release of a software package
+can be assigned a unique DOI corresponding to that version. If you want to know
+which specific version of a piece of software that someone was using, either
+the exact version number or the exact version DOI will tell you that.</p>
+<p>If all you care about is knowing what software someone was running, then version
+DOIs don't add anything new that version numbers don't already provide. However,
+unlike version numbers, DOIs are first-class items in the scholarly publishing
+information ecosystem. When you give software a DOI, it can be integrated into
+that ecosystem in way that isn't possible otherwise. Probably the most important
+aspect of this is that software DOIs can be associated with author lists and
+<a href="https://orcid.org/">ORCID iDs</a> using standard scholarly metadata systems, so
+that researchers can get personal credit when their software is used and cited!</p>
+<p>Because we want to be able to know exactly what piece of code a person was
+running, we absolutely want to create a new DOI for each release of a software
+package. But if that package has a whole bunch of releases, we have a whole
+bunch of different DOIs, which is going to make it really tedious to quantify
+the usage of the package overall. This is where concept DOIs come in. Concept
+DOIs don’t really carry any information on their own, but they can be used in
+the DOI metadata framework to link together different releases of the same
+software package in a machine-understandable way. While the DOI
+<a href="https://doi.org/10.5281/zenodo.6963051">10.5281/zenodo.6963051</a> is a machine-usable way to talk about “version 4.21.1
+of the <a href="https://huggingface.co/transformers">transformers</a>” package, the concept DOI <a href="https://doi.org/10.5281/zenodo.3385997">10.5281/zenodo.3385997</a> is a
+machine-usable way to refer to the thing that is “the transformers package”
+overall.</p>
+<h2 id="workflow-overview"><a class="header" href="#workflow-overview">Workflow Overview</a></h2>
+<p>Cranko’s support for Zenodo “deposition” involves a multi-stage process. It
+follows the principles of the <a href="../jit-versioning/index.html">just-in-time versioning approach</a> where
+release metadata only ever appear in tested release artifacts.</p>
+<ul>
+<li>During the beginning of CI/CD processing, a new Zenodo deposit is
+<a href="../commands/cicd/zenodo-preregister.html">preregistered</a>, and the DOIs that <em>will be</em> created are obtained.
+These can be inserted into the source files of your software, so that it can
+print out its own DOI. This step can be run during pull-request processing:
+but instead of doing anything with the Zenodo API, fake DOIs are generated and
+used.</li>
+<li>Once CI/CD tests have all passed, you can <a href="../commands/cicd/zenodo-upload-artifacts.html">upload artifacts</a> if so
+desired, then actually <a href="../commands/cicd/zenodo-publish.html">publish</a> the release. Zenodo will actually register
+the DOIs.</li>
+<li>Because Zenodo deposits are associated with version numbers, each deposit
+process is associated with a specific cranko <a href="../concepts/projects.html">project</a>. In a monorepo
+scenario, you can run multiple deposits for multiple projects as you see fit.</li>
+</ul>
+<h2 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h2>
+<p>To start using the Zenodo integration, you need to create a <a href="../configuration/zenodo.html">Zenodo metadata
+file</a> somewhere in your repository. This file is traditionally called
+<code>zenodo.json5</code> and can be stored anywhere you feel like.</p>
+<p>While you should see the <a href="../configuration/zenodo.html">Zenodo Metadata Files</a> page for the full
+details of the file format, the short version is that it has two main fields.
+The first, <code>"metadata"</code>, contains the metadata that will describe your Zenodo
+deposition. See <a href="https://developers.zenodo.org/#deposit-metadata">the Zenodo developer documentation</a> for a precise
+definition of all of the fields that can be used here, or check out <a href="https://github.com/pkgw/cranko/blob/master/ci/zenodo.json5">Cranko’s
+own version of the file</a> for inspiration. <em>The contents of this file
+are things you need to decide for yourself,</em> including, most importantly, the
+author list that you want to associate with your project.</p>
+<p>The second field, <code>"conceptrecid"</code>, will be used to ensure that successive
+releases of your project are all tied together with the same concept DOI. When
+creating the first Zenodo release of your software, you should set this to the
+special value <code>"new-for:$version"</code>, where <code>$version</code> is the planned next version
+of the project being released. For instance, you might put <code>"new-for:0.12.0"</code> at
+first. If the preregistration process runs for a <em>different</em> version, it will
+error out. This precaution helps make sure that you don’t forget to update your
+metadata file once the concept DOI has been created.</p>
+<p>If you're using a monorepo, you can make as many Zenodo releases as you like
+during CI processing. Just run the relevant commands as many times as needed,
+and create a different Zenodo configuration file for each project that gets
+assigned DOIs.</p>
+<h2 id="rewrites"><a class="header" href="#rewrites">Rewrites</a></h2>
+<p>The <a href="../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a> command can insert the DOIs that <em>will
+be</em> registered into your source code. You can use this functionality to create
+software releases that <em>know their own DOIs</em>.</p>
+<p>We suggest that you include commands in your software to print out these DOIs,
+along the lines of <a href="../commands/util/show.html#cranko-show-cranko-version-doi"><code>cranko show cranko-version-doi</code></a> and <a href="../commands/util/show.html#cranko-show-cranko-concept-doi"><code>cranko show cranko-concept-doi</code></a>. This way, there is an easy way for users to get the
+precise DOIs relating to the software that they're running. You might also want
+to insert these DOIs into logs or metadata associated with the files that your
+software creates, although in many cases the version number is going to be more
+understandable to users.</p>
+<p>This insertion happens during the <a href="../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a> command,
+which will rewrite any files whose paths you pass to it on the command line.
+The following rewrite rules are followed:</p>
+<ul>
+<li>The text <code>xx.xxxx/dev-build.$project.version</code>, where <code>$project</code> is the name of
+the Cranko project being released, is replaced with the version DOI. To be
+explicit, for Cranko itself the template to be replaced would be
+<code>xx.xxxx/dev-build.cranko.version</code>.</li>
+<li>The text <code>xx.xxxx/dev-build.$project.concept</code>, where <code>$project</code> is the name of
+the Cranko project being released, is replaced with the concept DOI.</li>
+</ul>
+<p>If you’re feeling extra-clever, you can include these templates in your
+<code>CHANGELOG.md</code> entry, and your final changelog will include the DOIs of the
+release that it describes. (If you do this, you’ll need to pass the path to
+<code>CHANGELOG.md</code> as an argument to <a href="../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a>.)</p>
+<p>If you’re building out of source control, these replacements won't happen, of
+course. If a pull request or other non-release build is being processed, or if
+you’re in a monorepo and the package in question isn’t being released, fake DOIs
+with similar forms will be substituted in. You can add checks in your code to
+see whether the DOIs start with the universal DOI prefix, <code>"10."</code>, to know
+whether your DOIs are real or fake.</p>
+<h2 id="cicd-workflow"><a class="header" href="#cicd-workflow">CI/CD Workflow</a></h2>
+<p>Zenodo publication operations require you to have a <a href="https://developers.zenodo.org/">Zenodo API token</a>,
+which you can create in the <a href="https://zenodo.org/account/settings/applications/tokens/new/">Zenodo Account Tokens page</a>. You need to get
+this token into the environment variable <code>ZENODO_TOKEN</code> for the Zenodo workflow
+to work.</p>
+<p>The <a href="../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a> command(s) should be run at the
+beginning of your CI/CD workflow, before <a href="./release-workflow-commit.html"><code>cranko release-workflow commit</code></a>. As
+described above, the command inserts placeholders for non-release builds, so you
+can run it in all of your workflows without worrying about needing to detect
+whether the current build is for a project release. If you’re using a monorepo
+with multiple projects that get Zenodo deposits, run the command as many times
+as needed. After all invocations are done, you should <code>git add</code> your modified
+files to make sure they get included in the release commit.</p>
+<p>At the end of your CI/CD workflow, if you are actually making real releases, you
+should run <a href="../commands/cicd/zenodo-upload-artifacts.html"><code>cranko zenodo upload-artifacts</code></a> as needed, then finally
+<a href="../commands/cicd/zenodo-publish.html"><code>cranko zenodo publish</code></a> to publish your new deposits. Once again, in
+a monorepo scenario, these commands should be run as many times as needed — with
+filters in place to only execute them if the projects in question have actually
+been released. This can be accomplished with <a href="../commands/util/show.html#cranko-show-if-released"><code>cranko show if-released --exit-code</code></a>.</p>
+<h2 id="continued-releases"><a class="header" href="#continued-releases">Continued Releases</a></h2>
+<p>After your first successful Zenodo deposit, you should update your
+<code>zenodo.json5</code> file and replace the special <code>"conceptrecid"</code> field with the
+Zenodo record ID corresponding to the “concept” of your software package. This
+is easily findable in the concept DOI, and is also printed by
+<a href="../commands/cicd/zenodo-preregister.html"><code>cranko zenodo preregister</code></a>.</p>
+<p>Going forward, you should review the <code>zenodo.json5</code> file periodically and update
+as needed — in particular, you should be attentive to the author list. As with
+any academic product, the choice of who goes on an author list, and what order
+that list is in, is not something that can be automated — you have to decide how
+you want to handle it.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../integrations/csproj.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../concepts/internal-dependencies.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../integrations/csproj.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../concepts/internal-dependencies.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>
