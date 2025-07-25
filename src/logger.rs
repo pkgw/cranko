@@ -89,9 +89,9 @@ impl Logger {
             let _r = inner.stderr.set_color(&LOGGER.error_cspec);
             let _r = write!(&mut inner.stderr, "caused by:");
             let _r = inner.stderr.reset();
-            let _r = writeln!(&mut inner.stderr, " {}", err);
+            let _r = writeln!(&mut inner.stderr, " {err}");
         } else {
-            eprintln!("caused by: {}", err);
+            eprintln!("caused by: {err}");
         }
     }
 
@@ -99,7 +99,7 @@ impl Logger {
         let msg = msg.to_string();
         let mut first = true;
 
-        for line in textwrap::wrap_iter(&msg, get_wrap_width() - 6) {
+        for line in textwrap::wrap(&msg, get_wrap_width() - 6) {
             if first {
                 first = false;
 
@@ -107,12 +107,12 @@ impl Logger {
                     let _r = inner.stderr.set_color(&LOGGER.error_cspec);
                     let _r = write!(&mut inner.stderr, "note:");
                     let _r = inner.stderr.reset();
-                    let _r = writeln!(&mut inner.stderr, " {}", line);
+                    let _r = writeln!(&mut inner.stderr, " {line}");
                 } else {
-                    eprintln!("note: {}", line);
+                    eprintln!("note: {line}");
                 }
             } else {
-                eprintln!("      {}", line);
+                eprintln!("      {line}");
             }
         }
     }
@@ -123,13 +123,13 @@ impl Logger {
         after: T3,
     ) {
         if let Ok(mut inner) = LOGGER.inner.write() {
-            let _r = write!(&mut inner.stdout, "{}", before);
+            let _r = write!(&mut inner.stdout, "{before}");
             let _r = inner.stdout.set_color(&LOGGER.highlight_cspec);
-            let _r = write!(&mut inner.stdout, "{}", highlight);
+            let _r = write!(&mut inner.stdout, "{highlight}");
             let _r = inner.stdout.reset();
-            let _r = writeln!(&mut inner.stdout, "{}", after);
+            let _r = writeln!(&mut inner.stdout, "{after}");
         } else {
-            println!("{}{}{}", before, highlight, after);
+            println!("{before}{highlight}{after}");
         }
     }
 }

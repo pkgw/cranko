@@ -255,9 +255,9 @@ impl Rewriter for PackageJsonRewriter {
                         // that we can't add an upper "<1" constraint too.
                         let v = v.to_string();
                         if v.starts_with("0.") {
-                            format!("{}{}>={}", protocol, sep, v)
+                            format!("{protocol}{sep}>={v}")
                         } else {
-                            format!("{}{}^{}", protocol, sep, v)
+                            format!("{protocol}{sep}^{v}")
                         }
                     } else {
                         continue;
@@ -359,7 +359,7 @@ impl Rewriter for PackageJsonRewriter {
 
             let spec = match &dep.cranko_requirement {
                 DepRequirement::Commit(cid) => cid.to_string(),
-                DepRequirement::Manual(t) => format!("manual:{}", t),
+                DepRequirement::Manual(t) => format!("manual:{t}"),
                 DepRequirement::Unavailable => continue,
             };
 
@@ -504,7 +504,7 @@ impl Command for InstallTokenCommand {
             p.push(".yarnrc.yml");
 
             let mut file = atry!(
-                OpenOptions::new().write(true).create(true).append(true).open(&p);
+                OpenOptions::new().create(true).append(true).open(&p);
                 ["failed to open file `{}` for appending", p.display()]
             );
 
@@ -528,7 +528,7 @@ impl Command for InstallTokenCommand {
             p.push(".npmrc");
 
             let mut file = atry!(
-                OpenOptions::new().write(true).create(true).append(true).open(&p);
+                OpenOptions::new().create(true).append(true).open(&p);
                 ["failed to open file `{}` for appending", p.display()]
             );
 

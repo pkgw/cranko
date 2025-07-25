@@ -1,4 +1,14 @@
-# rc: minor bump
+# rc: micro bump
+
+- Fix the downloader script for machines that identify as arm64 (#52, #53, @CraftSpider)
+- Various general dependency updates (@pkgw)
+
+The DOI of this release is [xx.xxxx/dev-build.cranko.version][vdoi].
+
+[vdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+
+
+# cranko 0.16.0 (2023-12-14)
 
 - Update to work with Zenodo after their [October 2023
   upgrade](https://blog.zenodo.org/2023/10/19/2023-10-19-upgrade-issues/) (#48,
@@ -7,9 +17,9 @@
 - General dependency updates, including a fix for a weird class seen only in
   recent release builds (#49, @pkgw).
 
-The DOI of this release is [xx.xxxx/dev-build.cranko.version][vdoi].
+The DOI of this release is [10.5281/zenodo.10382647][vdoi].
 
-[vdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+[vdoi]: https://doi.org/10.5281/zenodo.10382647
 
 
 # cranko 0.15.0 (2022-11-30)

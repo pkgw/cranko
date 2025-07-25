@@ -186,7 +186,7 @@ impl MarkdownChangelog {
                     let message = sess.repo.get_commit_summary(*cid)?;
                     let mut prefix = "- ";
 
-                    for line in textwrap::wrap_iter(&message, WRAP_WIDTH) {
+                    for line in textwrap::wrap(&message, WRAP_WIDTH) {
                         write_crlf!(new_f, "{}{}", prefix, line)?;
                         prefix = "  ";
                     }
