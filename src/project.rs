@@ -148,8 +148,8 @@ pub enum DepRequirement {
 impl std::fmt::Display for DepRequirement {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            DepRequirement::Commit(cid) => write!(f, "{} (commit)", cid),
-            DepRequirement::Manual(t) => write!(f, "{} (manual)", t),
+            DepRequirement::Commit(cid) => write!(f, "{cid} (commit)"),
+            DepRequirement::Manual(t) => write!(f, "{t} (manual)"),
             DepRequirement::Unavailable => write!(f, "(unavailable)"),
         }
     }

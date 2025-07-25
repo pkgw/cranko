@@ -16,13 +16,13 @@
     ],
     "language": "eng",
     "license": "MIT",
-    "publication_date": "2023-12-14",
-    "title": "cranko 0.16.0",
+    "publication_date": "2025-07-25",
+    "title": "cranko 0.16.1",
     "upload_type": "software",
-    "version": "0.16.0"
+    "version": "0.16.1"
   },
   "conceptdoi": "10.5281/zenodo.6981679",
-  "record_id": "10382647",
-  "doi": "10.5281/zenodo.10382647",
-  "bucket_link": "https://zenodo.org/api/files/1e8db89c-b45f-4509-8391-0dc0231f6d5f"
+  "record_id": "16416428",
+  "doi": "10.5281/zenodo.16416428",
+  "bucket_link": "https://zenodo.org/api/files/5e32f243-ce83-41ad-b0fa-7e235ee2a557"
 }

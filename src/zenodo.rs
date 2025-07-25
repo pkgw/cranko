@@ -54,7 +54,7 @@ impl ZenodoService {
     }
 
     fn api_url(&self, rest: &str) -> String {
-        format!("https://zenodo.org/api/{}", rest)
+        format!("https://zenodo.org/api/{rest}")
     }
 }
 
@@ -387,7 +387,7 @@ impl<'a> ZenodoWorkflow<'a> {
             serde_json::to_string(&md.metadata);
             ["failed to serialize Zenodo metadata to JSON"]
         );
-        let body = format!("{{\"metadata\":{}}}", md_body);
+        let body = format!("{{\"metadata\":{md_body}}}");
 
         // Send the request.
 
@@ -758,7 +758,7 @@ impl Command for PublishCommand {
             serde_json::to_string(&md.metadata);
             ["failed to serialize Zenodo metadata to JSON"]
         );
-        let body = format!("{{\"metadata\":{}}}", md_body);
+        let body = format!("{{\"metadata\":{md_body}}}");
 
         let url = svc.api_url(&format!("deposit/depositions/{}", &md.version_rec_id));
         let resp = client

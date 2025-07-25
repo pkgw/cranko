@@ -32,9 +32,9 @@ pub enum Version {
 impl Display for Version {
     fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
         match self {
-            Version::Semver(ref v) => write!(f, "{}", v),
-            Version::Pep440(ref v) => write!(f, "{}", v),
-            Version::DotNet(ref v) => write!(f, "{}", v),
+            Version::Semver(ref v) => write!(f, "{v}"),
+            Version::Pep440(ref v) => write!(f, "{v}"),
+            Version::DotNet(ref v) => write!(f, "{v}"),
         }
     }
 }
@@ -65,11 +65,8 @@ impl Version {
                 v.major = 0;
                 v.minor = 0;
                 v.patch = 0;
-                v.pre.clear();
-                v.pre
-                    .push(semver::Identifier::AlphaNumeric("dev".to_string()));
-                v.pre.push(semver::Identifier::Numeric(0));
-                v.build.clear();
+                v.pre = semver::Prerelease::new("dev.0").unwrap();
+                v.build = semver::BuildMetadata::EMPTY;
             }
 
             Version::Pep440(v) => {
@@ -172,7 +169,7 @@ impl VersionBumpScheme {
             match version {
                 Version::Semver(v) => {
                     let code = format!("{:04}{:02}{:02}", local.year(), local.month(), local.day());
-                    v.build.push(semver::Identifier::AlphaNumeric(code));
+                    v.build = semver::BuildMetadata::new(&code).unwrap();
                 }
 
                 Version::Pep440(v) => {
@@ -200,8 +197,8 @@ impl VersionBumpScheme {
         fn apply_micro_bump(version: &mut Version) -> Result<()> {
             match version {
                 Version::Semver(v) => {
-                    v.pre.clear();
-                    v.build.clear();
+                    v.pre = semver::Prerelease::EMPTY;
+                    v.build = semver::BuildMetadata::EMPTY;
                     v.patch += 1;
                 }
 
@@ -232,8 +229,8 @@ impl VersionBumpScheme {
         fn apply_minor_bump(version: &mut Version) -> Result<()> {
             match version {
                 Version::Semver(v) => {
-                    v.pre.clear();
-                    v.build.clear();
+                    v.pre = semver::Prerelease::EMPTY;
+                    v.build = semver::BuildMetadata::EMPTY;
                     v.patch = 0;
                     v.minor += 1;
                 }
@@ -267,8 +264,8 @@ impl VersionBumpScheme {
         fn apply_major_bump(version: &mut Version) -> Result<()> {
             match version {
                 Version::Semver(v) => {
-                    v.pre.clear();
-                    v.build.clear();
+                    v.pre = semver::Prerelease::EMPTY;
+                    v.build = semver::BuildMetadata::EMPTY;
                     v.patch = 0;
                     v.minor = 0;
                     v.major += 1;
@@ -466,8 +463,7 @@ mod pep440 {
                 };
 
             Ok(format!(
-                "({}, {}, {}, '{}', {})",
-                major, minor, micro, pre_code, pre_serial
+                "({major}, {minor}, {micro}, '{pre_code}', {pre_serial})"
             ))
         }
     }
@@ -494,23 +490,23 @@ mod pep440 {
             write!(f, "{}", self.segments[0])?;
 
             for more in &self.segments[1..] {
-                write!(f, ".{}", more)?;
+                write!(f, ".{more}")?;
             }
 
             if let Some(ref p) = self.pre_release {
-                write!(f, ".{}", p)?;
+                write!(f, ".{p}")?;
             }
 
             if let Some(n) = self.post_release {
-                write!(f, ".post{}", n)?;
+                write!(f, ".post{n}")?;
             }
 
             if let Some(n) = self.dev_release {
-                write!(f, ".dev{}", n)?;
+                write!(f, ".dev{n}")?;
             }
 
             if let Some(ref l) = self.local_identifier {
-                write!(f, "+{}", l)?;
+                write!(f, "+{l}")?;
             }
 
             Ok(())
@@ -520,9 +516,9 @@ mod pep440 {
     impl Display for Pep440Prerelease {
         fn fmt(&self, f: &mut Formatter) -> std::result::Result<(), std::fmt::Error> {
             match self {
-                Pep440Prerelease::Alpha(n) => write!(f, "a{}", n),
-                Pep440Prerelease::Beta(n) => write!(f, "b{}", n),
-                Pep440Prerelease::Rc(n) => write!(f, "rc{}", n),
+                Pep440Prerelease::Alpha(n) => write!(f, "a{n}"),
+                Pep440Prerelease::Beta(n) => write!(f, "b{n}"),
+                Pep440Prerelease::Rc(n) => write!(f, "rc{n}"),
             }
         }
     }

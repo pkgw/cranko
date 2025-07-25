@@ -839,8 +839,8 @@ impl Repository {
         // efficient. (I haven't done any testing to see how much the caching
         // helps, though ...)
 
-        let mut commit_data = lru::LruCache::new(512);
-        let mut trees = lru::LruCache::new(3);
+        let mut commit_data = lru::LruCache::new(std::num::NonZeroUsize::new(512).unwrap());
+        let mut trees = lru::LruCache::new(std::num::NonZeroUsize::new(3).unwrap());
 
         let mut dopts = git2::DiffOptions::new();
         dopts.include_typechange(true);
@@ -1374,6 +1374,7 @@ pub struct ReleasedProjectInfo {
 #[derive(Clone, Debug, Default)]
 pub struct RcCommitInfo {
     /// The Git commit-ish that this object describes.
+    #[allow(dead_code)]
     pub commit: Option<CommitId>,
 
     /// A list of projects and their "rc" information as of this commit. This
@@ -1454,11 +1455,11 @@ impl RepoHistory {
 
         let release_commit = repo.repo.find_commit(rcid.0)?;
         let rc_commit = a_ok_or!(
-            release_commit.parents().last();
+            release_commit.parents().next_back();
             ["release commit has no parents?"]
         );
         let main_commit = a_ok_or!(
-            rc_commit.parents().last();
+            rc_commit.parents().next_back();
             ["rc commit has no parents?"]
         );
 
@@ -1622,7 +1623,7 @@ impl RepoPath {
         // include the separating items, which we want.
         let basename = self.0.rsplit(|c| *c == b'/').next().unwrap();
         let ndir = self.0.len() - basename.len();
-        return (self.0[..ndir].as_ref(), basename.as_ref());
+        (self.0[..ndir].as_ref(), basename.as_ref())
     }
 
     /// Return this path with a trailing directory separator removed, if one is

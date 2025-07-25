@@ -41,7 +41,10 @@ steps:
 
 # Main build, and test if we can
 
-- bash: ./cross build $CROSS_ARGS --all
+# 2024 Feb: the `-j1` seems needed to prevent some kind of `make` concurrency
+# issue when building vendored openssl:
+# "make: *** read jobs pipe: Resource temporarily unavailable.  Stop."
+- bash: ./cross build -j1 $CROSS_ARGS --all
   displayName: "cross build"
 
 - ${{ if parameters.qemuAndTest }}:

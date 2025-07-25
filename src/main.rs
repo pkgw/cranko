@@ -9,6 +9,7 @@
 //! Heavily modeled on Cargo's implementation of the same sort of functionality.
 
 use anyhow::{anyhow, bail, Context};
+use base64::prelude::*;
 use log::{info, warn};
 use std::{
     collections::BTreeSet,
@@ -158,7 +159,7 @@ fn main() {
     let opts = CrankoOptions::from_args();
 
     if let Err(e) = logger::Logger::init() {
-        eprintln!("error: cannot initialize logging backend: {}", e);
+        eprintln!("error: cannot initialize logging backend: {e}");
         process::exit(1);
     }
     log::set_max_level(log::LevelFilter::Info);
@@ -275,7 +276,7 @@ impl Command for CiUtilEnvToFileCommand {
         let b = match self.decode_mode {
             EnvDecodingMode::Text => value.into_bytes(),
 
-            EnvDecodingMode::Base64 => base64::decode(&value).with_context(|| {
+            EnvDecodingMode::Base64 => BASE64_STANDARD.decode(&value).with_context(|| {
                 format!(
                     "failed to decode value of environment variable `{}` as BASE64",
                     self.var_name.to_string_lossy()
@@ -378,7 +379,7 @@ impl Command for ConfirmCommand {
                         DepRequirement::Commit(_) => {
                             format!(">= {}", dep.resolved_version.as_ref().unwrap())
                         }
-                        DepRequirement::Manual(t) => format!("{} (manual)", t),
+                        DepRequirement::Manual(t) => format!("{t} (manual)"),
                         DepRequirement::Unavailable => {
                             "** version requirement unavailable **".to_owned()
                         }
@@ -502,7 +503,7 @@ impl Command for ListCommandsCommand {
         println!("Currently available \"cranko\" subcommands:\n");
 
         for command in list_commands() {
-            println!("    {}", command);
+            println!("    {command}");
         }
 
         Ok(0)
@@ -738,13 +739,13 @@ struct ShowCrankoVersionDoiCommand {}
 impl Command for ShowCrankoVersionDoiCommand {
     fn execute(self) -> Result<i32> {
         // For releases, this will be rewritten to the real DOI:
-        let doi = "10.5281/zenodo.10382647";
+        let doi = "10.5281/zenodo.16416428";
 
         if doi.starts_with("xx.") {
             warn!("you are running a development build; the printed value is not a real DOI");
         }
 
-        println!("{}", doi);
+        println!("{doi}");
         Ok(0)
     }
 }
@@ -761,7 +762,7 @@ impl Command for ShowCrankoConceptDoiCommand {
             warn!("you are running a development build; the printed value is not a real DOI");
         }
 
-        println!("{}", doi);
+        println!("{doi}");
         Ok(0)
     }
 }

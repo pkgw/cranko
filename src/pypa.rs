@@ -605,7 +605,7 @@ impl Rewriter for PythonRewriter {
 
                 DepRequirement::Commit(_) => {
                     if let Some(ref v) = dep.resolved_version {
-                        format!("^{}", v)
+                        format!("^{v}")
                     } else {
                         continue;
                     }
@@ -825,7 +825,7 @@ impl Command for InstallTokenCommand {
         p.push(".pypirc");
 
         let mut file = atry!(
-            OpenOptions::new().write(true).create(true).append(true).open(&p);
+            OpenOptions::new().create(true).append(true).open(&p);
             ["failed to open file `{}` for appending", p.display()]
         );
 

@@ -1,3 +1,13 @@
+# cranko 0.16.1 (2025-07-25)
+
+- Fix the downloader script for machines that identify as arm64 (#52, #53, @CraftSpider)
+- Various general dependency updates (@pkgw)
+
+The DOI of this release is [10.5281/zenodo.16416428][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.16416428
+
+
 # cranko 0.16.0 (2023-12-14)
 
 - Update to work with Zenodo after their [October 2023
