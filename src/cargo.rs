@@ -18,7 +18,7 @@ use std::{
     process, thread, time,
 };
 use structopt::StructOpt;
-use toml_edit::{Document, Item, Table};
+use toml_edit::{DocumentMut, Item, Table};
 
 use super::Command;
 
@@ -225,7 +225,7 @@ impl Rewriter for CargoRewriter {
             let mut f = File::open(&toml_path)?;
             f.read_to_string(&mut s)?;
         }
-        let mut doc: Document = s.parse()?;
+        let mut doc: DocumentMut = s.parse()?;
 
         // Helper table for applying internal deps. Note that we use the 0'th
         // qname, not the user-facing name, since that is what is used in
@@ -371,7 +371,7 @@ impl Rewriter for CargoRewriter {
             let mut f = File::open(&toml_path)?;
             f.read_to_string(&mut s)?;
         }
-        let mut doc: Document = s.parse()?;
+        let mut doc: DocumentMut = s.parse()?;
 
         // Modify.
 

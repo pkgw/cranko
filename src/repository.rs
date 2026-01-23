@@ -564,11 +564,11 @@ impl Repository {
         })
     }
 
-    fn get_signature(&self) -> Result<git2::Signature> {
+    fn get_signature(&self) -> Result<git2::Signature<'_>> {
         Ok(git2::Signature::now("cranko", "cranko@devnull")?)
     }
 
-    fn try_get_release_commit(&self) -> Result<Option<git2::Commit>> {
+    fn try_get_release_commit(&self) -> Result<Option<git2::Commit<'_>>> {
         let release_ref = match self.repo.resolve_reference_from_short_name(&format!(
             "{}/{}",
             self.upstream_name, self.upstream_release_name
@@ -587,7 +587,7 @@ impl Repository {
         Ok(Some(release_ref.peel_to_commit()?))
     }
 
-    fn try_get_rc_commit(&self) -> Result<Option<git2::Commit>> {
+    fn try_get_rc_commit(&self) -> Result<Option<git2::Commit<'_>>> {
         let rc_ref = match self.repo.resolve_reference_from_short_name(&format!(
             "{}/{}",
             self.upstream_name, self.upstream_rc_name
