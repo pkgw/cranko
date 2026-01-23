@@ -104,7 +104,7 @@ impl CargoLoader {
             let manifest_repopath = app.repo.convert_path(&pkg.manifest_path)?;
             let (prefix, _) = manifest_repopath.split_basename();
 
-            let qnames = vec![pkg.name.to_owned(), "cargo".to_owned()];
+            let qnames = vec![pkg.name.to_string(), "cargo".to_owned()];
 
             if let Some(ident) = app.graph.try_add_project(qnames, pconfig) {
                 let proj = app.graph.lookup_mut(ident);
@@ -707,7 +707,7 @@ impl BinaryArchiveMode {
         let mut zip = zip::ZipWriter::new(out_file);
         zip.set_comment("Created by Cranko");
 
-        let options = zip::write::FileOptions::default().unix_permissions(0o755);
+        let options = zip::write::FileOptions::<'_, ()>::default().unix_permissions(0o755);
 
         for bin in binaries {
             let name = bin
