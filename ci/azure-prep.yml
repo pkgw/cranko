@@ -32,6 +32,7 @@ jobs:
     displayName: "cargo build (bootstrap)"
 
   - bash: |
+      env ; echo ; echo ; echo
       cargo run --release -- release-workflow apply-versions
     displayName: "cranko release-workflow apply-versions (bootstrap)"
 

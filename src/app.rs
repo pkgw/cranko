@@ -38,7 +38,14 @@ impl AppBuilder {
     pub fn new() -> Result<AppBuilder> {
         let repo = Repository::open_from_env()?;
         let graph = ProjectGraphBuilder::new();
+
+        eprintln!(
+            "QQQ CI: {:?}, {:?}",
+            ci_env::is_ci(),
+            ci_env::detect_provider()
+        );
         let ci_env = ci_env::get_environment();
+        eprintln!("RRR CI: {:?}", ci_env);
 
         Ok(AppBuilder {
             graph,
