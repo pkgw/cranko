@@ -9,6 +9,7 @@
   - [CI/CD](workflows-cicd/index.md)
 - [Integrations]()
   - [Azure Pipelines](integrations/azure-pipelines.md)
+  - [Generic Projects](integrations/generic-projects.md)
   - [Python](integrations/python.md)
   - [Visual Studio C# Projects](integrations/csproj.md)
   - [Zenodo](integrations/zenodo.md)
