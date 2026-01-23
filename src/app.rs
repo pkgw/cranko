@@ -26,7 +26,7 @@ pub struct AppBuilder {
     pub repo: Repository,
     pub graph: ProjectGraphBuilder,
 
-    ci_info: ci_info::types::CiInfo,
+    ci_env: Option<ci_env::CiEnvironment>,
     populate_graph: bool,
 }
 
@@ -38,12 +38,12 @@ impl AppBuilder {
     pub fn new() -> Result<AppBuilder> {
         let repo = Repository::open_from_env()?;
         let graph = ProjectGraphBuilder::new();
-        let ci_info = ci_info::get();
+        let ci_env = ci_env::get_environment();
 
         Ok(AppBuilder {
             graph,
             repo,
-            ci_info,
+            ci_env,
             populate_graph: true,
         })
     }
@@ -120,7 +120,7 @@ impl AppBuilder {
             repo: self.repo,
             graph,
             npm_config: config.npm,
-            ci_info: self.ci_info,
+            ci_env: self.ci_env,
         })
     }
 }
@@ -144,7 +144,7 @@ pub struct AppSession {
     graph: ProjectGraph,
 
     /// Information about the CI environment that we may be running in.
-    ci_info: ci_info::types::CiInfo,
+    ci_env: Option<ci_env::CiEnvironment>,
 }
 
 impl AppSession {
@@ -156,78 +156,114 @@ impl AppSession {
     /// Characterize the repository environment in which this process is
     /// running.
     pub fn execution_environment(&self) -> Result<ExecutionEnvironment> {
-        if !self.ci_info.ci {
-            Ok(ExecutionEnvironment::NotCi)
-        } else {
-            let maybe_pr = self.ci_info.pr;
-            let maybe_ci_branch = self.ci_info.branch_name.as_ref().map(|s| s.as_ref());
-            let rc_name = self.repo.upstream_rc_name();
-            let release_name = self.repo.upstream_release_name();
+        // We use ci_env from rust-cicd-env which distinguishes between CI and
+        // CD environments, but it appears that we can treat everything as CI.
 
-            if maybe_ci_branch.is_none() {
-                warn!("cannot determine the triggering branch name in this CI environment");
-                warn!("... this will affect many workflow safety checks")
-            }
+        let Some(ci_env) = self.ci_env.as_ref() else {
+            return Ok(ExecutionEnvironment::NotCi);
+        };
 
-            if let Some(true) = maybe_pr {
-                if maybe_ci_branch == Some(rc_name) {
-                    warn!("cranko seems to be running in a pull request to the `{}` branch; this is not recommended", rc_name);
+        // The source branch of a PR, or the branch being updated in a non-PR
+        // situation.
+        let current_branch: &str = ci_env.branch.as_ref();
+
+        // If this is a PR-type situation, this is the target branch of the PR.
+        let maybe_target_branch: Option<&str> = ci_env.base_branch.as_ref().map(|s| s.as_ref());
+
+        let rc_name = self.repo.upstream_rc_name();
+        let release_name = self.repo.upstream_release_name();
+        let mut is_rc_update = false;
+
+        match maybe_target_branch {
+            None => {
+                // We know that we're in CI, so we might as well log generously
+                info!(
+                    "detected {:?} CI/CD environment, push mode: branch {}",
+                    ci_env.provider, current_branch,
+                );
+
+                // Non-PR scenario, i.e. just an update/push of some branch. In
+                // this case, we know that we should *not* be running on the
+                // release branch (no CI should run at all; it should be
+                // passive), but anything else could be fine.
+
+                if current_branch == release_name {
+                    warn!("cranko seems to be running in an update to the `{}` branch; this is not recommended", release_name);
                     warn!("... treating as a non-CI environment for safety");
                     return Ok(ExecutionEnvironment::NotCi);
                 }
 
-                if maybe_ci_branch == Some(release_name) {
-                    warn!("cranko seems to be running in a pull request to the `{}` branch; this is not recommended", release_name);
+                if current_branch == rc_name {
+                    is_rc_update = true;
+                }
+            }
+
+            Some(b) => {
+                info!(
+                    "detected {:?} CI/CD environment, PR mode: source branch {}, target branch {}",
+                    ci_env.provider, current_branch, b
+                );
+
+                // PR case. Special branches should only receive direct updates,
+                // so check that.
+
+                if b == rc_name || b == release_name {
+                    warn!("cranko seems to be running in a pull request to the `{}` branch; this is not recommended", b);
                     warn!("... treating as a non-CI environment for safety");
                     return Ok(ExecutionEnvironment::NotCi);
                 }
             }
-
-            if maybe_ci_branch == Some(release_name) {
-                warn!("cranko seems to be running in an update to the `{}` branch; this is not recommended", release_name);
-                warn!("... treating as a non-CI environment for safety");
-                return Ok(ExecutionEnvironment::NotCi);
-            }
-
-            // Gather some useful parameters ... Note: on Azure Pipelines, the
-            // initial checkout is in detached-HEAD state, so on pushes to the
-            // `rc` branch we can't determine `current_branch`. It would be kind
-            // of tedious to force all Azure users to manually check out the RC
-            // branch, so if we can parse out the RC info, let's assume that's
-            // what's going on.
-
-            let is_rc_update = maybe_ci_branch == Some(rc_name);
-            let current_is_release = self
-                .repo
-                .current_branch_name()?
-                .as_ref()
-                .map(|s| s.as_ref())
-                == Some(release_name);
-
-            // If the current branch is called `release`, we insist that we can
-            // parse release info from HEAD. We must be in dev mode (due to PR,
-            // or dev branch update) unless we have been triggered by an update to
-            // the `rc` branch.
-
-            if current_is_release {
-                let rel_info = self.repo.parse_release_info_from_head()?;
-                let dev_mode = !is_rc_update;
-                return Ok(ExecutionEnvironment::CiReleaseMode(dev_mode, rel_info));
-            }
-
-            // Otherwise, we must be in RC mode. If we're an update to the `rc`
-            // branch, we are *not* in dev mode and we insist that we can parse
-            // actual RC info from HEAD. Otherwise, we are in dev mode and we
-            // fake an RC request for all projects.
-
-            let (dev_mode, rc_info) = if is_rc_update {
-                (false, self.repo.parse_rc_info_from_head()?)
-            } else {
-                (true, self.default_dev_rc_info())
-            };
-
-            Ok(ExecutionEnvironment::CiRcMode(dev_mode, rc_info))
         }
+
+        // Is the currently checked-out branch known to be `release`? Although
+        // Cranko should not run during updates to the release branch, it is a
+        // common pattern for both CI and CD processing to make a commit to the
+        // `release` branch and then check that branch out, so this might be the
+        // situation independent of what the CI environment is telling us. (It's
+        // just that, in most situations, this update to the release branch will
+        // be discarded at the end of processing. Commits to the release branch
+        // will only see the light of day if we're doing actual release
+        // processing.)
+        //
+        // Note that on Azure Pipelines, the initial Git checkout is in
+        // detached-HEAD state, so we can't determine the name of the current
+        // branch of the repo *at the start of CI processing*. But anything
+        // involving release updates will explicitly check out that branch, so
+        // this approach still works.
+
+        let current_is_release = self
+            .repo
+            .current_branch_name()?
+            .as_ref()
+            .map(|s| s.as_ref())
+            == Some(release_name);
+
+        // Well, if the current branch is known to be called `release`, we
+        // insist that we can parse release info from HEAD. We must be in dev
+        // mode **unless** we have been triggered by an update to the `rc`
+        // branch.
+
+        if current_is_release {
+            let rel_info = self.repo.parse_release_info_from_head()?;
+            let dev_mode = !is_rc_update;
+            return Ok(ExecutionEnvironment::CiReleaseMode(dev_mode, rel_info));
+        }
+
+        // Otherwise, we must be in RC mode -- either a release has been
+        // requested but a release commit hasn't yet been made, or this is
+        // something like an update to `main` or a pull request, where we'll
+        // synthesize dev versions. If the former (an update to the `rc`
+        // branch), we are *not* in dev mode and we insist that we can parse
+        // actual RC info from HEAD. Otherwise, we are in dev mode and we fake
+        // an RC request for all projects.
+
+        let (dev_mode, rc_info) = if is_rc_update {
+            (false, self.repo.parse_rc_info_from_head()?)
+        } else {
+            (true, self.default_dev_rc_info())
+        };
+
+        Ok(ExecutionEnvironment::CiRcMode(dev_mode, rc_info))
     }
 
     /// Check that the current process is running *outside* of a CI environment.
