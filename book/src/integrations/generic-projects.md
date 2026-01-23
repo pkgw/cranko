@@ -44,7 +44,7 @@ file in the repository named in the `files` list (relative to the
 the Cranko-managed project version. In the example above, a line looking like:
 
 ```
-This is myproject version {dev}.
+This is myproject version <dev>.
 ```
 
 will become something like
