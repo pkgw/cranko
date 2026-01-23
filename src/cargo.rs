@@ -18,7 +18,7 @@ use std::{
     process, thread, time,
 };
 use structopt::StructOpt;
-use toml_edit::{Document, Item, Table};
+use toml_edit::{DocumentMut, Item, Table};
 
 use super::Command;
 
@@ -104,7 +104,7 @@ impl CargoLoader {
             let manifest_repopath = app.repo.convert_path(&pkg.manifest_path)?;
             let (prefix, _) = manifest_repopath.split_basename();
 
-            let qnames = vec![pkg.name.to_owned(), "cargo".to_owned()];
+            let qnames = vec![pkg.name.to_string(), "cargo".to_owned()];
 
             if let Some(ident) = app.graph.try_add_project(qnames, pconfig) {
                 let proj = app.graph.lookup_mut(ident);
@@ -225,7 +225,7 @@ impl Rewriter for CargoRewriter {
             let mut f = File::open(&toml_path)?;
             f.read_to_string(&mut s)?;
         }
-        let mut doc: Document = s.parse()?;
+        let mut doc: DocumentMut = s.parse()?;
 
         // Helper table for applying internal deps. Note that we use the 0'th
         // qname, not the user-facing name, since that is what is used in
@@ -371,7 +371,7 @@ impl Rewriter for CargoRewriter {
             let mut f = File::open(&toml_path)?;
             f.read_to_string(&mut s)?;
         }
-        let mut doc: Document = s.parse()?;
+        let mut doc: DocumentMut = s.parse()?;
 
         // Modify.
 
@@ -707,7 +707,7 @@ impl BinaryArchiveMode {
         let mut zip = zip::ZipWriter::new(out_file);
         zip.set_comment("Created by Cranko");
 
-        let options = zip::write::FileOptions::default().unix_permissions(0o755);
+        let options = zip::write::FileOptions::<'_, ()>::default().unix_permissions(0o755);
 
         for bin in binaries {
             let name = bin

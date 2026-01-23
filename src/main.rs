@@ -30,6 +30,7 @@ mod config;
 mod csproj;
 mod env;
 mod errors;
+mod generic;
 mod github;
 mod gitutil;
 mod graph;
@@ -739,7 +740,7 @@ struct ShowCrankoVersionDoiCommand {}
 impl Command for ShowCrankoVersionDoiCommand {
     fn execute(self) -> Result<i32> {
         // For releases, this will be rewritten to the real DOI:
-        let doi = "10.5281/zenodo.16416428";
+        let doi = "10.5281/zenodo.18345170";
 
         if doi.starts_with("xx.") {
             warn!("you are running a development build; the printed value is not a real DOI");

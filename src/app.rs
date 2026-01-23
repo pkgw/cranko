@@ -80,6 +80,7 @@ impl AppBuilder {
             let mut csproj = crate::csproj::CsProjLoader::default();
             let mut npm = crate::npm::NpmLoader::default();
             let mut pypa = crate::pypa::PypaLoader::default();
+            let mut generic = crate::generic::GenericLoader::default();
 
             // Dumb hack around the borrowchecker to allow mutable reference to
             // the graph while iterating over the repo:
@@ -92,6 +93,7 @@ impl AppBuilder {
                 csproj.process_index_item(&repo, p, dirname, basename)?;
                 npm.process_index_item(&repo, &mut graph, p, dirname, basename, &proj_config)?;
                 pypa.process_index_item(dirname, basename);
+                generic.process_index_item(dirname, basename)?;
                 Ok(())
             })?;
 
@@ -103,6 +105,7 @@ impl AppBuilder {
             csproj.finalize(&mut self, &proj_config)?;
             npm.finalize(&mut self)?;
             pypa.finalize(&mut self, &proj_config)?;
+            generic.finalize(&mut self, &proj_config)?;
         }
 
         // Apply project config and compile the graph.

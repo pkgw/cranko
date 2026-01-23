@@ -3,9 +3,8 @@ title = "The Cranko Manual"
 authors = ["Peter K. G. Williams"]
 description = "A manual for the Cranko release automation tool."
 language = "en"
-multilingual = false
 src = "src"
 
 [output.html]
 git-repository-url = "https://github.com/pkgw/cranko"
-git-repository-icon = "fa-github"
+git-repository-icon = "fab-github"
