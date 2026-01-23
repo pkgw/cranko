@@ -56,7 +56,7 @@ impl PypaLoader {
         pconfig: &HashMap<String, ProjectConfiguration>,
     ) -> Result<()> {
         if self.dirs_of_interest.len() > 1 {
-            warn!("multiple Python projects detected. Internal interdependenciess are not yet supported.")
+            warn!("multiple Python projects detected. Internal interdependencies are not yet supported.")
         }
 
         for dirname in &self.dirs_of_interest {

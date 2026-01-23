@@ -30,6 +30,7 @@ mod config;
 mod csproj;
 mod env;
 mod errors;
+mod generic;
 mod github;
 mod gitutil;
 mod graph;
