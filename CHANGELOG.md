@@ -1,3 +1,13 @@
+# cranko 0.17.2 (2026-01-24)
+
+- The new support for generic projects didn't actually fully work. Now it does,
+  hopefully (#57, @pkgw). Avoid using previous releases in the 0.17.x series.
+
+The DOI of this release is [10.5281/zenodo.18358028][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.18358028
+
+
 # cranko 0.17.1 (2026-01-24)
 
 - Switch to a patched version of the [`ci_info`] crate in an attempt to fix
