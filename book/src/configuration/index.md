@@ -54,13 +54,13 @@ This field is a string specifying how the names of Git tags corresponding to
 releases will be constructed. The default is `{project_slug}@{version}`.
 
 Values are interpolated using a standard curly-brace substitution scheme (as
-implemented by the `curly` module of the [dynfmt] crate). Available input
+implemented by the `curly` module of the [dynfmt2] crate). Available input
 variables are:
 
 - `project_slug`: the “user facing name” of the released project
 - `version`: the stringification of the version of the released project
 
-[dynfmt]: https://github.com/jan-auer/dynfmt
+[dynfmt2]: https://github.com/dathere/dynfmt2
 
 #### The `upstream_urls` field
 

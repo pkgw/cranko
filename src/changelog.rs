@@ -9,7 +9,7 @@
 //! release(s). That's exactly the information contained in a release changelog.
 
 use chrono::{offset::Local, Datelike};
-use dynfmt::{Format, SimpleCurlyFormat};
+use dynfmt2::{Format, SimpleCurlyFormat};
 use std::{
     collections::HashMap,
     fs::File,
