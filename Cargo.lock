@@ -218,8 +218,7 @@ dependencies = [
 [[package]]
 name = "ci_info"
 version = "0.14.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d502ead02cc105c33a87aa76817cdca915a7576b59caba5eeb4e7abdd633f23"
+source = "git+https://github.com/pkgw/ci_info?branch=github-fix#9b7c628cb40b53ff3298396ec17a05d5c0bdcd3f"
 dependencies = [
  "envmnt",
 ]

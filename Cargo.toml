@@ -57,6 +57,7 @@ zip = { version = "^7", default-features = false, features = [
 
 # https://github.com/jan-auer/dynfmt/pull/9
 [patch.crates-io]
+ci_info = { git = "https://github.com/pkgw/ci_info", branch = "github-fix" }
 dynfmt = { git = "https://github.com/jqnatividad/dynfmt", branch = "2021-clippy_ptr_as_ptr-bumpdeps" }
 
 [features]
