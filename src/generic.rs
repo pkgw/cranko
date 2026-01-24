@@ -12,8 +12,9 @@ use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
     fs::File,
-    io::{BufRead, BufReader, Read},
+    io::{BufRead, BufReader, Read, Write},
 };
+use toml_edit::DocumentMut;
 
 use crate::{
     app::{AppBuilder, AppSession},
@@ -52,9 +53,9 @@ impl GenericLoader {
         for dirname in self.dirs_of_interest.drain() {
             let mut toml_repopath = dirname.clone();
             toml_repopath.push("CrankoProject.toml");
+            let toml_path = app.repo.resolve_workdir(&toml_repopath);
 
             let mut config: GenericProjectFile = {
-                let toml_path = app.repo.resolve_workdir(&toml_repopath);
                 let mut f = atry!(
                     File::open(&toml_path);
                     ["failed to open file `{}`", toml_path.display()]
@@ -72,6 +73,18 @@ impl GenericLoader {
                 )
             };
 
+            // If we've already applied versions, the TOML file will include
+            // a version specification.
+
+            let this_semver = if let Some(text) = &config.version {
+                atry!(
+                    semver::Version::parse(text);
+                    ["could not parse semver version `{}` in `{}`", text, toml_path.display()]
+                )
+            } else {
+                semver::Version::new(0, 0, 0)
+            };
+
             // Registering is easy
 
             let qnames = vec![config.name.to_owned(), "generic".to_owned()];
@@ -79,7 +92,7 @@ impl GenericLoader {
             if let Some(ident) = app.graph.try_add_project(qnames, pconfig) {
                 let proj = app.graph.lookup_mut(ident);
                 proj.prefix = Some(dirname.to_owned());
-                proj.version = Some(Version::Semver(semver::Version::new(0, 0, 0)));
+                proj.version = Some(Version::Semver(this_semver));
 
                 for spec in config.rewrite.drain(..) {
                     let rewrite = GenericRewriter::new(ident, dirname.to_owned(), spec);
@@ -97,6 +110,7 @@ impl GenericLoader {
 #[derive(Debug, Deserialize)]
 struct GenericProjectFile {
     pub name: String,
+    pub version: Option<String>,
     pub rewrite: Vec<GenericRewriteSpec>,
 }
 
@@ -129,6 +143,30 @@ impl Rewriter for GenericRewriter {
     fn rewrite(&self, app: &AppSession, changes: &mut ChangeList) -> Result<()> {
         let proj = app.graph().lookup(self.proj_id);
         let version = proj.version.to_string();
+
+        // Rewrite the project file to embed the version
+
+        let mut repo_path = self.proj_root.clone();
+        repo_path.push("CrankoProject.toml");
+        let toml_path = app.repo.resolve_workdir(&repo_path);
+
+        let mut s = String::new();
+        {
+            let mut f = File::open(&toml_path)?;
+            f.read_to_string(&mut s)?;
+        }
+        let mut doc: DocumentMut = s.parse()?;
+
+        let proj_root = doc.as_table_mut();
+        proj_root["version"] = toml_edit::value(proj.version.to_string());
+
+        {
+            let mut f = File::create(&toml_path)?;
+            write!(f, "{doc}")?;
+            changes.add_path(&repo_path);
+        }
+
+        // Now do the files specced in the project file
 
         for rel_path in &self.spec.files {
             let mut did_anything = false;

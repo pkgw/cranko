@@ -1,12 +1,22 @@
 # rc: micro bump
 
-- Switch to a patched version of the [`ci_info`] crate in an attempt to fix
-  branch detection on GitHub Actions, which is pretty important for Cranko to
-  work at all (#56, @pkgw).
+- The new support for generic projects didn't actually fully work. Now it does,
+  hopefully (#57, @pkgw). Avoid using previous releases in the 0.17.x series.
 
 The DOI of this release is [xx.xxxx/dev-build.cranko.version][vdoi].
 
 [vdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+
+
+# cranko 0.17.1 (2026-01-24)
+
+- Switch to a patched version of the [`ci_info`] crate in an attempt to fix
+  branch detection on GitHub Actions, which is pretty important for Cranko to
+  work at all (#56, @pkgw).
+
+The DOI of this release is [10.5281/zenodo.18357208][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.18357208
 
 
 # cranko 0.17.0 (2026-01-23)
