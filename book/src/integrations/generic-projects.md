@@ -20,6 +20,7 @@ The format of the `CrankoProject.toml` file is as per this example:
 
 ```toml
 name = "project-name"
+# after versions are applied, a `version = "1.2.3"` entry will be added.
 
 [[rewrite]]
 version_placeholder = "<dev>"
