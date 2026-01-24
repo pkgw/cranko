@@ -1,3 +1,14 @@
+# cranko 0.17.1 (2026-01-24)
+
+- Switch to a patched version of the [`ci_info`] crate in an attempt to fix
+  branch detection on GitHub Actions, which is pretty important for Cranko to
+  work at all (#56, @pkgw).
+
+The DOI of this release is [10.5281/zenodo.18357208][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.18357208
+
+
 # cranko 0.17.0 (2026-01-23)
 
 - Add support for "generic" projects, detected via the existence of a

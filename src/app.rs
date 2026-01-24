@@ -164,6 +164,29 @@ impl AppSession {
             let rc_name = self.repo.upstream_rc_name();
             let release_name = self.repo.upstream_release_name();
 
+            // Since we're running in CI, might as well log generously
+            let ci_vendor_desc = self
+                .ci_info
+                .vendor
+                .map(|v| format!("{:?}", v))
+                .unwrap_or_else(|| "Unknown".to_owned());
+            let ci_build_type = maybe_pr
+                .map(|is_pr| {
+                    if is_pr {
+                        "pull request"
+                    } else {
+                        "branch update"
+                    }
+                })
+                .unwrap_or("unknown type");
+            let ci_branch_desc = maybe_ci_branch
+                .map(|b| format!("`{b}`"))
+                .unwrap_or_else(|| "unknown".to_owned());
+
+            info!(
+                "{ci_vendor_desc} CI environment detected, {ci_build_type} build, source branch {ci_branch_desc}"
+            );
+
             if maybe_ci_branch.is_none() {
                 warn!("cannot determine the triggering branch name in this CI environment");
                 warn!("... this will affect many workflow safety checks")

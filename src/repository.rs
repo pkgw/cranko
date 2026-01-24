@@ -4,7 +4,7 @@
 //! State of the backing version control repository.
 
 use anyhow::{anyhow, bail};
-use dynfmt::{Format, SimpleCurlyFormat};
+use dynfmt2::{Format, SimpleCurlyFormat};
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -81,7 +81,7 @@ pub struct Repository {
     upstream_release_name: String,
 
     /// The format specification to use for release tag names, as understood by
-    /// the `SimpleCurlyFormat` of the `dynfmt` crate.
+    /// the `SimpleCurlyFormat` of the `dynfmt2` crate.
     release_tag_name_format: String,
 
     /// "Bootstrap" versioning information used to tell us where versions were at
