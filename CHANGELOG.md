@@ -1,11 +1,21 @@
 # rc: micro bump
 
-- The new support for generic projects didn't actually fully work. Now it does,
-  hopefully (#57, @pkgw). Avoid using previous releases in the 0.17.x series.
+- In Rust projects, fix rewriting inside `target.'cfg(...)'.dependencies`
+  blocks (#58, #59, @CraftSpider).
 
 The DOI of this release is [xx.xxxx/dev-build.cranko.version][vdoi].
 
 [vdoi]: https://doi.org/xx.xxxx/dev-build.cranko.version
+
+
+# cranko 0.17.2 (2026-01-24)
+
+- The new support for generic projects didn't actually fully work. Now it does,
+  hopefully (#57, @pkgw). Avoid using previous releases in the 0.17.x series.
+
+The DOI of this release is [10.5281/zenodo.18358028][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.18358028
 
 
 # cranko 0.17.1 (2026-01-24)
