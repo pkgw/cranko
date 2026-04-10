@@ -279,7 +279,10 @@ impl Rewriter for CargoRewriter {
             // main tables and a nested table of potential target-specific
             // tables.
 
-            for tblname in &["dependencies", "dev-dependencies", "build-dependencies"] {
+            const TABLE_NAMES: &[&str] =
+                &["dependencies", "dev-dependencies", "build-dependencies"];
+
+            for tblname in TABLE_NAMES {
                 if let Some(tbl) = ct_root.get_mut(tblname).and_then(|i| i.as_table_mut()) {
                     rewrite_deptable(&internal_reqs, tbl)?;
                 }
@@ -288,17 +291,15 @@ impl Rewriter for CargoRewriter {
             if let Some(ct_target) = ct_root.get_mut("target").and_then(|i| i.as_table_mut()) {
                 // As far as I can tell, no way to iterate over the table while mutating
                 // its values?
-                let target_specs = ct_target
-                    .iter()
-                    .map(|(k, _v)| k.to_owned())
-                    .collect::<Vec<_>>();
-
-                for target_spec in &target_specs[..] {
-                    if let Some(tbl) = ct_target
-                        .get_mut(target_spec)
-                        .and_then(|i| i.as_table_mut())
-                    {
-                        rewrite_deptable(&internal_reqs, tbl)?;
+                for (_, tbl) in ct_target.iter_mut() {
+                    if let Some(cfg_table) = tbl.as_table_mut() {
+                        for tblname in TABLE_NAMES {
+                            if let Some(tbl) =
+                                cfg_table.get_mut(tblname).and_then(|i| i.as_table_mut())
+                            {
+                                rewrite_deptable(&internal_reqs, tbl)?;
+                            }
+                        }
                     }
                 }
             }

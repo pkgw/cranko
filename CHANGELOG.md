@@ -1,3 +1,13 @@
+# cranko 0.17.3 (2026-04-10)
+
+- In Rust projects, fix rewriting inside `target.'cfg(...)'.dependencies`
+  blocks (#58, #59, @CraftSpider).
+
+The DOI of this release is [10.5281/zenodo.19499931][vdoi].
+
+[vdoi]: https://doi.org/10.5281/zenodo.19499931
+
+
 # cranko 0.17.2 (2026-01-24)
 
 - The new support for generic projects didn't actually fully work. Now it does,
